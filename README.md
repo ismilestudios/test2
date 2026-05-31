@@ -89,3 +89,12 @@ If the live Vercel site still shows Craig Elementary / Skano / Bell Top placehol
 ## Latest data import
 
 This package includes the real September, October, and November 2025 schedule imports. The app reads from `lib/scheduleData.js`; Vercel redeploys after pushing these files to GitHub.
+
+
+## April 2026 careful import
+
+This build adds April 2026 from the uploaded April schedule PDF, including school/account master-list additions where missing. School-facing events after February are treated as Spring Picture Day unless they are clearly seniors, sports, rain dates, meetings, headshots, photo booth, or special events.
+
+
+## March 2026 careful import
+Added March 2026 schedule data from School Schedule MASTER COPY - March 2026.pdf, including March school events, Spring Picture Day classification after February, non-school event preservation, April 1-3 spillover items, and missing school/account additions to the master list.
