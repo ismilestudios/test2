@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS } from '../lib/scheduleData';
 
-const tabs = ['Planning Board', 'Month View', 'Week View', 'Day View'];
+const tabs = ['Planning Board', 'Month View', 'Week View', 'Day View', 'Carrie View'];
 
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
@@ -88,7 +88,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
                 className="w-full rounded-2xl border border-zinc-200 bg-white/80 py-3 pl-10 pr-4 text-sm outline-none ring-sage/30 transition focus:ring-4"
               />
             </label>
-            <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <nav className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {tabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
@@ -171,6 +171,124 @@ function DayView({ events, onClick, month }) {
   const entries = Object.entries(grouped);
   if (!entries.length) return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">No events scheduled for {monthLabel(month)} yet.</div>;
   return <div className="space-y-4">{entries.map(([date, dayEvents]) => <div key={date} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">{formatDate(date)}</h2><div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div></div>)}</div>;
+}
+
+
+function getFall2025SchoolsToSchedule() {
+  const scheduled2026 = new Set(
+    EVENTS.filter(event => event.date.startsWith('2026-') && event.type === 'Fall Picture Day' && event.canonicalSchool)
+      .map(event => event.canonicalSchool)
+  );
+
+  const map = new Map();
+  EVENTS.filter(event =>
+    event.date >= '2025-09-01' &&
+    event.date <= '2025-11-30' &&
+    event.type === 'Fall Picture Day' &&
+    event.canonicalSchool &&
+    !scheduled2026.has(event.canonicalSchool)
+  ).forEach(event => {
+    const existing = map.get(event.canonicalSchool);
+    if (!existing || event.date < existing.firstDate) existing.firstDate = event.date;
+    if (!existing || event.date > existing.lastDate) {
+      map.set(event.canonicalSchool, {
+        school: event.canonicalSchool,
+        lastYearTitle: event.title,
+        firstDate: existing?.firstDate || event.date,
+        lastDate: event.date,
+        irm: event.irm || existing?.irm || '',
+        photographers: event.photographers,
+        assistants: event.assistants,
+        notes: event.notes
+      });
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) => a.school.localeCompare(b.school));
+}
+
+function getFall2026Availability() {
+  const dates = [];
+  const start = new Date('2026-09-01T12:00:00');
+  const end = new Date('2026-11-30T12:00:00');
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const day = d.getDay();
+    if (day === 0 || day === 6) continue;
+    const key = d.toISOString().slice(0, 10);
+    const scheduled = EVENTS.filter(event => event.date === key);
+    const bookedPhotographers = new Set(scheduled.flatMap(event => event.photographers || []));
+    const availablePhotographers = PHOTOGRAPHERS.filter(name => !bookedPhotographers.has(name));
+    dates.push({
+      date: key,
+      scheduledCount: scheduled.length,
+      availablePhotographers,
+      scheduled
+    });
+  }
+  return dates;
+}
+
+function CarrieView({ query }) {
+  const schools = useMemo(() => getFall2025SchoolsToSchedule(), []);
+  const availability = useMemo(() => getFall2026Availability(), []);
+  const q = query.trim().toLowerCase();
+  const filteredSchools = q
+    ? schools.filter(item => [item.school, item.lastYearTitle, item.notes, ...(item.photographers || []), ...(item.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
+    : schools;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
+      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-950">Carrie View</h2>
+            <p className="mt-1 text-sm text-zinc-600">Fall 2025 schools that still need to be scheduled for Fall 2026.</p>
+          </div>
+          <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} schools</Pill>
+        </div>
+        <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
+          {filteredSchools.map(item => (
+            <div key={item.school} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-zinc-950">{item.school}</div>
+                  <div className="mt-1 text-xs text-zinc-500">2025 reference: {formatDate(item.lastDate)}</div>
+                </div>
+                {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
+              </div>
+              <div className="mt-2 text-xs text-zinc-600">{item.lastYearTitle}</div>
+              <div className="mt-2 grid gap-2 text-xs text-zinc-600 sm:grid-cols-2">
+                <div><span className="font-semibold text-zinc-700">2025 photogs:</span> {item.photographers?.length ? item.photographers.join(', ') : '—'}</div>
+                <div><span className="font-semibold text-zinc-700">2025 assistants:</span> {item.assistants?.length ? item.assistants.join(', ') : '—'}</div>
+              </div>
+              {item.notes ? <div className="mt-2 line-clamp-2 text-xs text-zinc-500">{item.notes}</div> : null}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
+          <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Empty means nothing has been scheduled yet.</p>
+        </div>
+        <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
+          {availability.map(day => (
+            <div key={day.date} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-zinc-900">{formatDate(day.date)}</div>
+                  <div className="mt-1 text-xs text-zinc-500">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
+                </div>
+                <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photogs open</Pill>
+              </div>
+              <div className="mt-2 text-xs text-zinc-600">Available: {day.availablePhotographers.join(', ') || '—'}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function Drawer({ event, onClose }) {
