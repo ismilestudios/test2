@@ -1,6 +1,6 @@
 # iSmile Scheduler
 
-Internal September + October 2025 prototype for iSmile Studios.
+Internal September + October + November 2025 prototype for iSmile Studios.
 
 ## What this is
 
@@ -88,4 +88,4 @@ If the live Vercel site still shows Craig Elementary / Skano / Bell Top placehol
 
 ## Latest data import
 
-This package includes the real September 2025 data plus the October 2025 schedule PDF import. The app reads from `lib/scheduleData.js`; Vercel redeploys after pushing these files to GitHub.
+This package includes the real September, October, and November 2025 schedule imports. The app reads from `lib/scheduleData.js`; Vercel redeploys after pushing these files to GitHub.
