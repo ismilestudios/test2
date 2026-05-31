@@ -12,7 +12,7 @@ function Pill({ children, className = '' }) {
 }
 
 function monthKey(date) {
-  return date.slice(0, 7);
+  return typeof date === 'string' && date.length >= 7 ? date.slice(0, 7) : '';
 }
 
 function monthLabel(key) {
@@ -156,18 +156,18 @@ function PlanningBoard({ events, onClick }) {
 function MonthView({ events, month, onClick }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e.date === date); return <div key={date} className="min-h-[132px] rounded-2xl border border-zinc-200 bg-cream/80 p-2"><div className="mb-2 text-xs font-semibold text-zinc-500">{day}</div><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
+  return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className="min-h-[132px] rounded-2xl border border-zinc-200 bg-cream/80 p-2"><div className="mb-2 text-xs font-semibold text-zinc-500">{day}</div><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
 
 function WeekView({ events, month, onClick }) {
   const totalDays = daysInMonth(month);
   const weeks = [];
   for (let day = 1; day <= totalDays; day += 7) weeks.push(Array.from({ length: Math.min(7, totalDays - day + 1) }, (_, i) => day + i));
-  return <div className="space-y-4">{weeks.map((week, idx) => <div key={idx} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">Week of {monthLabel(month).split(' ')[0]} {week[0]}, {month.split('-')[0]}</h2><div className="grid gap-3 md:grid-cols-7">{week.map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e.date === date); return <div key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-3"><div className="mb-2 text-xs font-semibold text-zinc-500">{monthLabel(month).slice(0,3)} {day}</div><div className="space-y-2">{dayEvents.length ? dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} compact />) : <div className="text-xs text-zinc-400">No scheduled items</div>}</div></div>})}</div></div>)}</div>;
+  return <div className="space-y-4">{weeks.map((week, idx) => <div key={idx} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">Week of {monthLabel(month).split(' ')[0]} {week[0]}, {month.split('-')[0]}</h2><div className="grid gap-3 md:grid-cols-7">{week.map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-3"><div className="mb-2 text-xs font-semibold text-zinc-500">{monthLabel(month).slice(0,3)} {day}</div><div className="space-y-2">{dayEvents.length ? dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} compact />) : <div className="text-xs text-zinc-400">No scheduled items</div>}</div></div>})}</div></div>)}</div>;
 }
 
 function DayView({ events, onClick, month }) {
-  const grouped = events.reduce((acc, event) => { acc[event.date] ||= []; acc[event.date].push(event); return acc; }, {});
+  const grouped = events.filter(event => event && event.date).reduce((acc, event) => { acc[event.date] ||= []; acc[event.date].push(event); return acc; }, {});
   const entries = Object.entries(grouped);
   if (!entries.length) return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">No events scheduled for {monthLabel(month)} yet.</div>;
   return <div className="space-y-4">{entries.map(([date, dayEvents]) => <div key={date} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">{formatDate(date)}</h2><div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div></div>)}</div>;
@@ -205,7 +205,7 @@ function getSeasonLabel(date) {
 
 function getFall2026ScheduledSchools(events = EVENTS) {
   return new Set(
-    events.filter(event => event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
+    events.filter(event => event && event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
       .map(event => schoolKey(event.canonicalSchool))
   );
 }
@@ -216,7 +216,7 @@ function getSchoolsToSchedule(events = EVENTS) {
     .filter(school => !scheduled2026.has(schoolKey(school.name)))
     .map(school => {
       const history = getSchoolHistory(school.name, events);
-      const fall2025 = history.filter(event => event.date >= '2025-09-01' && event.date <= '2025-11-30');
+      const fall2025 = history.filter(event => event && event.date >= '2025-09-01' && event.date <= '2025-11-30');
       const mostRecent = fall2025[fall2025.length - 1] || history[history.length - 1];
       return {
         ...school,
@@ -237,7 +237,7 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
     const day = d.getDay();
     if (day === 0 || day === 6) continue;
     const key = d.toISOString().slice(0, 10);
-    const scheduled = events.filter(event => event.date === key);
+    const scheduled = events.filter(event => event && event.date === key);
     const bookedPhotographers = new Set(scheduled.flatMap(event => event.photographers || []));
     const availablePhotographers = photographers.filter(name => !bookedPhotographers.has(name));
     dates.push({ date: key, scheduledCount: scheduled.length, availablePhotographers, scheduled });
@@ -254,6 +254,7 @@ function SchoolHistoryPanel({ school, onClickEvent }) {
     );
   }
   const grouped = school.history.reduce((acc, event) => {
+    if (!event || !event.date) return acc;
     const season = getSeasonLabel(event.date);
     acc[season] ||= [];
     acc[season].push(event);
@@ -635,18 +636,19 @@ export default function SchedulerApp() {
     try { window.localStorage.setItem('ismile.customEvents', JSON.stringify(customEvents)); } catch {}
   }, [customEvents]);
 
-  const allEvents = useMemo(() => [...EVENTS, ...customEvents], [customEvents]);
+  const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string';
+  const allEvents = useMemo(() => [...EVENTS, ...customEvents].filter(isValidEvent), [customEvents]);
   const handleScheduleEvent = (event) => {
     setCustomEvents(prev => [...prev.filter(item => item.id !== event.id), event]);
     setMonth(monthKey(event.date));
     setActiveTab('Calendar View');
   };
 
-  const monthEvents = useMemo(() => allEvents.filter(event => monthKey(event.date) === month), [allEvents, month]);
+  const monthEvents = useMemo(() => allEvents.filter(event => event && monthKey(event.date) === month), [allEvents, month]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return monthEvents;
-    return monthEvents.filter(event => [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...event.photographers, ...event.assistants].filter(Boolean).join(' ').toLowerCase().includes(q));
+    return monthEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q));
   }, [query, monthEvents]);
 
   return (
