@@ -68,9 +68,9 @@ function Header({ query, setQuery, activeTab, setActiveTab, month, setMonth, mon
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-zinc-500"><CalendarDays size={16} /> Historical Schedule Import v0.2</div>
+            <div className="flex items-center gap-2 text-sm font-medium text-zinc-500"><CalendarDays size={16} /> REAL September 2025 import wired · 92 events</div>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler</h1>
-            <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
+            <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference. Now using the real imported September 2025 schedule data.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[460px]">
             <div className="grid gap-2 sm:grid-cols-[1fr_170px]">

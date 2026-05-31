@@ -77,3 +77,10 @@ Dependencies are pinned to Next.js 14, React 18, and TailwindCSS 3 to avoid the 
 ## Data update in this package
 
 This package imports the September 2025 historical schedule dataset from `September Data.txt` into `lib/scheduleData.js`. The app now defaults to Month View and renders every September 2025 event included in the uploaded import file.
+
+
+## Data wiring note
+
+This version is wired to the real imported September 2025 schedule data in `lib/scheduleData.js`. The UI imports `EVENTS` from that file and renders those records across Planning Board, Month View, Week View, Day View, Search, and the event detail drawer.
+
+If the live Vercel site still shows Craig Elementary / Skano / Bell Top placeholder dates, GitHub is still using an older file. Replace the full repo contents with the contents of this folder, commit changes, and let Vercel redeploy.
