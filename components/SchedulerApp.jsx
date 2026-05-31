@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 
-const tabs = ['Planning Board', 'Month View', 'Week View', 'Day View', 'Carrie View', 'School Pages'];
+const tabs = ['Planning Board', 'Calendar View', 'Carrie View', 'School Pages', 'Team Members'];
 
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
@@ -229,7 +229,7 @@ function getSchoolsToSchedule() {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getFall2026Availability() {
+function getFall2026Availability(photographers = PHOTOGRAPHERS) {
   const dates = [];
   const start = new Date('2026-09-01T12:00:00');
   const end = new Date('2026-11-30T12:00:00');
@@ -239,7 +239,7 @@ function getFall2026Availability() {
     const key = d.toISOString().slice(0, 10);
     const scheduled = EVENTS.filter(event => event.date === key);
     const bookedPhotographers = new Set(scheduled.flatMap(event => event.photographers || []));
-    const availablePhotographers = PHOTOGRAPHERS.filter(name => !bookedPhotographers.has(name));
+    const availablePhotographers = photographers.filter(name => !bookedPhotographers.has(name));
     dates.push({ date: key, scheduledCount: scheduled.length, availablePhotographers, scheduled });
   }
   return dates;
@@ -297,9 +297,9 @@ function SchoolHistoryPanel({ school, onClickEvent }) {
   );
 }
 
-function CarrieView({ query, onClickEvent }) {
+function CarrieView({ query, onClickEvent, photographers }) {
   const schools = useMemo(() => getSchoolsToSchedule(), []);
-  const availability = useMemo(() => getFall2026Availability(), []);
+  const availability = useMemo(() => getFall2026Availability(photographers), [photographers]);
   const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
   const q = query.trim().toLowerCase();
   const filteredSchools = q
@@ -385,6 +385,111 @@ function SchoolPages({ query, onClickEvent }) {
   );
 }
 
+
+function CalendarView({ viewMode, setViewMode, events, monthEvents, month, setMonth, onClick }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">Calendar View</h2>
+          <p className="mt-1 text-sm text-zinc-600">Switch between month, week, and day layouts while staying on one clean calendar page.</p>
+        </div>
+        <div className="inline-flex rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm">
+          {['Month', 'Week', 'Day'].map(mode => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+      </div>
+      <MonthNavigator month={month} setMonth={setMonth} />
+      {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} />}
+      {viewMode === 'Week' && <WeekView events={events} month={month} onClick={onClick} />}
+      {viewMode === 'Day' && <DayView events={events} month={month} onClick={onClick} />}
+    </div>
+  );
+}
+
+function normalizeMemberName(value) {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function TeamMembers({ photographers, assistants, setPhotographers, setAssistants }) {
+  const [photographerInput, setPhotographerInput] = useState('');
+  const [assistantInput, setAssistantInput] = useState('');
+
+  const addMember = (role, value) => {
+    const name = normalizeMemberName(value);
+    if (!name) return;
+    if (role === 'photographer') {
+      setPhotographers(prev => prev.some(item => item.toLowerCase() === name.toLowerCase()) ? prev : [...prev, name].sort((a, b) => a.localeCompare(b)));
+      setPhotographerInput('');
+    } else {
+      setAssistants(prev => prev.some(item => item.toLowerCase() === name.toLowerCase()) ? prev : [...prev, name].sort((a, b) => a.localeCompare(b)));
+      setAssistantInput('');
+    }
+  };
+
+  const removeMember = (role, name) => {
+    if (role === 'photographer') setPhotographers(prev => prev.filter(item => item !== name));
+    else setAssistants(prev => prev.filter(item => item !== name));
+  };
+
+  const MemberEditor = ({ title, description, members, value, setValue, role }) => (
+    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-zinc-950">{title}</h2>
+        <p className="mt-1 text-sm text-zinc-600">{description}</p>
+      </div>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          addMember(role, value);
+        }}
+      >
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={`Add ${role === 'photographer' ? 'photographer' : 'assistant'}...`}
+          className="min-w-0 flex-1 rounded-2xl border border-zinc-200 bg-white/85 px-4 py-3 text-sm outline-none ring-sage/30 transition focus:ring-4"
+        />
+        <button type="submit" className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">
+          <Plus size={16} /> Add
+        </button>
+      </form>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {members.map(name => (
+          <div key={name} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-cream/80 px-3 py-2">
+            <span className="text-sm font-medium text-zinc-900">{name}</span>
+            <button type="button" onClick={() => removeMember(role, name)} className="rounded-full p-2 text-zinc-400 transition hover:bg-white hover:text-rose-600" aria-label={`Remove ${name}`}>
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/60 p-4 shadow-sm">
+        <h2 className="text-lg font-semibold text-zinc-950">Team Members</h2>
+        <p className="mt-1 text-sm text-zinc-700">Add or remove the photographers and assistants available for future scheduling. These changes save in this browser for now; a database can make them shared for everyone later.</p>
+      </section>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <MemberEditor title="Photographers" description="Used by Carrie View availability and future assignment lists." members={photographers} value={photographerInput} setValue={setPhotographerInput} role="photographer" />
+        <MemberEditor title="Assistants" description="Used as the active assistant roster for scheduling reference." members={assistants} value={assistantInput} setValue={setAssistantInput} role="assistant" />
+      </div>
+    </div>
+  );
+}
+
 function Drawer({ event, onClose }) {
   return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5"><Info icon={UserRoundCheck} title="Photographers" value={event.photographers.length ? event.photographers.join(', ') : 'Needs Photographers Scheduled'} /><Info icon={Users} title="Assistants" value={event.assistants.length ? event.assistants.join(', ') : '—'} /><Info icon={ClipboardList} title="Status" value={event.status} /><Info icon={Clock} title="IRM" value={event.irm ? `${event.irm} — informational only` : '—'} /><Info icon={Pencil} title="Notes" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">This is still a frontend-only prototype. Update this data file in GitHub for now; add Supabase later for live editing and persistence.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
@@ -394,10 +499,32 @@ function Info({ icon: Icon, title, value, large = false }) {
 }
 
 export default function SchedulerApp() {
-  const [activeTab, setActiveTab] = useState('Month View');
+  const [activeTab, setActiveTab] = useState('Calendar View');
+  const [calendarMode, setCalendarMode] = useState('Month');
   const [month, setMonth] = useState('2025-09');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
+  const [photographers, setPhotographers] = useState(PHOTOGRAPHERS);
+  const [assistants, setAssistants] = useState(ASSISTANTS);
+
+  useEffect(() => {
+    try {
+      const savedPhotographers = window.localStorage.getItem('ismile.photographers');
+      const savedAssistants = window.localStorage.getItem('ismile.assistants');
+      if (savedPhotographers) setPhotographers(JSON.parse(savedPhotographers));
+      if (savedAssistants) setAssistants(JSON.parse(savedAssistants));
+    } catch (error) {
+      console.warn('Could not load saved team members', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try { window.localStorage.setItem('ismile.photographers', JSON.stringify(photographers)); } catch {}
+  }, [photographers]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem('ismile.assistants', JSON.stringify(assistants)); } catch {}
+  }, [assistants]);
 
   const monthEvents = useMemo(() => EVENTS.filter(event => monthKey(event.date) === month), [month]);
   const filtered = useMemo(() => {
@@ -412,17 +539,15 @@ export default function SchedulerApp() {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         <Summary events={filtered} allMonthEvents={monthEvents} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
-          {['Planning Board', 'Month View', 'Week View', 'Day View'].includes(activeTab) && <MonthNavigator month={month} setMonth={setMonth} />}
-          {activeTab === 'Planning Board' && <PlanningBoard events={filtered} onClick={setSelected} />}
-          {activeTab === 'Month View' && <MonthView events={filtered} month={month} onClick={setSelected} />}
-          {activeTab === 'Week View' && <WeekView events={filtered} month={month} onClick={setSelected} />}
-          {activeTab === 'Day View' && <DayView events={filtered} month={month} onClick={setSelected} />}
-          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} />}
+          {activeTab === 'Planning Board' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} /></>}
+          {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} monthEvents={monthEvents} month={month} setMonth={setMonth} onClick={setSelected} />}
+          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} />}
           {activeTab === 'School Pages' && <SchoolPages query={query} onClickEvent={setSelected} />}
+          {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} />}
         </section>
         <section className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{PHOTOGRAPHERS.join(', ')}</p></div>
-          <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Assistants</h3><p className="mt-2 text-sm text-zinc-600">{ASSISTANTS.join(', ')}</p></div>
+          <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>
+          <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Assistants</h3><p className="mt-2 text-sm text-zinc-600">{assistants.join(', ')}</p></div>
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Rule</h3><p className="mt-2 text-sm text-zinc-600">Humans make scheduling decisions. This app supports reference, visibility, and notes — not automation.</p></div>
         </section>
       </div>
