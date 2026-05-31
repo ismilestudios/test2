@@ -1,6 +1,6 @@
 # iSmile Scheduler
 
-Internal September 2025 prototype for iSmile Studios.
+Internal September + October 2025 prototype for iSmile Studios.
 
 ## What this is
 
@@ -84,3 +84,8 @@ This package imports the September 2025 historical schedule dataset from `Septem
 This version is wired to the real imported September 2025 schedule data in `lib/scheduleData.js`. The UI imports `EVENTS` from that file and renders those records across Planning Board, Month View, Week View, Day View, Search, and the event detail drawer.
 
 If the live Vercel site still shows Craig Elementary / Skano / Bell Top placeholder dates, GitHub is still using an older file. Replace the full repo contents with the contents of this folder, commit changes, and let Vercel redeploy.
+
+
+## Latest data import
+
+This package includes the real September 2025 data plus the October 2025 schedule PDF import. The app reads from `lib/scheduleData.js`; Vercel redeploys after pushing these files to GitHub.
