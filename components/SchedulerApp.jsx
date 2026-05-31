@@ -3,9 +3,9 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
-import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS } from '../lib/scheduleData';
+import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 
-const tabs = ['Planning Board', 'Month View', 'Week View', 'Day View', 'Carrie View'];
+const tabs = ['Planning Board', 'Month View', 'Week View', 'Day View', 'Carrie View', 'School Pages'];
 
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
@@ -174,37 +174,59 @@ function DayView({ events, onClick, month }) {
 }
 
 
-function getFall2025SchoolsToSchedule() {
-  const scheduled2026 = new Set(
-    EVENTS.filter(event => event.date.startsWith('2026-') && event.type === 'Fall Picture Day' && event.canonicalSchool)
-      .map(event => event.canonicalSchool)
+
+function schoolKey(value = '') {
+  return String(value).toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function schoolMatchesEvent(schoolName, event) {
+  const school = schoolKey(schoolName);
+  const canonical = schoolKey(event.canonicalSchool || '');
+  const title = schoolKey(event.title || '');
+  if (!school) return false;
+  if (canonical && (canonical === school || canonical.includes(school) || school.includes(canonical))) return true;
+  if (title && title.includes(school)) return true;
+  return false;
+}
+
+function getSchoolHistory(schoolName) {
+  return EVENTS
+    .filter(event => schoolMatchesEvent(schoolName, event))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getSeasonLabel(date) {
+  if (date >= '2025-03-01' && date <= '2025-06-30') return 'Spring 2025';
+  if (date >= '2025-09-01' && date <= '2025-11-30') return 'Fall 2025';
+  if (date >= '2026-03-01' && date <= '2026-06-30') return 'Spring 2026';
+  if (date >= '2026-09-01' && date <= '2026-11-30') return 'Fall 2026';
+  return date.slice(0, 4);
+}
+
+function getFall2026ScheduledSchools() {
+  return new Set(
+    EVENTS.filter(event => event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
+      .map(event => schoolKey(event.canonicalSchool))
   );
+}
 
-  const map = new Map();
-  EVENTS.filter(event =>
-    event.date >= '2025-09-01' &&
-    event.date <= '2025-11-30' &&
-    event.type === 'Fall Picture Day' &&
-    event.canonicalSchool &&
-    !scheduled2026.has(event.canonicalSchool)
-  ).forEach(event => {
-    const existing = map.get(event.canonicalSchool);
-    if (!existing || event.date < existing.firstDate) existing.firstDate = event.date;
-    if (!existing || event.date > existing.lastDate) {
-      map.set(event.canonicalSchool, {
-        school: event.canonicalSchool,
-        lastYearTitle: event.title,
-        firstDate: existing?.firstDate || event.date,
-        lastDate: event.date,
-        irm: event.irm || existing?.irm || '',
-        photographers: event.photographers,
-        assistants: event.assistants,
-        notes: event.notes
-      });
-    }
-  });
-
-  return Array.from(map.values()).sort((a, b) => a.school.localeCompare(b.school));
+function getSchoolsToSchedule() {
+  const scheduled2026 = getFall2026ScheduledSchools();
+  return SCHOOLS
+    .filter(school => !scheduled2026.has(schoolKey(school.name)))
+    .map(school => {
+      const history = getSchoolHistory(school.name);
+      const fall2025 = history.filter(event => event.date >= '2025-09-01' && event.date <= '2025-11-30');
+      const mostRecent = fall2025[fall2025.length - 1] || history[history.length - 1];
+      return {
+        ...school,
+        history,
+        fall2025,
+        lastEvent: mostRecent,
+        status: 'Needs Fall 2026 Scheduling'
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function getFall2026Availability() {
@@ -218,75 +240,147 @@ function getFall2026Availability() {
     const scheduled = EVENTS.filter(event => event.date === key);
     const bookedPhotographers = new Set(scheduled.flatMap(event => event.photographers || []));
     const availablePhotographers = PHOTOGRAPHERS.filter(name => !bookedPhotographers.has(name));
-    dates.push({
-      date: key,
-      scheduledCount: scheduled.length,
-      availablePhotographers,
-      scheduled
-    });
+    dates.push({ date: key, scheduledCount: scheduled.length, availablePhotographers, scheduled });
   }
   return dates;
 }
 
-function CarrieView({ query }) {
-  const schools = useMemo(() => getFall2025SchoolsToSchedule(), []);
+function SchoolHistoryPanel({ school, onClickEvent }) {
+  if (!school) {
+    return (
+      <div className="rounded-3xl border border-dashed border-zinc-200 bg-white/60 p-6 text-sm text-zinc-500">
+        Select a school to view its schedule history.
+      </div>
+    );
+  }
+  const grouped = school.history.reduce((acc, event) => {
+    const season = getSeasonLabel(event.date);
+    acc[season] ||= [];
+    acc[season].push(event);
+    return acc;
+  }, {});
+  const seasons = ['Spring 2025', 'Fall 2025', 'Spring 2026', 'Fall 2026'];
+  return (
+    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-zinc-950">{school.name}</h2>
+          <p className="mt-1 text-sm text-zinc-600">School history page: past picture days, makeups, photographers, assistants, and future scheduling status.</p>
+        </div>
+        {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        {seasons.map(season => {
+          const events = grouped[season] || [];
+          return (
+            <div key={season} className="rounded-2xl border border-zinc-200 bg-cream/80 p-3">
+              <div className="mb-2 text-sm font-semibold text-zinc-800">{season}</div>
+              {events.length ? (
+                <div className="space-y-2">
+                  {events.map(event => (
+                    <button key={event.id} onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-white/80 p-2 text-left text-xs transition hover:bg-white hover:shadow-sm">
+                      <div className="font-semibold text-zinc-900">{formatDate(event.date)}</div>
+                      <div className="mt-1 text-zinc-600">{event.title}</div>
+                      <div className="mt-1 text-zinc-500">Photogs: {event.photographers?.length ? event.photographers.join(', ') : '—'}</div>
+                    </button>
+                  ))}
+                </div>
+              ) : <div className="text-xs text-zinc-400">No imported records yet.</div>}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
+        <span className="font-semibold text-zinc-800">Notes:</span> {school.notes || '—'}
+      </div>
+    </section>
+  );
+}
+
+function CarrieView({ query, onClickEvent }) {
+  const schools = useMemo(() => getSchoolsToSchedule(), []);
   const availability = useMemo(() => getFall2026Availability(), []);
+  const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
   const q = query.trim().toLowerCase();
   const filteredSchools = q
-    ? schools.filter(item => [item.school, item.lastYearTitle, item.notes, ...(item.photographers || []), ...(item.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
+    ? schools.filter(item => [item.name, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
     : schools;
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-950">Carrie View</h2>
-            <p className="mt-1 text-sm text-zinc-600">Fall 2025 schools that still need to be scheduled for Fall 2026.</p>
+    <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-[1.25fr_1fr]">
+        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-950">Carrie View</h2>
+              <p className="mt-1 text-sm text-zinc-600">Every Fall 2025 school/account that still needs Fall 2026 scheduling. Since Fall 2026 is blank right now, this list should be the full working list.</p>
+            </div>
+            <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
           </div>
-          <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} schools</Pill>
-        </div>
-        <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
-          {filteredSchools.map(item => (
-            <div key={item.school} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-zinc-950">{item.school}</div>
-                  <div className="mt-1 text-xs text-zinc-500">2025 reference: {formatDate(item.lastDate)}</div>
+          <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
+            {filteredSchools.map(item => (
+              <button key={item.name} onClick={() => setSelectedSchool(item)} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-zinc-950">{item.name}</div>
+                    <div className="mt-1 text-xs text-zinc-500">{item.lastEvent ? `2025 reference: ${formatDate(item.lastEvent.date)}` : 'No imported Fall 2025 event matched yet'}</div>
+                  </div>
+                  {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
                 </div>
-                {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
-              </div>
-              <div className="mt-2 text-xs text-zinc-600">{item.lastYearTitle}</div>
-              <div className="mt-2 grid gap-2 text-xs text-zinc-600 sm:grid-cols-2">
-                <div><span className="font-semibold text-zinc-700">2025 photogs:</span> {item.photographers?.length ? item.photographers.join(', ') : '—'}</div>
-                <div><span className="font-semibold text-zinc-700">2025 assistants:</span> {item.assistants?.length ? item.assistants.join(', ') : '—'}</div>
-              </div>
-              {item.notes ? <div className="mt-2 line-clamp-2 text-xs text-zinc-500">{item.notes}</div> : null}
-            </div>
-          ))}
-        </div>
-      </section>
+                <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
+                {item.lastEvent ? <div className="mt-2 text-xs text-zinc-500">2025 photogs: {item.lastEvent.photographers?.length ? item.lastEvent.photographers.join(', ') : '—'}</div> : null}
+              </button>
+            ))}
+          </div>
+        </section>
 
-      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
-          <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Empty means nothing has been scheduled yet.</p>
-        </div>
-        <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
-          {availability.map(day => (
-            <div key={day.date} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-zinc-900">{formatDate(day.date)}</div>
-                  <div className="mt-1 text-xs text-zinc-500">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
+        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
+            <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Empty means nothing has been scheduled yet.</p>
+          </div>
+          <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
+            {availability.map(day => (
+              <div key={day.date} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-zinc-900">{formatDate(day.date)}</div>
+                    <div className="mt-1 text-xs text-zinc-500">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
+                  </div>
+                  <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photogs open</Pill>
                 </div>
-                <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photogs open</Pill>
+                <div className="mt-2 text-xs text-zinc-600">Available: {day.availablePhotographers.join(', ') || '—'}</div>
               </div>
-              <div className="mt-2 text-xs text-zinc-600">Available: {day.availablePhotographers.join(', ') || '—'}</div>
-            </div>
+            ))}
+          </div>
+        </section>
+      </div>
+      <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
+    </div>
+  );
+}
+
+function SchoolPages({ query, onClickEvent }) {
+  const [selectedName, setSelectedName] = useState(SCHOOLS[0]?.name || '');
+  const q = query.trim().toLowerCase();
+  const schools = useMemo(() => SCHOOLS.map(school => ({ ...school, history: getSchoolHistory(school.name) })).sort((a, b) => a.name.localeCompare(b.name)), []);
+  const filtered = q ? schools.filter(school => [school.name, school.notes, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : schools;
+  const selected = schools.find(school => school.name === selectedName) || filtered[0] || null;
+  return (
+    <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <h2 className="text-lg font-semibold text-zinc-950">School Pages</h2>
+        <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history.</p>
+        <div className="mt-4 max-h-[760px] space-y-2 overflow-auto pr-1">
+          {filtered.map(school => (
+            <button key={school.name} onClick={() => setSelectedName(school.name)} className={`w-full rounded-2xl border p-3 text-left text-sm transition hover:bg-white ${selected?.name === school.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+              <div className="font-semibold text-zinc-900">{school.name}</div>
+              <div className="mt-1 text-xs text-zinc-500">{school.history.length} imported record{school.history.length === 1 ? '' : 's'}{school.irm ? ` · IRM ${school.irm}` : ''}</div>
+            </button>
           ))}
         </div>
       </section>
+      <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} />
     </div>
   );
 }
@@ -318,11 +412,13 @@ export default function SchedulerApp() {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         <Summary events={filtered} allMonthEvents={monthEvents} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
-          <MonthNavigator month={month} setMonth={setMonth} />
+          {['Planning Board', 'Month View', 'Week View', 'Day View'].includes(activeTab) && <MonthNavigator month={month} setMonth={setMonth} />}
           {activeTab === 'Planning Board' && <PlanningBoard events={filtered} onClick={setSelected} />}
           {activeTab === 'Month View' && <MonthView events={filtered} month={month} onClick={setSelected} />}
           {activeTab === 'Week View' && <WeekView events={filtered} month={month} onClick={setSelected} />}
           {activeTab === 'Day View' && <DayView events={filtered} month={month} onClick={setSelected} />}
+          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} />}
+          {activeTab === 'School Pages' && <SchoolPages query={query} onClickEvent={setSelected} />}
         </section>
         <section className="grid gap-4 md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{PHOTOGRAPHERS.join(', ')}</p></div>
