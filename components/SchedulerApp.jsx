@@ -189,8 +189,8 @@ function schoolMatchesEvent(schoolName, event) {
   return false;
 }
 
-function getSchoolHistory(schoolName) {
-  return EVENTS
+function getSchoolHistory(schoolName, events = EVENTS) {
+  return events
     .filter(event => schoolMatchesEvent(schoolName, event))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -203,19 +203,19 @@ function getSeasonLabel(date) {
   return date.slice(0, 4);
 }
 
-function getFall2026ScheduledSchools() {
+function getFall2026ScheduledSchools(events = EVENTS) {
   return new Set(
-    EVENTS.filter(event => event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
+    events.filter(event => event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
       .map(event => schoolKey(event.canonicalSchool))
   );
 }
 
-function getSchoolsToSchedule() {
-  const scheduled2026 = getFall2026ScheduledSchools();
+function getSchoolsToSchedule(events = EVENTS) {
+  const scheduled2026 = getFall2026ScheduledSchools(events);
   return SCHOOLS
     .filter(school => !scheduled2026.has(schoolKey(school.name)))
     .map(school => {
-      const history = getSchoolHistory(school.name);
+      const history = getSchoolHistory(school.name, events);
       const fall2025 = history.filter(event => event.date >= '2025-09-01' && event.date <= '2025-11-30');
       const mostRecent = fall2025[fall2025.length - 1] || history[history.length - 1];
       return {
@@ -229,7 +229,7 @@ function getSchoolsToSchedule() {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getFall2026Availability(photographers = PHOTOGRAPHERS) {
+function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS) {
   const dates = [];
   const start = new Date('2026-09-01T12:00:00');
   const end = new Date('2026-11-30T12:00:00');
@@ -237,7 +237,7 @@ function getFall2026Availability(photographers = PHOTOGRAPHERS) {
     const day = d.getDay();
     if (day === 0 || day === 6) continue;
     const key = d.toISOString().slice(0, 10);
-    const scheduled = EVENTS.filter(event => event.date === key);
+    const scheduled = events.filter(event => event.date === key);
     const bookedPhotographers = new Set(scheduled.flatMap(event => event.photographers || []));
     const availablePhotographers = photographers.filter(name => !bookedPhotographers.has(name));
     dates.push({ date: key, scheduledCount: scheduled.length, availablePhotographers, scheduled });
@@ -297,10 +297,111 @@ function SchoolHistoryPanel({ school, onClickEvent }) {
   );
 }
 
-function CarrieView({ query, onClickEvent, photographers }) {
-  const schools = useMemo(() => getSchoolsToSchedule(), []);
-  const availability = useMemo(() => getFall2026Availability(photographers), [photographers]);
+
+function SchedulingModal({ school, photographers, assistants, onClose, onSave }) {
+  const [date, setDate] = useState('2026-09-01');
+  const [selectedPhotographers, setSelectedPhotographers] = useState([]);
+  const [selectedAssistants, setSelectedAssistants] = useState([]);
+  const [notes, setNotes] = useState('');
+
+  if (!school) return null;
+
+  const toggleName = (name, setter) => {
+    setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
+  };
+
+  const saveSchedule = () => {
+    const event = {
+      id: `2026-${school.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+      date,
+      title: `${school.name} Fall Picture Day`,
+      canonicalSchool: school.name,
+      type: 'Fall Picture Day',
+      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Scheduled',
+      photographers: selectedPhotographers,
+      assistants: selectedAssistants,
+      features: [],
+      irm: school.irm || null,
+      time: 'TBD',
+      notes: notes || 'Scheduled from Carrie View. Details can be refined later.',
+      rainInfo: '',
+      history: school.lastEvent ? `Fall 2025 reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
+    };
+    onSave(event);
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-8 max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl">
+          <div className="border-b border-zinc-200 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Schedule Fall 2026</Pill>
+                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">{school.name}</h2>
+                <p className="mt-1 text-sm text-zinc-600">Pick a date and assign the team. This saves locally in the prototype for now.</p>
+              </div>
+              <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
+            </div>
+          </div>
+
+          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Fall 2026 Date</div>
+                <input type="date" min="2026-09-01" max="2026-11-30" value={date} onChange={(e) => setDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">2025 Reference</div>
+                <div className="mt-2 text-sm text-zinc-800">{school.lastEvent ? `${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}` : 'No matched Fall 2025 reference yet.'}</div>
+                <div className="mt-1 text-xs text-zinc-500">Photogs: {school.lastEvent?.photographers?.length ? school.lastEvent.photographers.join(', ') : '—'}</div>
+              </div>
+            </div>
+
+            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <h3 className="text-sm font-semibold text-zinc-900">Photographers</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {photographers.map(name => (
+                  <button key={name} type="button" onClick={() => toggleName(name, setSelectedPhotographers)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedPhotographers.includes(name) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {assistants.map(name => (
+                  <button key={name} type="button" onClick={() => toggleName(name, setSelectedAssistants)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>
+                ))}
+              </div>
+            </section>
+
+            <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Scheduling Notes</div>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Optional notes for Carrie/Steph/Matt..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
+            <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
+            <button type="button" onClick={saveSchedule} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save Schedule</button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule }) {
+  const schools = useMemo(() => getSchoolsToSchedule(events), [events]);
+  const availability = useMemo(() => getFall2026Availability(events, photographers), [events, photographers]);
   const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
+  const [schedulingSchool, setSchedulingSchool] = useState(null);
+  useEffect(() => {
+    if (!selectedSchool && schools.length) setSelectedSchool(schools[0]);
+  }, [schools, selectedSchool]);
+
   const q = query.trim().toLowerCase();
   const filteredSchools = q
     ? schools.filter(item => [item.name, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
@@ -313,13 +414,13 @@ function CarrieView({ query, onClickEvent, photographers }) {
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-zinc-950">Carrie View</h2>
-              <p className="mt-1 text-sm text-zinc-600">Every Fall 2025 school/account that still needs Fall 2026 scheduling. Since Fall 2026 is blank right now, this list should be the full working list.</p>
+              <p className="mt-1 text-sm text-zinc-600">Click a school to schedule it for Fall 2026. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
             </div>
             <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
           </div>
           <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
             {filteredSchools.map(item => (
-              <button key={item.name} onClick={() => setSelectedSchool(item)} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+              <button key={item.name} onClick={() => { setSelectedSchool(item); setSchedulingSchool(item); }} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-sm font-semibold text-zinc-950">{item.name}</div>
@@ -356,14 +457,15 @@ function CarrieView({ query, onClickEvent, photographers }) {
         </section>
       </div>
       <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
+      <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
     </div>
   );
 }
 
-function SchoolPages({ query, onClickEvent }) {
+function SchoolPages({ query, onClickEvent, events }) {
   const [selectedName, setSelectedName] = useState(SCHOOLS[0]?.name || '');
   const q = query.trim().toLowerCase();
-  const schools = useMemo(() => SCHOOLS.map(school => ({ ...school, history: getSchoolHistory(school.name) })).sort((a, b) => a.name.localeCompare(b.name)), []);
+  const schools = useMemo(() => SCHOOLS.map(school => ({ ...school, history: getSchoolHistory(school.name, events) })).sort((a, b) => a.name.localeCompare(b.name)), [events]);
   const filtered = q ? schools.filter(school => [school.name, school.notes, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : schools;
   const selected = schools.find(school => school.name === selectedName) || filtered[0] || null;
   return (
@@ -506,6 +608,7 @@ export default function SchedulerApp() {
   const [selected, setSelected] = useState(null);
   const [photographers, setPhotographers] = useState(PHOTOGRAPHERS);
   const [assistants, setAssistants] = useState(ASSISTANTS);
+  const [customEvents, setCustomEvents] = useState([]);
 
   useEffect(() => {
     try {
@@ -513,6 +616,8 @@ export default function SchedulerApp() {
       const savedAssistants = window.localStorage.getItem('ismile.assistants');
       if (savedPhotographers) setPhotographers(JSON.parse(savedPhotographers));
       if (savedAssistants) setAssistants(JSON.parse(savedAssistants));
+      const savedEvents = window.localStorage.getItem('ismile.customEvents');
+      if (savedEvents) setCustomEvents(JSON.parse(savedEvents));
     } catch (error) {
       console.warn('Could not load saved team members', error);
     }
@@ -526,7 +631,18 @@ export default function SchedulerApp() {
     try { window.localStorage.setItem('ismile.assistants', JSON.stringify(assistants)); } catch {}
   }, [assistants]);
 
-  const monthEvents = useMemo(() => EVENTS.filter(event => monthKey(event.date) === month), [month]);
+  useEffect(() => {
+    try { window.localStorage.setItem('ismile.customEvents', JSON.stringify(customEvents)); } catch {}
+  }, [customEvents]);
+
+  const allEvents = useMemo(() => [...EVENTS, ...customEvents], [customEvents]);
+  const handleScheduleEvent = (event) => {
+    setCustomEvents(prev => [...prev.filter(item => item.id !== event.id), event]);
+    setMonth(monthKey(event.date));
+    setActiveTab('Calendar View');
+  };
+
+  const monthEvents = useMemo(() => allEvents.filter(event => monthKey(event.date) === month), [allEvents, month]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return monthEvents;
@@ -541,8 +657,8 @@ export default function SchedulerApp() {
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
           {activeTab === 'Planning Board' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} /></>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} monthEvents={monthEvents} month={month} setMonth={setMonth} onClick={setSelected} />}
-          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} />}
-          {activeTab === 'School Pages' && <SchoolPages query={query} onClickEvent={setSelected} />}
+          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
+          {activeTab === 'School Pages' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} />}
         </section>
         <section className="grid gap-4 md:grid-cols-3">
