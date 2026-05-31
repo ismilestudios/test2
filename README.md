@@ -10,7 +10,7 @@ This is intentionally **not** auto-scheduling software. Humans make scheduling d
 
 ## Included
 
-- Next.js app structure
+- Next.js 14 app structure
 - TailwindCSS
 - Framer Motion
 - Lucide icons
@@ -63,3 +63,17 @@ Get a sharable internal prototype URL for Matt, Stephanie, and Carrie to review.
 ## Future backend
 
 Supabase can be added later for persistent data, auth, and live edits. Do not add backend complexity yet.
+
+
+## Vercel upload note
+
+When uploading to GitHub, open this folder and upload the contents directly to the repository root. The repository root should show `app`, `components`, `lib`, and `package.json` immediately, not another nested `ismile-scheduler` folder.
+
+## Build note
+
+Dependencies are pinned to Next.js 14, React 18, and TailwindCSS 3 to avoid the Tailwind v4 PostCSS plugin mismatch on Vercel.
+
+
+## Data update in this package
+
+This package imports the September 2025 historical schedule dataset from `September Data.txt` into `lib/scheduleData.js`. The app now defaults to Month View and renders every September 2025 event included in the uploaded import file.
