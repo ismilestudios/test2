@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronDown } from 'lucide-react';
+import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS } from '../lib/scheduleData';
 
 const tabs = ['Planning Board', 'Month View', 'Week View', 'Day View'];
@@ -62,34 +62,32 @@ function EventCard({ event, onClick, compact = false }) {
   );
 }
 
-function Header({ query, setQuery, activeTab, setActiveTab, month, setMonth, monthOptions }) {
+function addMonths(key, delta) {
+  const [year, month] = key.split('-').map(Number);
+  const d = new Date(year, month - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function Header({ query, setQuery, activeTab, setActiveTab }) {
   return (
     <header className="sticky top-0 z-20 border-b border-zinc-200/70 bg-cream/90 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-zinc-500"><CalendarDays size={16} /> REAL September + October 2025 imports wired</div>
+            <div className="flex items-center gap-2 text-sm font-medium text-zinc-500"><CalendarDays size={16} /> Historical schedule imports wired</div>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler</h1>
-            <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference. Now using the real imported September and October 2025 schedule data.</p>
+            <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
-          <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[460px]">
-            <div className="grid gap-2 sm:grid-cols-[1fr_170px]">
-              <label className="relative block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search schools, photographers, assistants, notes..."
-                  className="w-full rounded-2xl border border-zinc-200 bg-white/80 py-3 pl-10 pr-4 text-sm outline-none ring-sage/30 transition focus:ring-4"
-                />
-              </label>
-              <label className="relative block">
-                <select value={month} onChange={(e) => setMonth(e.target.value)} className="w-full appearance-none rounded-2xl border border-zinc-200 bg-white/80 px-4 py-3 pr-9 text-sm font-medium outline-none ring-sage/30 transition focus:ring-4">
-                  {monthOptions.map((option) => <option key={option} value={option}>{monthLabel(option)}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-              </label>
-            </div>
+          <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
+            <label className="relative block">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search schools, photographers, assistants, notes..."
+                className="w-full rounded-2xl border border-zinc-200 bg-white/80 py-3 pl-10 pr-4 text-sm outline-none ring-sage/30 transition focus:ring-4"
+              />
+            </label>
             <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {tabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
@@ -101,6 +99,32 @@ function Header({ query, setQuery, activeTab, setActiveTab, month, setMonth, mon
         </div>
       </div>
     </header>
+  );
+}
+
+function MonthNavigator({ month, setMonth }) {
+  return (
+    <div className="mb-4 flex items-center justify-center gap-3">
+      <button
+        type="button"
+        onClick={() => setMonth(addMonths(month, -1))}
+        className="rounded-full border border-zinc-200 bg-white/85 p-2 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft"
+        aria-label="Previous month"
+      >
+        <ChevronLeft size={20} />
+      </button>
+      <div className="min-w-[220px] rounded-full border border-zinc-200 bg-white/90 px-6 py-2 text-center text-base font-semibold text-zinc-900 shadow-sm">
+        {monthLabel(month)}
+      </div>
+      <button
+        type="button"
+        onClick={() => setMonth(addMonths(month, 1))}
+        className="rounded-full border border-zinc-200 bg-white/85 p-2 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft"
+        aria-label="Next month"
+      >
+        <ChevronRight size={20} />
+      </button>
+    </div>
   );
 }
 
@@ -132,7 +156,7 @@ function PlanningBoard({ events, onClick }) {
 function MonthView({ events, month, onClick }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-semibold text-zinc-800">{monthLabel(month)}</h2><Pill className="border-zinc-200 bg-white text-zinc-600">{events.length} events</Pill></div><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e.date === date); return <div key={date} className="min-h-[132px] rounded-2xl border border-zinc-200 bg-cream/80 p-2"><div className="mb-2 text-xs font-semibold text-zinc-500">{day}</div><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div></div>;
+  return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e.date === date); return <div key={date} className="min-h-[132px] rounded-2xl border border-zinc-200 bg-cream/80 p-2"><div className="mb-2 text-xs font-semibold text-zinc-500">{day}</div><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
 
 function WeekView({ events, month, onClick }) {
@@ -142,9 +166,11 @@ function WeekView({ events, month, onClick }) {
   return <div className="space-y-4">{weeks.map((week, idx) => <div key={idx} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">Week of {monthLabel(month).split(' ')[0]} {week[0]}, {month.split('-')[0]}</h2><div className="grid gap-3 md:grid-cols-7">{week.map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e.date === date); return <div key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-3"><div className="mb-2 text-xs font-semibold text-zinc-500">{monthLabel(month).slice(0,3)} {day}</div><div className="space-y-2">{dayEvents.length ? dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} compact />) : <div className="text-xs text-zinc-400">No scheduled items</div>}</div></div>})}</div></div>)}</div>;
 }
 
-function DayView({ events, onClick }) {
+function DayView({ events, onClick, month }) {
   const grouped = events.reduce((acc, event) => { acc[event.date] ||= []; acc[event.date].push(event); return acc; }, {});
-  return <div className="space-y-4">{Object.entries(grouped).map(([date, dayEvents]) => <div key={date} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">{formatDate(date)}</h2><div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div></div>)}</div>;
+  const entries = Object.entries(grouped);
+  if (!entries.length) return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">No events scheduled for {monthLabel(month)} yet.</div>;
+  return <div className="space-y-4">{entries.map(([date, dayEvents]) => <div key={date} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">{formatDate(date)}</h2><div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div></div>)}</div>;
 }
 
 function Drawer({ event, onClose }) {
@@ -156,9 +182,8 @@ function Info({ icon: Icon, title, value, large = false }) {
 }
 
 export default function SchedulerApp() {
-  const monthOptions = useMemo(() => Array.from(new Set(EVENTS.map(event => monthKey(event.date)))).sort(), []);
   const [activeTab, setActiveTab] = useState('Month View');
-  const [month, setMonth] = useState(monthOptions[0] || '2025-09');
+  const [month, setMonth] = useState('2025-09');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
 
@@ -171,14 +196,15 @@ export default function SchedulerApp() {
 
   return (
     <main className="min-h-screen font-sans text-zinc-900">
-      <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} month={month} setMonth={setMonth} monthOptions={monthOptions} />
+      <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         <Summary events={filtered} allMonthEvents={monthEvents} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
+          <MonthNavigator month={month} setMonth={setMonth} />
           {activeTab === 'Planning Board' && <PlanningBoard events={filtered} onClick={setSelected} />}
           {activeTab === 'Month View' && <MonthView events={filtered} month={month} onClick={setSelected} />}
           {activeTab === 'Week View' && <WeekView events={filtered} month={month} onClick={setSelected} />}
-          {activeTab === 'Day View' && <DayView events={filtered} onClick={setSelected} />}
+          {activeTab === 'Day View' && <DayView events={filtered} month={month} onClick={setSelected} />}
         </section>
         <section className="grid gap-4 md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{PHOTOGRAPHERS.join(', ')}</p></div>
