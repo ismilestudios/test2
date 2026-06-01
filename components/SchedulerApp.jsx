@@ -216,27 +216,33 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
 }
 
 
+const ROLLOUT_EVENT_TYPES = new Set([
+  'Fall Picture Day',
+  'Spring Picture Day',
+  'Sports',
+  'Seniors',
+  'Makeup Day',
+  'Rain Date',
+  'Family Photos',
+  'Special Event'
+]);
+
 function isRolloutEvent(event) {
-  const rolloutTypes = new Set(['Fall Picture Day', 'Spring Picture Day', 'Makeup Day', 'Rain Date']);
-  return event && rolloutTypes.has(event.type);
+  return event && ROLLOUT_EVENT_TYPES.has(event.type);
 }
 
-function parseRolloutCountFromTitle(title = '') {
-  const text = String(title).toLowerCase();
-  const explicit = text.match(/(\d+)\s*(?:teams?|photogs?|photographers?)/);
-  if (explicit) return Math.max(1, Number(explicit[1]) || 1);
-  if (text.includes('2 teams') || text.includes('two teams')) return 2;
-  if (text.includes('3 teams') || text.includes('three teams')) return 3;
-  if (text.includes('1 team') || text.includes('1 photog') || text.includes('one team')) return 1;
-  return null;
+function getAssignedPhotographerCount(event) {
+  if (!Array.isArray(event?.photographers)) return 0;
+  return event.photographers.filter(Boolean).length;
 }
 
 function getRolloutCount(event) {
   if (!isRolloutEvent(event)) return 0;
-  const fromTitle = parseRolloutCountFromTitle(event.title || event.sourceTitle || '');
-  if (fromTitle) return fromTitle;
-  const assigned = Array.isArray(event.photographers) ? event.photographers.length : 0;
-  return Math.max(1, assigned);
+
+  // Rollouts are intentionally based on assigned photographers, not title parsing.
+  // Event titles use inconsistent wording like "1 Team", "2 Teams", or omit team counts entirely,
+  // so photographer assignment is the operational source of truth. Assistants do not count.
+  return getAssignedPhotographerCount(event);
 }
 
 function getCapacityTone(rollouts) {

@@ -98,3 +98,13 @@ This build adds April 2026 from the uploaded April schedule PDF, including schoo
 
 ## March 2026 careful import
 Added March 2026 schedule data from School Schedule MASTER COPY - March 2026.pdf, including March school events, Spring Picture Day classification after February, non-school event preservation, April 1-3 spillover items, and missing school/account additions to the master list.
+
+## Rollout logic update
+
+This build fixes Week View rollout counting so rollouts are based only on assigned photographers, not title text such as "1 Team" or "2 Teams." Assistants are intentionally ignored. Sports, Seniors, Fall Picture Day, Spring Picture Day, Makeup Day, Rain Date, Family Photos, and field-crew Special Events can contribute rollouts when photographers are assigned. This fixes cases like Duanesburg Sports and BKW Sports not showing rollout pills/counters because the title did not use consistent team wording.
+
+Validated with:
+
+```bash
+npm run build
+```
