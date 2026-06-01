@@ -1,0 +1,3408 @@
+{
+  "ics_events_with_descriptions_up_to_2026_05_31": 3523,
+  "matched_scheduler_events_updated": 342,
+  "match_rows": [
+    {
+      "date": "2025-11-04",
+      "icsSummary": "Airline Drive Academy (1 Team)",
+      "schedulerEvent": "Airline Drive Academy (1 Team) 7IRM",
+      "canonicalSchool": "Airline Drive Academy",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-17",
+      "icsSummary": "Studio Staff Quarterly Meeting 8-9 AM",
+      "schedulerEvent": "IN-STUDIO Staff Quarterly Meeting",
+      "canonicalSchool": null,
+      "score": 1.124
+    },
+    {
+      "date": "2025-10-09",
+      "icsSummary": "Okte Elem Makeup Day (1 studio photo)",
+      "schedulerEvent": "Okte Elementary Makeups (1 Team)",
+      "canonicalSchool": "Okte Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-16",
+      "icsSummary": "Troy School 14 MAKEUPS (1 team)",
+      "schedulerEvent": "Troy School 14 MAKEUPS (1 team)",
+      "canonicalSchool": "Troy School 14",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-10",
+      "icsSummary": "Rivers Casino Employee Party",
+      "schedulerEvent": "Rivers Casino Employee Party 6/10PM",
+      "canonicalSchool": null,
+      "score": 1.105
+    },
+    {
+      "date": "2025-10-03",
+      "icsSummary": "Lincoln Elem Picture Day (1 team)",
+      "schedulerEvent": "Lincoln Elementary (2 Teams?) 24IRM",
+      "canonicalSchool": "Lincoln Elementary Community School (Schenectady School District)",
+      "score": 0.985
+    },
+    {
+      "date": "2026-03-10",
+      "icsSummary": "AW Becker Clubs for Yrbk (1 photog)",
+      "schedulerEvent": "AW Becker Clubs",
+      "canonicalSchool": "A.W. Becker Elementary School (Ravena-Coeymans-Selkirk School District)",
+      "score": 1.023
+    },
+    {
+      "date": "2026-04-27",
+      "icsSummary": "Okte RAIN Spring Pics & 5th grade pano (2 teams)",
+      "schedulerEvent": "Okte Spring Pics & Pano RAIN",
+      "canonicalSchool": "Okte Elementary School (Shenendehowa School District)",
+      "score": 0.855
+    },
+    {
+      "date": "2025-10-07",
+      "icsSummary": "Cohoes Senior Makeups (1 team)",
+      "schedulerEvent": "Cohoes Senior Makeups",
+      "canonicalSchool": "Cohoes Seniors",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-13",
+      "icsSummary": "RPI",
+      "schedulerEvent": "RPI Seniors",
+      "canonicalSchool": "RPI Seniors",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-06",
+      "icsSummary": "PHOTO BOOTH Shaker Ridge Luncheon",
+      "schedulerEvent": "PHOTO BOOTH Shaker Ridge Luncheon 10/2PM",
+      "canonicalSchool": null,
+      "score": 1.087
+    },
+    {
+      "date": "2026-03-12",
+      "icsSummary": "Wood Road Yearbook Photos (1 photog)",
+      "schedulerEvent": "Wood Road Yearbook Photos",
+      "canonicalSchool": "Wood Road Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-04",
+      "icsSummary": "Destine Prep Makeup (1 photog)",
+      "schedulerEvent": "Destine Prep Makeup (1 photog)",
+      "canonicalSchool": "Destine Prep Charter School",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-02",
+      "icsSummary": "Cairo-Durham Spring Sports (2 photogs)",
+      "schedulerEvent": "Cairo-Durham Spring Sports (2 photogs)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-12",
+      "icsSummary": "Little Journeys Daycare (1 team)",
+      "schedulerEvent": "Little Journeys Daycare",
+      "canonicalSchool": "Little Journeys",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-12",
+      "icsSummary": "Eagle Point 5th Grade Grad Photos (1 team)",
+      "schedulerEvent": "Eagle Point 5th Grade Grads (1 Team)",
+      "canonicalSchool": "Eagle Point Elementary School (Albany School District)",
+      "score": 1.05
+    },
+    {
+      "date": "2026-05-21",
+      "icsSummary": "Karigon 5th Grade Picnic (1 studio photog 11;45a)",
+      "schedulerEvent": "Karigon 5th Grade Picnic 11:45am",
+      "canonicalSchool": "Karigon Elementary School (Shenendehowa School District)",
+      "score": 1.071
+    },
+    {
+      "date": "2026-04-23",
+      "icsSummary": "NEW DATE Blessed Sacrament Spring Pics (REQ Andrew 1 team)",
+      "schedulerEvent": "Blessed Sacrament (1 Team) REQ: Andrew",
+      "canonicalSchool": "Blessed Sacrament",
+      "score": 1.079
+    },
+    {
+      "date": "2026-03-30",
+      "icsSummary": "Elevate Dance Project Day 1 4;00-8;30 PM",
+      "schedulerEvent": "Elevate Dance Project Studio Day 1 4:30-8:15 PM",
+      "canonicalSchool": "Elevate Dance Project",
+      "score": 1.053
+    },
+    {
+      "date": "2026-04-30",
+      "icsSummary": "TSL East Greenbush UPK & Grads (1 photog)",
+      "schedulerEvent": "TSL East Greenbush UPK new address (1 Photog)",
+      "canonicalSchool": "TSL East Greenbush UPK",
+      "score": 1.084
+    },
+    {
+      "date": "2026-04-24",
+      "icsSummary": "Shatekon Elem Spring Pic Day (2 teams plus one extra photog)",
+      "schedulerEvent": "Shatekon Elem Spring Pics (2 Teams) Pano?",
+      "canonicalSchool": "Shatekon Elementary School (Shenendehowa School District)",
+      "score": 1.04
+    },
+    {
+      "date": "2026-03-03",
+      "icsSummary": "Tech Valley Senior Retakes (Steph +1)",
+      "schedulerEvent": "Tech Valley Senior Retakes",
+      "canonicalSchool": "Tech Valley Seniors",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-08",
+      "icsSummary": "Wonderland Co-op Nursery RAIN DATES (REQ Lauren)",
+      "schedulerEvent": "Wonderland Rain Req Lauren",
+      "canonicalSchool": "Wonderland",
+      "score": 0.875
+    },
+    {
+      "date": "2025-10-08",
+      "icsSummary": "Malta Ave Elementary Picture Day (2 teams)",
+      "schedulerEvent": "Malta Ave Elementary (2 Teams) 68IRM",
+      "canonicalSchool": "Malta Avenue Elementary School (Ballston Spa School District)",
+      "score": 1.012
+    },
+    {
+      "date": "2025-11-07",
+      "icsSummary": "Jefferson Elementary MAKEUPS (1 team)",
+      "schedulerEvent": "Jefferson Elementary Makeups (1 Team)",
+      "canonicalSchool": "Jefferson Elementary School (Schalmont School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-15",
+      "icsSummary": "Academy Club Photos STEPH",
+      "schedulerEvent": "Academy Club Photos",
+      "canonicalSchool": "The Academies (AA/G)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-25",
+      "icsSummary": "Schenectady JCC Spring Photos 2 days (1 team)",
+      "schedulerEvent": "Schenectady JCC Day 1 (1 Team)",
+      "canonicalSchool": "Schenectady JCC",
+      "score": 1.071
+    },
+    {
+      "date": "2026-02-03",
+      "icsSummary": "AAG Senior Night (Steph)",
+      "schedulerEvent": "AAG Senior Night",
+      "canonicalSchool": "The Academies (AA/G)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-05",
+      "icsSummary": "Karigon Yearbook Club Pics (1 photog)",
+      "schedulerEvent": "Karigon Yearbook Photos 1 Photog",
+      "canonicalSchool": "Karigon Elementary School (Shenendehowa School District)",
+      "score": 1.019
+    },
+    {
+      "date": "2025-11-14",
+      "icsSummary": "Arbor Hill Elem Makeup Day (1 team)",
+      "schedulerEvent": "Arbor Hill Elementary Makeups (1 Photog?)",
+      "canonicalSchool": "Arbor Hill Elementary School (Albany School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-15",
+      "icsSummary": "Cairo-Durham Winter Sports (1 team)",
+      "schedulerEvent": "RESCHEDULED: Cairo-Durham Winter Sports (1 team)",
+      "canonicalSchool": null,
+      "score": 1.018
+    },
+    {
+      "date": "2025-12-01",
+      "icsSummary": "Northville Winter Sports (1 team)",
+      "schedulerEvent": "Northville Winter Sports (1 team)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-02",
+      "icsSummary": "Pleasant Valley Elem (2 teams)",
+      "schedulerEvent": "Pleasant Valley Elementary (2 Teams) 27IRM",
+      "canonicalSchool": "Pleasant Valley Elementary School (Schenectady School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-19",
+      "icsSummary": "REDO Gordon Creek PANO 5th Grade (1 photog)",
+      "schedulerEvent": "REDO Gordon Creek 5th Grade Pano (NO SPRING PICS) 9:15",
+      "canonicalSchool": "Gordon Creek Elementary School (Ballston Spa School District)",
+      "score": 0.9
+    },
+    {
+      "date": "2025-10-16",
+      "icsSummary": "Waterford-Halfmoon Elem MAKEUP DAY (same team as HS)",
+      "schedulerEvent": "Waterford Elementary & MS/HS Makeups (1 Team)",
+      "canonicalSchool": "Waterford Halfmoon Elem",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-30",
+      "icsSummary": "Nathan Lebron Early Learning Center (1 team)",
+      "schedulerEvent": "Nathan Lebron ELC (1 Team) 7IRM",
+      "canonicalSchool": "Nathan Lebron ELC",
+      "score": 0.66
+    },
+    {
+      "date": "2025-10-24",
+      "icsSummary": "Orenda Elem Rain & Makeup Day (2 teams potentially)",
+      "schedulerEvent": "Orenda Elementary MAKEUPS",
+      "canonicalSchool": "Orenda Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-13",
+      "icsSummary": "Nathan Lebron Early Learning Center (1 team)",
+      "schedulerEvent": "Nathan Lebron ELC Spring Photos",
+      "canonicalSchool": "Nathan Lebron ELC",
+      "score": 0.66
+    },
+    {
+      "date": "2026-05-06",
+      "icsSummary": "Loudonville Christian Spring Photos (PK-5) (1 team)",
+      "schedulerEvent": "Loudonville Christian Spring Photos PK-5 (1 Team)",
+      "canonicalSchool": "Loudonville Christian",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-15",
+      "icsSummary": "Duanesburg Spring Sports Media Day (2 TEAMS)",
+      "schedulerEvent": "Duanesburg Spring Sports (2 Set-ups)",
+      "canonicalSchool": "Duanesburg",
+      "score": 1.023
+    },
+    {
+      "date": "2025-10-09",
+      "icsSummary": "Wood Road Elem Fall Photos (2 teams)",
+      "schedulerEvent": "Wood Road Elementary (2 Teams) 88IRM",
+      "canonicalSchool": "Wood Road Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-04",
+      "icsSummary": "DUANESBURG Winter Sports (1 team)",
+      "schedulerEvent": "DUANESBURG Winter Sports (1 team)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-01",
+      "icsSummary": "Elevate Dance Project Day 2 4;00-8;30 PM",
+      "schedulerEvent": "Elevate Dance Project Studio Day 2 4:30-8:15 PM",
+      "canonicalSchool": "Elevate Dance Project",
+      "score": 1.053
+    },
+    {
+      "date": "2026-03-18",
+      "icsSummary": "Cairo-Durham Elem PK/K/5th Grad Pics  (2 teams)",
+      "schedulerEvent": "Cairo Elem Grad Pics (PK/K/5th) (2 Teams)",
+      "canonicalSchool": "Cairo-Durham Elem",
+      "score": 0.922
+    },
+    {
+      "date": "2025-11-21",
+      "icsSummary": "Yates Elementary Makeups (1 team)",
+      "schedulerEvent": "Yates Makeups (1 Photog)",
+      "canonicalSchool": "Yates Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-28",
+      "icsSummary": "TSL Kid's Crew, Scotia (1 photog)",
+      "schedulerEvent": "TSL Scotia (1 Photog)",
+      "canonicalSchool": "TSL Scotia",
+      "score": 0.829
+    },
+    {
+      "date": "2025-12-17",
+      "icsSummary": "Rivers Casino Employee Party",
+      "schedulerEvent": "Rivers Casino Employee Party 6/10PM",
+      "canonicalSchool": null,
+      "score": 1.105
+    },
+    {
+      "date": "2025-09-26",
+      "icsSummary": "NEW Craig Elementary (2 teams)",
+      "schedulerEvent": "NEW Craig Elementary School [Nisky] (2 Teams) ~75IRM",
+      "canonicalSchool": "Craig Elementary School (Niskayuna School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-03",
+      "icsSummary": "Troy School 14 Elem (2 teams)",
+      "schedulerEvent": "Troy School 14 Elementary (2 Teams) 47IRM",
+      "canonicalSchool": "Troy School 14",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-08",
+      "icsSummary": "Cohoes HS Fall Sports (1 team)",
+      "schedulerEvent": "Cohoes HS Fall Sports Afternoon",
+      "canonicalSchool": null,
+      "score": 0.954
+    },
+    {
+      "date": "2026-04-17",
+      "icsSummary": "Malta Ave 5th Grade Pano RAIN (1 photog )",
+      "schedulerEvent": "Malta Ave 5th Grade Pano RAIN",
+      "canonicalSchool": "Malta Avenue Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-06",
+      "icsSummary": "Smile Lodge Christmas Party 2 PHOTOGS",
+      "schedulerEvent": "Smile Lodge Christmas Party 2 PHOTOGS 5PM",
+      "canonicalSchool": null,
+      "score": 1.112
+    },
+    {
+      "date": "2025-10-09",
+      "icsSummary": "Albany Academy Makeup Day (1 photog)",
+      "schedulerEvent": "Albany Academy Makeup Day",
+      "canonicalSchool": "The Academies (AA/G)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-20",
+      "icsSummary": "Maple Leaf Halfmoon (2 teams-baby team/toddler team)",
+      "schedulerEvent": "Maple Leaf Halfmoon (2 Teams)",
+      "canonicalSchool": "Maple Leaf Halfmoon",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-02",
+      "icsSummary": "Waterford-Halfmoon Fall Sports (1 team)",
+      "schedulerEvent": "Waterford Halfmoon Fall Sports",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-03",
+      "icsSummary": "MLK Jr. Elementary (NEW) (2 teams)",
+      "schedulerEvent": "MLK Jr. Elementary (NEW) (2 teams)",
+      "canonicalSchool": "MLK Jr. Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-21",
+      "icsSummary": "New Dreams Nursery 2 Mornings (1 photog)",
+      "schedulerEvent": "New Dreams Nursery Day 1 (1 photog)",
+      "canonicalSchool": "New Dreams Nursery",
+      "score": 1.016
+    },
+    {
+      "date": "2025-09-29",
+      "icsSummary": "School Team Huddle 8pm?",
+      "schedulerEvent": "SCHOOL TEAM HUDDLE CALL 8PM",
+      "canonicalSchool": null,
+      "score": 0.89
+    },
+    {
+      "date": "2026-02-12",
+      "icsSummary": "Columbia High Senior-Musicians EARLY AM (Steph?)",
+      "schedulerEvent": "Columbia High Musicians Early AM",
+      "canonicalSchool": "Columbia High School",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-18",
+      "icsSummary": "Wood Road Family Photo Day",
+      "schedulerEvent": "Wood Road Family Photos",
+      "canonicalSchool": "Wood Road Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-07",
+      "icsSummary": "Duanesburg Sweetheart Dance",
+      "schedulerEvent": "Duanesburg Sweetheart Dance",
+      "canonicalSchool": "Duanesburg",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-02",
+      "icsSummary": "Nassau-Shatford LL (2 photogs + 1 team)",
+      "schedulerEvent": "Nassau LL (2 Photogs + 1 Team Photog)",
+      "canonicalSchool": null,
+      "score": 0.817
+    },
+    {
+      "date": "2025-10-17",
+      "icsSummary": "Duanesburg Makeup Day Elem & MSHS (1 team)",
+      "schedulerEvent": "Duanesburg Elementary & MS/HS Makeups (1 Team)",
+      "canonicalSchool": "D'burg Elementary",
+      "score": 0.757
+    },
+    {
+      "date": "2026-04-29",
+      "icsSummary": "TSL Niskayuna UPK (1 photog)",
+      "schedulerEvent": "TSL Niskayuna UPK (1 Photog)",
+      "canonicalSchool": "TSL Niskayuna UPK",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-29",
+      "icsSummary": "Pieter B Coeymans Elem Picture Day (2 teams)",
+      "schedulerEvent": "Pieter B Coeymans (2 Teams) 85IRM",
+      "canonicalSchool": "RCS - Pieter B Coeymans",
+      "score": 1.085
+    },
+    {
+      "date": "2026-05-04",
+      "icsSummary": "Heatly 8th grade pano RAIN (1 photog)",
+      "schedulerEvent": "Tesago 5th Grade Pano RAIN",
+      "canonicalSchool": "Tesago Elementary School (Shenendehowa School District)",
+      "score": 0.644
+    },
+    {
+      "date": "2025-09-04",
+      "icsSummary": "Academy Upper School Pics (New/Mentor/US)",
+      "schedulerEvent": "Academy Upper School Pictures (New/Mentor/Upper School)",
+      "canonicalSchool": "The Academies (AA/G)",
+      "score": 0.795
+    },
+    {
+      "date": "2025-09-03",
+      "icsSummary": "Kids Express First Day 7:30am (1 photog)",
+      "schedulerEvent": "Kids Express First Day AM",
+      "canonicalSchool": "Kid's Express",
+      "score": 0.863
+    },
+    {
+      "date": "2026-05-04",
+      "icsSummary": "Waterford-Halfmoon RAIN PANO ONLY (1 photog)",
+      "schedulerEvent": "Waterford-Halfmoon Spring Photos (2 Teams)",
+      "canonicalSchool": "Waterford Halfmoon Elem",
+      "score": 1.03
+    },
+    {
+      "date": "2026-05-13",
+      "icsSummary": "Gordon Creek PANO 5th Grade (1 photog)",
+      "schedulerEvent": "Gordon Creek 5th Grade Pano (NO SPRING PICS)",
+      "canonicalSchool": "Gordon Creek Elementary School (Ballston Spa School District)",
+      "score": 0.938
+    },
+    {
+      "date": "2026-04-16",
+      "icsSummary": "Arbor Hill Elementary AM ONLY (2 teams)",
+      "schedulerEvent": "Arbor Hill Elementary (2 Teams)",
+      "canonicalSchool": "Arbor Hill Elementary School (Albany School District)",
+      "score": 0.993
+    },
+    {
+      "date": "2026-02-18",
+      "icsSummary": "Siena Career Fair 1 Photog",
+      "schedulerEvent": "Siena Career Fair 1 Photog",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-14",
+      "icsSummary": "BKW Spring Sports (2 photogs)",
+      "schedulerEvent": "BKW Spring Sports (2 Photogs)",
+      "canonicalSchool": "BKW Secondary",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-03",
+      "icsSummary": "Albany Academy Fall Sports (2 photogs) AFTERNOON 2-4pm",
+      "schedulerEvent": "Academy Fall Sports AFTERNOON 2-4pm",
+      "canonicalSchool": null,
+      "score": 1.071
+    },
+    {
+      "date": "2026-05-05",
+      "icsSummary": "Pieter B Coeymans Spring Pic Day (2 teams+1)",
+      "schedulerEvent": "Pieter B Coeymans Spring Photos (2 Teams)",
+      "canonicalSchool": "Pieter B Coeymans",
+      "score": 1.085
+    },
+    {
+      "date": "2025-10-20",
+      "icsSummary": "Hamilton Elementary School (2 teams)",
+      "schedulerEvent": "Hamilton Elementary School (2 Teams) 40IRM",
+      "canonicalSchool": "Hamilton Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-24",
+      "icsSummary": "Van Corlaer Elem Makeups (1 team)",
+      "schedulerEvent": "Van Corlaer Makeups",
+      "canonicalSchool": "Van Corlaer Elementary School (Schenectady School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-15",
+      "icsSummary": "Keane 5th Grade Pano Rain Date (1 photog)",
+      "schedulerEvent": "Keane 5th Grade Pano RAIN (1 Photog)",
+      "canonicalSchool": "Keane Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-06",
+      "icsSummary": "Little Scholars Viaport (1 team)",
+      "schedulerEvent": "Little Scholars Viaport (1 Team)",
+      "canonicalSchool": "Little Scholars Viaport",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-20",
+      "icsSummary": "The Sara Marie School (1 photog)",
+      "schedulerEvent": "Sara Marie Preschool (1 Team) 45IRM",
+      "canonicalSchool": "Sara Marie Preschool",
+      "score": 0.967
+    },
+    {
+      "date": "2026-05-08",
+      "icsSummary": "Pieter B Coeymans RAIN FOR PANO ONLY (1 Photog)",
+      "schedulerEvent": "Pieter B Coeymans Pano RAIN",
+      "canonicalSchool": "Pieter B Coeymans",
+      "score": 0.975
+    },
+    {
+      "date": "2025-11-17",
+      "icsSummary": "Little Llamas Preschool (1 photog)",
+      "schedulerEvent": "Little Llamas Preschool Day 1 (1 Photog)",
+      "canonicalSchool": "Little Llamas Preschool",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-28",
+      "icsSummary": "NEW Precious Hearts Daycare (1 team)",
+      "schedulerEvent": "Precious Hearts Daycare",
+      "canonicalSchool": "Precious Hearts Daycare",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-01",
+      "icsSummary": "Hamilton Elem Makeups (1 team)",
+      "schedulerEvent": "Hamilton Elem Makeups (1 team)",
+      "canonicalSchool": "Hamilton Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-08",
+      "icsSummary": "Germantown High School Winter Sports (NEW)",
+      "schedulerEvent": "Germantown Winter Sports NEW",
+      "canonicalSchool": null,
+      "score": 0.929
+    },
+    {
+      "date": "2025-12-09",
+      "icsSummary": "NEW TSL @ Sacred Heart",
+      "schedulerEvent": "New TSL @ Sacred Heart (1 Team)",
+      "canonicalSchool": "TSL Sacred Heart",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-12",
+      "icsSummary": "Happy Kids Day Care (1 photog)",
+      "schedulerEvent": "Happy Kids Daycare (1 Photog)",
+      "canonicalSchool": "Happy Kids Daycare",
+      "score": 0.8
+    },
+    {
+      "date": "2025-09-15",
+      "icsSummary": "NEW Capital Region BOCES Albany Extension (1 Team)",
+      "schedulerEvent": "Capital Region BOCES Albany Extension (1 Team)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-12",
+      "icsSummary": "Photo Booth Rudy's VR (near studio)",
+      "schedulerEvent": "Photobooth Rudy's VR 5:30p",
+      "canonicalSchool": null,
+      "score": 0.859
+    },
+    {
+      "date": "2025-12-11",
+      "icsSummary": "Keane Elem Makeups (1 team)",
+      "schedulerEvent": "Keane Makeups (1 Photog)",
+      "canonicalSchool": "Keane Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-09",
+      "icsSummary": "April Scheduling Call 2:30pm",
+      "schedulerEvent": "APRIL SCHEDULING CALL",
+      "canonicalSchool": null,
+      "score": 1.091
+    },
+    {
+      "date": "2025-11-07",
+      "icsSummary": "Clifton Park Ctr Baptist Preschool (1 photog)",
+      "schedulerEvent": "Clifton Park Center Baptist Church (1 Photog)",
+      "canonicalSchool": "Clifton Park Center Baptist Church",
+      "score": 0.707
+    },
+    {
+      "date": "2026-03-11",
+      "icsSummary": "Milton Terrace Yearbook Photos (1 photog)",
+      "schedulerEvent": "Milton Terrace Yearbook Photos",
+      "canonicalSchool": "Milton Terrace Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-17",
+      "icsSummary": "Belanger Nursing Senior Photos (2 photogs)",
+      "schedulerEvent": "Belanger Nursing Seniors (2 Photogs)",
+      "canonicalSchool": "Belanger Nursing Seniors",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-31",
+      "icsSummary": "Women's Summit LAUREN",
+      "schedulerEvent": "Business Review Women's Summit HOLD - TENTATIVE",
+      "canonicalSchool": null,
+      "score": 0.84
+    },
+    {
+      "date": "2025-10-22",
+      "icsSummary": "Siena Townhouse Pics STEPH",
+      "schedulerEvent": "Senior Night Townhouse Family Pics 6-8 PM",
+      "canonicalSchool": null,
+      "score": 0.8
+    },
+    {
+      "date": "2026-04-23",
+      "icsSummary": "Okte Spring Pics & 5th grade pano (2 teams)",
+      "schedulerEvent": "Okte Spring Pictures (2 Teams)",
+      "canonicalSchool": "Okte Elementary School (Shenendehowa School District)",
+      "score": 0.757
+    },
+    {
+      "date": "2025-09-29",
+      "icsSummary": "Tesago Elementary (2 teams)",
+      "schedulerEvent": "Tesago Elementary (2 Teams) 67IRM",
+      "canonicalSchool": "Tesago Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-27",
+      "icsSummary": "Tesago Elem Makeup Day (1 team)",
+      "schedulerEvent": "Tesago Elementary Makeups",
+      "canonicalSchool": "Tesago Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-03",
+      "icsSummary": "Lincoln Elem Makeup (1 team)",
+      "schedulerEvent": "Lincoln Elementary Makeups 24IRM",
+      "canonicalSchool": "Lincoln Elementary Community School (Schenectady School District)",
+      "score": 0.985
+    },
+    {
+      "date": "2026-04-22",
+      "icsSummary": "Arongen Spring Pics & 5th Grade Pano (2 teams)",
+      "schedulerEvent": "Arongen Spring Pictures (2 Photogs)",
+      "canonicalSchool": "Arongen Elementary School (Shenendehowa School District)",
+      "score": 0.826
+    },
+    {
+      "date": "2025-11-13",
+      "icsSummary": "Gordon Creek Elem Makeups (1 team)",
+      "schedulerEvent": "Gordon Creek Makeups (1 Photog)",
+      "canonicalSchool": "Gordon Creek Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-05",
+      "icsSummary": "Little Achiever's Preschool (1 team)",
+      "schedulerEvent": "Little Achiever's Preschool (1 Team) DAY 1",
+      "canonicalSchool": "Little Achiever's Preschool",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-22",
+      "icsSummary": "Saratoga Girls Varsity Basketball Media STEPH AM",
+      "schedulerEvent": "Saratoga Girls Varsity Basketball Media Day 9AM",
+      "canonicalSchool": null,
+      "score": 0.919
+    },
+    {
+      "date": "2025-11-04",
+      "icsSummary": "Destine Preparatory Charter School (2 teams)",
+      "schedulerEvent": "Destine Prep Charter School (2 Teams) 17IRM",
+      "canonicalSchool": "Destine Prep Charter School",
+      "score": 0.768
+    },
+    {
+      "date": "2026-05-20",
+      "icsSummary": "Keane 5th Grade Group Photo 10:15",
+      "schedulerEvent": "MOVED Keane 5th Grade Pano 10:15 (1 Photog)",
+      "canonicalSchool": "Keane Elementary",
+      "score": 0.804
+    },
+    {
+      "date": "2026-05-07",
+      "icsSummary": "Karigon Spring Photos + 5th grade groups (2 teams)",
+      "schedulerEvent": "Karigon Spring Photos (2 Teams)",
+      "canonicalSchool": "Karigon Elementary School (Shenendehowa School District)",
+      "score": 0.848
+    },
+    {
+      "date": "2025-10-27",
+      "icsSummary": "Two By Two Nursery School (1 team)",
+      "schedulerEvent": "Two by Two Nursery School (1 Photog) 7IRM",
+      "canonicalSchool": "Two by Two Nursery School",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-30",
+      "icsSummary": "Shaker Prom",
+      "schedulerEvent": "Shaker Junior Prom",
+      "canonicalSchool": null,
+      "score": 0.867
+    },
+    {
+      "date": "2026-04-25",
+      "icsSummary": "Rotterdam Softball NEW 2 teams plus one team photographer",
+      "schedulerEvent": "Rotterdam Softball (2 Photogs + 1 Team Photog)",
+      "canonicalSchool": null,
+      "score": 1.04
+    },
+    {
+      "date": "2025-11-23",
+      "icsSummary": "Saint Madeleine and Saint Gabriel Confirmation Group Pic 1;30",
+      "schedulerEvent": "Saint Madeleine and Saint Gabriel Confirmation Group Pic 1:30",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-06",
+      "icsSummary": "Our Savior's Makeup Day (1 team)",
+      "schedulerEvent": "Our Saviors Makeup Day (1 Photog)",
+      "canonicalSchool": "Our Saviors",
+      "score": 0.899
+    },
+    {
+      "date": "2025-11-19",
+      "icsSummary": "TSL UPK East Greenbush (1 photog)",
+      "schedulerEvent": "TSL East Greenbush (1 Photog) 2IRM",
+      "canonicalSchool": "TSL East Greenbush",
+      "score": 0.945
+    },
+    {
+      "date": "2026-02-05",
+      "icsSummary": "Heatly 8th Grade Grad Photos (1 photog + Asst)",
+      "schedulerEvent": "Heatly 8th Grade Grad Photos (1 Photog + Assistant)",
+      "canonicalSchool": "Heatly School",
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-04",
+      "icsSummary": "Digital Express Headshots STEPH",
+      "schedulerEvent": "Digital Xpress Headshots on site",
+      "canonicalSchool": null,
+      "score": 0.763
+    },
+    {
+      "date": "2025-11-05",
+      "icsSummary": "Wood Road Makeup Day (1 team)",
+      "schedulerEvent": "Wood Road Makeups (1 Team?)",
+      "canonicalSchool": "Wood Road Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-05",
+      "icsSummary": "Milton Terrace Elem Makeup (1 team)",
+      "schedulerEvent": "Milton Terrace Elementary Makeups (1 Team?)",
+      "canonicalSchool": "Milton Terrace Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-24",
+      "icsSummary": "Gordon Creek Yearbook Clubs (1 photog)",
+      "schedulerEvent": "Gordon Creek Yearbook Photos",
+      "canonicalSchool": "Gordon Creek Elementary School (Ballston Spa School District)",
+      "score": 1.081
+    },
+    {
+      "date": "2025-10-01",
+      "icsSummary": "Arongen Elementary (2 teams)",
+      "schedulerEvent": "Arongen Elementary (2 Teams) 87IRM",
+      "canonicalSchool": "Arongen Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-14",
+      "icsSummary": "Arbor Hill Elementary AM ONLY (2 teams)",
+      "schedulerEvent": "Arbor Hill Elementary (2 Teams) 22IRM",
+      "canonicalSchool": "Arbor Hill Elementary School (Albany School District)",
+      "score": 0.993
+    },
+    {
+      "date": "2026-03-13",
+      "icsSummary": "Skano 5th grade group pic (1 photog)",
+      "schedulerEvent": "Skano 5th Grade Group Picture",
+      "canonicalSchool": "Skano Elementary School (Shenendehowa School District)",
+      "score": 1.102
+    },
+    {
+      "date": "2026-04-02",
+      "icsSummary": "Northville Spring Sports & Clubs (2 photogs)",
+      "schedulerEvent": "Northville Spring Sports & Clubs (2 photogs)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-21",
+      "icsSummary": "New Lebanon SENIORS Day 2 (1 team)",
+      "schedulerEvent": "New Lebanon Underclass Makeups AND Seniors (1 Photog?)",
+      "canonicalSchool": "New Lebanon Jr/Sr High School",
+      "score": 0.908
+    },
+    {
+      "date": "2026-04-13",
+      "icsSummary": "May Schedule Call 1:20pm",
+      "schedulerEvent": "May Scheduling Call 1:20 PM",
+      "canonicalSchool": null,
+      "score": 0.716
+    },
+    {
+      "date": "2026-02-23",
+      "icsSummary": "Mentoring Monday 1;15 arrival",
+      "schedulerEvent": "Mentoring Monday Headshots",
+      "canonicalSchool": null,
+      "score": 0.674
+    },
+    {
+      "date": "2026-05-20",
+      "icsSummary": "YMCA Learning Village (CTK) Pre-K Grad Photos (1 photog)",
+      "schedulerEvent": "YMCA Learning Village (Christ the King) PK Grads (1 Team)",
+      "canonicalSchool": "Christ the King",
+      "score": 0.783
+    },
+    {
+      "date": "2026-05-20",
+      "icsSummary": "TSL Kids Crew, Rotterdam & Grads (1 photog)",
+      "schedulerEvent": "TSL Rotterdam & Grads",
+      "canonicalSchool": "TSL Rotterdam",
+      "score": 0.885
+    },
+    {
+      "date": "2026-02-13",
+      "icsSummary": "A Night to Shine PHOTOBOOTH",
+      "schedulerEvent": "A Night to Shine Photobooth",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-20",
+      "icsSummary": "Spotted Zebra (2 days, 1 team REQ Andrew +1)",
+      "schedulerEvent": "Spotted Zebra Day 1 (REQ: Andrew)",
+      "canonicalSchool": "Spotted Zebra",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-08",
+      "icsSummary": "Waterford Halfmoon Sweetheart Dance GIRLS 1 Photog",
+      "schedulerEvent": "Waterford Elementary Sweetheart Dance (Girls)",
+      "canonicalSchool": "Waterford Halfmoon Elem",
+      "score": 0.936
+    },
+    {
+      "date": "2025-10-14",
+      "icsSummary": "Christ the King ECC (1 team)",
+      "schedulerEvent": "Christ the King ELC Day 1 (1 Team) 29IRM",
+      "canonicalSchool": "Christ the King",
+      "score": 1.065
+    },
+    {
+      "date": "2026-05-07",
+      "icsSummary": "Maple Leaf - MALTA SOUTH (2 teams)",
+      "schedulerEvent": "Maple Leaf Malta South (2 Teams)",
+      "canonicalSchool": "Maple Leaf Malta South",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-15",
+      "icsSummary": "Hackett Middle School (2 teams)",
+      "schedulerEvent": "Hackett Middle School Day 1 (2 Teams) 27IRM",
+      "canonicalSchool": "William S. Hackett Middle School (Albany School District)",
+      "score": 1.053
+    },
+    {
+      "date": "2025-12-11",
+      "icsSummary": "BKW Winter Sports (2 photogs)",
+      "schedulerEvent": "BKW Winter Sports (2 photogs)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-01",
+      "icsSummary": "NEW Little Journeys Daycare (1 team)",
+      "schedulerEvent": "NEW Little Journeys Daycare (1 team)",
+      "canonicalSchool": "Little Journeys Daycare",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-08",
+      "icsSummary": "Childhood Friends - Rotterdam (1 Team)",
+      "schedulerEvent": "Childhood Friends - Rotterdam (1 Team) Day 1",
+      "canonicalSchool": "Childhood Friends - Rotterdam",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-12",
+      "icsSummary": "Stevens Elementary MAKEUPS (Burnt Hills) (1 team)",
+      "schedulerEvent": "Stevens Elementary Makeups (1 Photog?)",
+      "canonicalSchool": "Stevens Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-30",
+      "icsSummary": "Skano Elem Rain Date (3 teams)",
+      "schedulerEvent": "Skano Rain Date",
+      "canonicalSchool": "Skano Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-07",
+      "icsSummary": "Saint Madeleine's Fall Photos (1 team)",
+      "schedulerEvent": "SMS Fall Photos (1 Team) 45IRM",
+      "canonicalSchool": "Saint Madeleine",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-23",
+      "icsSummary": "Gardner-Dickinson Makeups (1 team)",
+      "schedulerEvent": "Gardner-Dickinson Makeups (1 Photog)",
+      "canonicalSchool": "Gardner Dickinson",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-06",
+      "icsSummary": "Central Park Middle School (1 team)",
+      "schedulerEvent": "Central Park Middle School (2 Teams) DAY 1",
+      "canonicalSchool": "Central Park Middle School",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-11",
+      "icsSummary": "TSL Daycare Guilderland (1 team)",
+      "schedulerEvent": "TSL Daycare Guilderland (1 Team)",
+      "canonicalSchool": "TSL Guilderland",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-21",
+      "icsSummary": "New Lebanon SENIORS Day 3 PM (1 team)",
+      "schedulerEvent": "New Lebanon Seniors",
+      "canonicalSchool": "New Lebanon Seniors",
+      "score": 1.053
+    },
+    {
+      "date": "2025-10-27",
+      "icsSummary": "Wildwood School - Latham Site (Andrew +1)",
+      "schedulerEvent": "Wildwood School - Latham (1 Team) 17IRM",
+      "canonicalSchool": "Wildwood School - Latham",
+      "score": 1.071
+    },
+    {
+      "date": "2026-03-26",
+      "icsSummary": "Siena Career Fair 1 Photog (Evening)",
+      "schedulerEvent": "Siena Career Fair Evening 4:30-6:30",
+      "canonicalSchool": null,
+      "score": 0.936
+    },
+    {
+      "date": "2025-11-30",
+      "icsSummary": "DCS 6th Grade Family Photo Day (Steph)",
+      "schedulerEvent": "DCS 6th Grade Family Photo Day (Steph)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-19",
+      "icsSummary": "Craig Elementary 5th Grade Pano (1 photog)",
+      "schedulerEvent": "Craig Elementary 5th Grade Pano (1 photog)",
+      "canonicalSchool": "Craig Elementary School (Niskayuna School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-24",
+      "icsSummary": "Glencliff Elementary (2 teams)",
+      "schedulerEvent": "Glencliff Elementary (2 Teams) 76IRM",
+      "canonicalSchool": "Glencliff Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-10",
+      "icsSummary": "Cairo-Durham Elem Spring (1 team)",
+      "schedulerEvent": "Cairo-Durham Spring Photos ALL GRADES",
+      "canonicalSchool": "Cairo-Durham Elem",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-14",
+      "icsSummary": "Shatekon Elementary (2 teams)",
+      "schedulerEvent": "Shatekon Elementary (2 Teams) 81IRM",
+      "canonicalSchool": "Shatekon Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-28",
+      "icsSummary": "Wildwood School - Curry Road (Andrew + 1)",
+      "schedulerEvent": "Wildwood School - Curry Road (1 Team) 17IRM",
+      "canonicalSchool": "Wildwood School - Curry Road",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-04",
+      "icsSummary": "Maywood Academy BOCES (1 team)",
+      "schedulerEvent": "Maywood Academy BOCES (1 Team) 10IRM",
+      "canonicalSchool": null,
+      "score": 1.081
+    },
+    {
+      "date": "2025-11-04",
+      "icsSummary": "Hudson Valley Consortium Makeups FULL DAY (REQ Molly +1)",
+      "schedulerEvent": "Hudson Valley Consortium Makeups (1 Photog) 21IRM",
+      "canonicalSchool": "Hudson Valley Consortium",
+      "score": 1.098
+    },
+    {
+      "date": "2025-11-14",
+      "icsSummary": "Alb School of Humanities Makeup Day (1 team)",
+      "schedulerEvent": "ASH Makeups (1 Team)",
+      "canonicalSchool": "Albany School of Humanities (Albany School District)",
+      "score": 0.722
+    },
+    {
+      "date": "2025-11-14",
+      "icsSummary": "Academy Winter Sports Day 1",
+      "schedulerEvent": "Academy Sports Day 1 (basketball, Swim, and prep hockey)",
+      "canonicalSchool": null,
+      "score": 0.967
+    },
+    {
+      "date": "2026-04-27",
+      "icsSummary": "Shatekon PANO RAIN DATE (1 photog)",
+      "schedulerEvent": "Shatekon Pano RAIN",
+      "canonicalSchool": "Shatekon Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-19",
+      "icsSummary": "Jefferson 4th Grade Pano RAIN DATE (1 photog)",
+      "schedulerEvent": "Jefferson 4th Grade",
+      "canonicalSchool": "Jefferson Elementary School (Schalmont School District)",
+      "score": 1.086
+    },
+    {
+      "date": "2025-11-12",
+      "icsSummary": "Mother Teresa Academy Makeups (1 team)",
+      "schedulerEvent": "Mother Teresa Academy Makeups (1 Photog)",
+      "canonicalSchool": "Mother Theresa Academy",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-07",
+      "icsSummary": "Albany Academy Spring Photos (ECA-4) (1 team)",
+      "schedulerEvent": "Albany Academy Spring Photos (1 Team)",
+      "canonicalSchool": "The Academies (AA/G)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-13",
+      "icsSummary": "Malta Ave Family Photo Night STEPH",
+      "schedulerEvent": "Malta Ave Family Photo Night",
+      "canonicalSchool": "Malta Avenue Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-07",
+      "icsSummary": "Cohoes High School (1 team)",
+      "schedulerEvent": "Cohoes High School Day 1 (1 Team) 20IRM",
+      "canonicalSchool": "Cohoes High School",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-21",
+      "icsSummary": "Photo Booth Saint Madeleine’s",
+      "schedulerEvent": "Photobooth St. Mads",
+      "canonicalSchool": "Saint Madeleine",
+      "score": 1.058
+    },
+    {
+      "date": "2026-04-14",
+      "icsSummary": "KinderCare Niskayuna (2 teams)",
+      "schedulerEvent": "Kindercare Niskayuna (2 teams)",
+      "canonicalSchool": "Kindercare Niskayuna",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-01",
+      "icsSummary": "Destine Prep Spring Pics & K Grads (2 teams)",
+      "schedulerEvent": "Destine Prep Spring Photos & K Grads (2 Teams)",
+      "canonicalSchool": "Destine Prep Charter School",
+      "score": 0.933
+    },
+    {
+      "date": "2025-09-25",
+      "icsSummary": "Karigon Elementary School (2 teams)",
+      "schedulerEvent": "Karigon Elementary (2 Teams) 88IRM",
+      "canonicalSchool": "Karigon Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-21",
+      "icsSummary": "Myers Middle School (2 teams; 2 days)",
+      "schedulerEvent": "Myers Middle School Day 1 (2 Teams) 18IRM",
+      "canonicalSchool": "Stephen and Harriet Myers Middle School (Albany School District)",
+      "score": 1.04
+    },
+    {
+      "date": "2025-10-15",
+      "icsSummary": "Cairo-Durham Elem Makeups (1 team)",
+      "schedulerEvent": "Cairo Elementary Makeups (1 Photog)",
+      "canonicalSchool": "Cairo-Durham Elem",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-17",
+      "icsSummary": "Maple Leaf - Malta SOUTH (2 teams)",
+      "schedulerEvent": "Maple Leaf Malta South (2 Teams) 13IRM",
+      "canonicalSchool": "Maple Leaf Malta South",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-17",
+      "icsSummary": "Duanesburg MS/HS (1 team)",
+      "schedulerEvent": "Duanesburg MS/HS Day 1 (1 Photog) 37IRM",
+      "canonicalSchool": "D'burg MS/HS",
+      "score": 1.063
+    },
+    {
+      "date": "2025-11-14",
+      "icsSummary": "Hackett MS Makeup Day (1 team)",
+      "schedulerEvent": "Hackett Makeups (1 Team)",
+      "canonicalSchool": "William S. Hackett Middle School (Albany School District)",
+      "score": 1.053
+    },
+    {
+      "date": "2025-11-24",
+      "icsSummary": "Wildwood Makeups (AM only ANDREW)",
+      "schedulerEvent": "Wildwood Makeups",
+      "canonicalSchool": "Wildwood School",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-09",
+      "icsSummary": "DLL Opening Day (3 Photographers)",
+      "schedulerEvent": "RESCHEDULING: DLL Opening Day (3 Photogs)",
+      "canonicalSchool": null,
+      "score": 0.946
+    },
+    {
+      "date": "2025-09-23",
+      "icsSummary": "Walter B. Howard Rain Date (1 team)",
+      "schedulerEvent": "Walter B. Howard Elementary RAIN",
+      "canonicalSchool": "Walter B Howard",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-18",
+      "icsSummary": "TSL Niskayuna UPK (1 photog)",
+      "schedulerEvent": "TSL Niskayuna UPK (was PreK No Colonie/Latham) (1 Photog)",
+      "canonicalSchool": "TSL Niskayuna UPK",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-30",
+      "icsSummary": "Calvary Methodist Preschool (Lauren or Carmen)",
+      "schedulerEvent": "Calvary Methodist Preschool AM (Lauren or Carmen)",
+      "canonicalSchool": "Calvary Methodist Preschool",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-10",
+      "icsSummary": "Siena Photo Booth 6-8pm",
+      "schedulerEvent": "Siena Photo Booth 6-8pm STUDIO",
+      "canonicalSchool": null,
+      "score": 0.996
+    },
+    {
+      "date": "2025-09-03",
+      "icsSummary": "Cairo-Durham SENIORS (2 photogs)",
+      "schedulerEvent": "Cairo Seniors",
+      "canonicalSchool": "Cairo-Durham Seniors",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-05",
+      "icsSummary": "Pleasant Valley Elem Makeups (1 team)",
+      "schedulerEvent": "Pleasant Valley Elementary Makeups (1 Team?)",
+      "canonicalSchool": "Pleasant Valley Elementary School (Schenectady School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-15",
+      "icsSummary": "Cairo-Durham Middle/High Makeups (1 team)",
+      "schedulerEvent": "Cairo Elementary Makeups (1 Photog)",
+      "canonicalSchool": "Cairo-Durham Elem",
+      "score": 0.967
+    },
+    {
+      "date": "2025-09-15",
+      "icsSummary": "Cairo-Durham Elementary 1 Team PK-Gr 2 (1 team)",
+      "schedulerEvent": "Cairo Elementary PK-2 (1 Team) 80IRM",
+      "canonicalSchool": "Cairo-Durham Elem",
+      "score": 1.04
+    },
+    {
+      "date": "2026-02-12",
+      "icsSummary": "RESCHEDULING: Melodies of Christmas Reception (afternoon)",
+      "schedulerEvent": "RESCHEDULING: Melodies of Christmas Reception",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-19",
+      "icsSummary": "Pooh's Corner Picture Day (1 team)",
+      "schedulerEvent": "Pooh's Corner Picture Day (1 Team?) 4IRM",
+      "canonicalSchool": "Pooh's Corner",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-07",
+      "icsSummary": "Milton Terrace Elementary (2 teams)",
+      "schedulerEvent": "Milton Terrace Elementary (2 Teams) 73IRM",
+      "canonicalSchool": "Milton Terrace Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-20",
+      "icsSummary": "Lodge Fest (Steph)",
+      "schedulerEvent": "Lodge Fest",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-16",
+      "icsSummary": "Okte Rain Date",
+      "schedulerEvent": "Okte Rain Date (2 Teams)",
+      "canonicalSchool": "Okte Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-03",
+      "icsSummary": "Waterford-Halfmoon Winter Sports",
+      "schedulerEvent": "Waterford-Halfmoon Winter Sports",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-12",
+      "icsSummary": "December Scheduling Call 3pm",
+      "schedulerEvent": "December Scheduling Call Afternoon 3pm",
+      "canonicalSchool": null,
+      "score": 0.917
+    },
+    {
+      "date": "2025-10-23",
+      "icsSummary": "Karigon Elementary Makeups (1 team)",
+      "schedulerEvent": "Karigon Elementary Makeups (1 Photog)",
+      "canonicalSchool": "Karigon Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-01",
+      "icsSummary": "Tesago Spring Pics & 5th Grade Group Photo (2 teams)",
+      "schedulerEvent": "Tesago Spring Photos & 5th Grade Pano",
+      "canonicalSchool": "Tesago Elementary School (Shenendehowa School District)",
+      "score": 0.8
+    },
+    {
+      "date": "2025-11-20",
+      "icsSummary": "Myers MS Makeup Day (1 team)",
+      "schedulerEvent": "Myers MS Makeups (1 Team)",
+      "canonicalSchool": "Myers Middle School",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-04",
+      "icsSummary": "Waterford-Halfmoon Spring Pics (2 teams)",
+      "schedulerEvent": "Waterford-Halfmoon Spring Photos (2 Teams)",
+      "canonicalSchool": "Waterford Halfmoon Elem",
+      "score": 1.083
+    },
+    {
+      "date": "2026-04-29",
+      "icsSummary": "TSL Bethlehem UPK & Grads (1 photog)",
+      "schedulerEvent": "TSL Bethlehem UPK (1 Photog)",
+      "canonicalSchool": "TSL Bethlehem UPK",
+      "score": 1.067
+    },
+    {
+      "date": "2025-09-09",
+      "icsSummary": "BKW Fall Sports (1 team)",
+      "schedulerEvent": "BKW Fall Sports 9IRM",
+      "canonicalSchool": null,
+      "score": 0.9
+    },
+    {
+      "date": "2026-02-13",
+      "icsSummary": "Christ the King Valentines Dance 6-7:pm (1 photog)",
+      "schedulerEvent": "Christ the King Valentine's Day Dance",
+      "canonicalSchool": "Christ the King",
+      "score": 0.888
+    },
+    {
+      "date": "2026-05-08",
+      "icsSummary": "Chango 5th grade photo (10;15a 1 photog)",
+      "schedulerEvent": "Chango 5th Grade Photo 10:15am (1 Photog)",
+      "canonicalSchool": "Chango Elementary School (Shenendehowa School District)",
+      "score": 1.04
+    },
+    {
+      "date": "2026-05-12",
+      "icsSummary": "AW Becker 5th Grade Group (Lauren)",
+      "schedulerEvent": "AW Becker 5th Grade Group Pano",
+      "canonicalSchool": "A.W. Becker Elementary School (Ravena-Coeymans-Selkirk School District)",
+      "score": 1.1
+    },
+    {
+      "date": "2026-05-08",
+      "icsSummary": "Wood Road Spring Pics & 5th Grade Pano (2 teams)",
+      "schedulerEvent": "Wood Road Spring Pictures & Pano (2 Teams)",
+      "canonicalSchool": "Wood Road Elementary School (Ballston Spa School District)",
+      "score": 0.861
+    },
+    {
+      "date": "2026-05-14",
+      "icsSummary": "Charles Schwab Saratoga Branding 9;00  STEPH",
+      "schedulerEvent": "Charles Schwab Saratoga Branding 9AM",
+      "canonicalSchool": null,
+      "score": 0.871
+    },
+    {
+      "date": "2025-10-08",
+      "icsSummary": "Stevens Elementary (Burnt Hills) (2 TEAMS)",
+      "schedulerEvent": "NEW Stevens Elementary [Burnt Hills] (2 Teams) ~75IRM",
+      "canonicalSchool": "Stevens Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-05",
+      "icsSummary": "Shatekon Grad Photos (1 team)",
+      "schedulerEvent": "Shatekon Grad Photos (1 Team)",
+      "canonicalSchool": "Shatekon Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-15",
+      "icsSummary": "Northville Picture Day (2 teams)",
+      "schedulerEvent": "Northville Picture Day (2 Teams & Class Pics) 84IRM",
+      "canonicalSchool": "Northville",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-23",
+      "icsSummary": "Yates Elementary (1 team)",
+      "schedulerEvent": "Yates Elementary (2 teams?) 33IRM",
+      "canonicalSchool": "Yates Elementary School (Schenectady School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-09",
+      "icsSummary": "Gordon Creek Elem Fall Picture Day (2 teams)",
+      "schedulerEvent": "Gordon Creek Elementary (2 Teams) 102IRM",
+      "canonicalSchool": "Gordon Creek Elementary School (Ballston Spa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-19",
+      "icsSummary": "Duanesburg Elementary (2 teams+1)",
+      "schedulerEvent": "Duanesburg Elementary (2 Teams) 98IRM",
+      "canonicalSchool": "D'burg Elementary",
+      "score": 1.023
+    },
+    {
+      "date": "2025-11-03",
+      "icsSummary": "Siena Career Fair 1 Photog",
+      "schedulerEvent": "Siena Career Fair 12:30-2",
+      "canonicalSchool": null,
+      "score": 1.032
+    },
+    {
+      "date": "2026-05-21",
+      "icsSummary": "NEW Craig Elementary RAIN 5th grade pano (1 photog)",
+      "schedulerEvent": "Craig Elementary PANO RAIN",
+      "canonicalSchool": "Craig Elementary School (Niskayuna School District)",
+      "score": 0.82
+    },
+    {
+      "date": "2025-09-17",
+      "icsSummary": "NEW Rosendale Elementary (2 teams+1)",
+      "schedulerEvent": "NEW Rosendale Elementary [Nisky] (2 Teams) ~75IRM",
+      "canonicalSchool": "Rosendale Elementary School (Niskayuna School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-16",
+      "icsSummary": "Waterford-Halfmoon MS/HS Makeups (1 team)",
+      "schedulerEvent": "Waterford Elementary & MS/HS Makeups (1 Team)",
+      "canonicalSchool": "Waterford Halfmoon Elem",
+      "score": 1.071
+    },
+    {
+      "date": "2025-10-22",
+      "icsSummary": "Skano Elem Makeup Day (1 team)",
+      "schedulerEvent": "Skano Elementary Makeups (1 Team)",
+      "canonicalSchool": "Skano Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-19",
+      "icsSummary": "Our Lady Queen of Peace Nursery School (1 team)",
+      "schedulerEvent": "Our Lady Queen of Peace Nursery School Day 1",
+      "canonicalSchool": "Our Lady Queen of Peace Nursery School",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-05",
+      "icsSummary": "Northville Fall Sports (1 team)",
+      "schedulerEvent": "Northville Fall Sports",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-21",
+      "icsSummary": "New Lebanon Jr/Sr High Makeups (1 team)",
+      "schedulerEvent": "New Lebanon Underclass Makeups AND Seniors (1 Photog?)",
+      "canonicalSchool": "New Lebanon Jr/Sr High School",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-10",
+      "icsSummary": "Cohoes HS Winter Sports (1 team)",
+      "schedulerEvent": "Cohoes HS Winter Sports (1 team)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-09",
+      "icsSummary": "NY Farm Bureau Photo Booth",
+      "schedulerEvent": "NY Farm Bureau Photo Booth",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-12",
+      "icsSummary": "Shatekon Makeups (1 team)",
+      "schedulerEvent": "Shatekon Makeups (1 Photog?)",
+      "canonicalSchool": "Shatekon Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-05",
+      "icsSummary": "Infinite Care (1 team)",
+      "schedulerEvent": "Infinite Care KIPP (1 team)",
+      "canonicalSchool": "Infinite Care KIPP",
+      "score": 1.061
+    },
+    {
+      "date": "2026-02-12",
+      "icsSummary": "Wildwood Seniors (1 team)",
+      "schedulerEvent": "Wildwood Seniors",
+      "canonicalSchool": "Wildwood",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-21",
+      "icsSummary": "New Lebanon Jr/Sr High (1 team)",
+      "schedulerEvent": "New Lebanon Jr/Sr High School (1 Team) 16IRM",
+      "canonicalSchool": "New Lebanon Jr/Sr High School",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-22",
+      "icsSummary": "Walter B Howard Makeup Day (1 team)",
+      "schedulerEvent": "Walter B Howard Makeups (1 Photog)",
+      "canonicalSchool": "Walter B Howard",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-23",
+      "icsSummary": "Glencliff Elem Makeup Day (1 team)",
+      "schedulerEvent": "Glencliff Elementary Makeups (1 Photog)",
+      "canonicalSchool": "Glencliff Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-10",
+      "icsSummary": "WYNANTSKILL Family Photo Night",
+      "schedulerEvent": "WYNANTSKILL (Gardner-Dickinson) Family Photo Night 3:30PM",
+      "canonicalSchool": "Gardner Dickinson",
+      "score": 1.098
+    },
+    {
+      "date": "2025-09-22",
+      "icsSummary": "Walter B. Howard Elem (1 team)",
+      "schedulerEvent": "Walter B. Howard Elementary (1 Team) 47IRM",
+      "canonicalSchool": "Walter B Howard",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-11",
+      "icsSummary": "Colonie Community Daycare Center (1 team)",
+      "schedulerEvent": "Colonie Community Daycare (1 Photog)",
+      "canonicalSchool": "Colonie Community Daycare",
+      "score": 1.082
+    },
+    {
+      "date": "2025-10-06",
+      "icsSummary": "Mother Teresa Academy (2 teams)",
+      "schedulerEvent": "Mother Teresa Academy (2 Teams) 42IRM",
+      "canonicalSchool": "Mother Theresa Academy",
+      "score": 1.081
+    },
+    {
+      "date": "2026-03-25",
+      "icsSummary": "SCAP Early Learning Bigelow (2 teams)",
+      "schedulerEvent": "SCAP Early Learning Bigelow (2 Teams)",
+      "canonicalSchool": "SCAP Early Learning Bigelow",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-06",
+      "icsSummary": "TSL Daycare Guilderland (1 team)",
+      "schedulerEvent": "TSL Guilderland (1 Team)",
+      "canonicalSchool": "TSL Guilderland",
+      "score": 0.884
+    },
+    {
+      "date": "2025-11-12",
+      "icsSummary": "A.W. Becker Makeup Day (1 team)",
+      "schedulerEvent": "AW Becker Makeups (1 Photog)",
+      "canonicalSchool": "A.W. Becker Elementary School (Ravena-Coeymans-Selkirk School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-26",
+      "icsSummary": "Orenda Elementary School (2 teams)",
+      "schedulerEvent": "Orenda Elementary (2 Teams) 85IRM",
+      "canonicalSchool": "Orenda Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-07",
+      "icsSummary": "Photo Booth - Siena PM",
+      "schedulerEvent": "Basketball / Photo Booth - Siena PM",
+      "canonicalSchool": null,
+      "score": 0.926
+    },
+    {
+      "date": "2025-10-03",
+      "icsSummary": "Jefferson Elementary School (3 teams)",
+      "schedulerEvent": "Jefferson Elementary (3 Teams) 204IRM",
+      "canonicalSchool": "Jefferson Elementary School (Schalmont School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-12",
+      "icsSummary": "Saint Madeleine's Makeup Day (1 team)",
+      "schedulerEvent": "Saint Madeline Sophie Makeups (1 Photog)",
+      "canonicalSchool": "Saint Madeleine",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-22",
+      "icsSummary": "Waterford-Halfmoon MS/HS & Senior Afterschool (1 team)",
+      "schedulerEvent": "Waterford-Halfmoon MS/HS & Seniors Afterschool (1 Team?) 21IRM",
+      "canonicalSchool": "Waterford MS/HS",
+      "score": 1.108
+    },
+    {
+      "date": "2025-11-24",
+      "icsSummary": "TSL Kid's Crew, Scotia (1 team)",
+      "schedulerEvent": "TSL Kid's Crew (Scotia)",
+      "canonicalSchool": "TSL Kid's Crew Scotia",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-01",
+      "icsSummary": "NEW Columbia Track Seniors (1:30p REQ LAUREN)",
+      "schedulerEvent": "NEW Columbia High Track Seniors",
+      "canonicalSchool": null,
+      "score": 0.917
+    },
+    {
+      "date": "2026-04-17",
+      "icsSummary": "Erica Ryan Farewell",
+      "schedulerEvent": "Shatekon Farewell for Erica Ryan 1:15",
+      "canonicalSchool": "Shatekon Elementary School (Shenendehowa School District)",
+      "score": 0.674
+    },
+    {
+      "date": "2026-05-15",
+      "icsSummary": "June Scheduling Call",
+      "schedulerEvent": "June Scheduling Call? Time TBD",
+      "canonicalSchool": null,
+      "score": 1.1
+    },
+    {
+      "date": "2025-12-11",
+      "icsSummary": "POSTPONED: Clifton KinderCare (1 team)",
+      "schedulerEvent": "POSTPONED DUE TO NO STAFF; Clifton KinderCare (1 team) Day 1",
+      "canonicalSchool": "Kindercare Clifton Park",
+      "score": 0.878
+    },
+    {
+      "date": "2026-04-28",
+      "icsSummary": "TSL Daycare, Troy (STRONGLY REQ Lauren)",
+      "schedulerEvent": "TSL Troy (REQ: Lauren)",
+      "canonicalSchool": "TSL Troy",
+      "score": 0.817
+    },
+    {
+      "date": "2025-10-21",
+      "icsSummary": "Learning Garden Childcare SLINGERLANDS (2 teams)",
+      "schedulerEvent": "NEW Learning Garden Childcare Slingerlands (2 teams?) ~40IRM",
+      "canonicalSchool": "Learning Garden Childcare Slingerlands",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-19",
+      "icsSummary": "NEW Widdle One’s Childcare Center (1 team)",
+      "schedulerEvent": "Widdle Ones's Childcare Center NEW (1 Team)",
+      "canonicalSchool": "Widdle Ones's Childcare Center",
+      "score": 0.878
+    },
+    {
+      "date": "2026-05-14",
+      "icsSummary": "Maple Leaf Halfmoon Spring & Grads (2 teams)",
+      "schedulerEvent": "Maple Leaf Halfmoon & GRADS (2 Teams)",
+      "canonicalSchool": "Maple Leaf Halfmoon",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-09",
+      "icsSummary": "KinderCare Niskayuna (2 teams)",
+      "schedulerEvent": "Kindercare Nisky (2 Teams) 18IRM",
+      "canonicalSchool": "Kindercare Clifton Park",
+      "score": 0.644
+    },
+    {
+      "date": "2025-11-21",
+      "icsSummary": "Maple Leaf MALTA NORTH (2 teams)",
+      "schedulerEvent": "Maple Leaf Malta North (2 Teams)",
+      "canonicalSchool": "Maple Leaf Malta North",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-03",
+      "icsSummary": "NY Farm Bureau State Meeting - Turning Stone Photo Booth",
+      "schedulerEvent": "NY Farm Bureau State Meeting - Turning Stone Photo Booth 7/2:30PM?",
+      "canonicalSchool": null,
+      "score": 1.123
+    },
+    {
+      "date": "2026-03-27",
+      "icsSummary": "Cohoes HS Spring Sports (1 team)",
+      "schedulerEvent": "Cohoes Spring Sports (1 team)",
+      "canonicalSchool": null,
+      "score": 1.04
+    },
+    {
+      "date": "2026-05-05",
+      "icsSummary": "NEW Widdle One’s Childcare & Grads (1 team)",
+      "schedulerEvent": "Widdle Ones Childcare & Grads (1 Team)",
+      "canonicalSchool": "Widdle Ones",
+      "score": 0.877
+    },
+    {
+      "date": "2025-12-07",
+      "icsSummary": "Jaguars Volleyball Club (Molly, Andrew +1 for team photos)",
+      "schedulerEvent": "Jaguars Volleyball Club",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-07",
+      "icsSummary": "Photo Booth - Albany Academy",
+      "schedulerEvent": "Albany Academy Photobooth",
+      "canonicalSchool": "The Academies (AA/G)",
+      "score": 0.642
+    },
+    {
+      "date": "2025-10-14",
+      "icsSummary": "Eagle Point Elementary (2 teams)",
+      "schedulerEvent": "Eagle Point Elementary (2 Teams) 37IRM",
+      "canonicalSchool": "Eagle Point Elementary School (Albany School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-13",
+      "icsSummary": "Karigon PANO RAIN DATE (1 photog)",
+      "schedulerEvent": "Karigon PANO RAIN (1 Photog)",
+      "canonicalSchool": "Karigon Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-10",
+      "icsSummary": "A.W. Becker Fall Elem Picture Day (2 teams)",
+      "schedulerEvent": "AW Becker Elementary (2 Teams) 71IRM",
+      "canonicalSchool": "A.W. Becker Elementary School (Ravena-Coeymans-Selkirk School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-04",
+      "icsSummary": "Siena Career Fair 1 Photog",
+      "schedulerEvent": "Siena Career Fair 1 Photog",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-27",
+      "icsSummary": "Kids Express Makeup (Matt+1)",
+      "schedulerEvent": "Kid's Express Makeup",
+      "canonicalSchool": "Kid's Express",
+      "score": 0.751
+    },
+    {
+      "date": "2025-10-17",
+      "icsSummary": "Green Tech Makeups (1 team)",
+      "schedulerEvent": "Green Tech Makeups (1 Photog)",
+      "canonicalSchool": "Green Tech MS/HS",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-23",
+      "icsSummary": "Kids Express Fall Photos Day 1 (Matt+1)",
+      "schedulerEvent": "HOLD Kid's Express Day 1 38IRM",
+      "canonicalSchool": "Kid's Express",
+      "score": 0.751
+    },
+    {
+      "date": "2025-12-08",
+      "icsSummary": "Waterford-Halfmoon Family Photo Night",
+      "schedulerEvent": "Waterford-Halfmoon Family Photo Night 4/8PM",
+      "canonicalSchool": "Waterford Halfmoon Elem",
+      "score": 1.117
+    },
+    {
+      "date": "2026-05-19",
+      "icsSummary": "Green Tech 8th grade Grads & Group Photo",
+      "schedulerEvent": "Green Tech 8th grade cap/gown and group photo & Some Seniors",
+      "canonicalSchool": "Green Tech MS/HS",
+      "score": 0.803
+    },
+    {
+      "date": "2026-04-27",
+      "icsSummary": "CX Maple Leaf MALTA NORTH Spring & Grads (2 teams)",
+      "schedulerEvent": "Maple Leaf Malta North (2 Teams)",
+      "canonicalSchool": "Maple Leaf Malta North",
+      "score": 1.057
+    },
+    {
+      "date": "2026-05-07",
+      "icsSummary": "HOLD Albany Academy Spring Photos (PS-4) (1 team)",
+      "schedulerEvent": "Albany Academy Spring Photos (1 Team)",
+      "canonicalSchool": "The Academies (AA/G)",
+      "score": 1.067
+    },
+    {
+      "date": "2026-05-16",
+      "icsSummary": "DLL Opening Day RAIN (3 Photographers)",
+      "schedulerEvent": "DLL Opening Day Rain (3 Photogs)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-03",
+      "icsSummary": "Heatly School (1 team + class pic photg and Colleen)",
+      "schedulerEvent": "Heatly School (1 Team) 34IRM",
+      "canonicalSchool": "Heatly School",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-16",
+      "icsSummary": "NOVEMBER SCHEDULING CALL",
+      "schedulerEvent": "NOVEMBER SCHEDULING CALL 8PM",
+      "canonicalSchool": null,
+      "score": 1.108
+    },
+    {
+      "date": "2025-10-02",
+      "icsSummary": "Hudson Valley Consortium Day 2 (1 team)",
+      "schedulerEvent": "Hudson Valley Consortium Day 2 (1 Team) 21IRM",
+      "canonicalSchool": "Hudson Valley Consortium",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-17",
+      "icsSummary": "Alb School of Humanities Picture Day (2 teams)",
+      "schedulerEvent": "ASH Elementary School (2 Teams) 22IRM",
+      "canonicalSchool": "Albany School of Humanities (Albany School District)",
+      "score": 0.722
+    },
+    {
+      "date": "2025-09-05",
+      "icsSummary": "Academy First Day Stock Photos (STEPH)",
+      "schedulerEvent": "Academy First Day Stock Photos",
+      "canonicalSchool": "The Academies (AA/G)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-28",
+      "icsSummary": "Cohoes HS Makeups (1 team)",
+      "schedulerEvent": "Cohoes Makeups & Seniors",
+      "canonicalSchool": "Cohoes High School",
+      "score": 1.04
+    },
+    {
+      "date": "2025-10-15",
+      "icsSummary": "Rosendale Elementary MAKEUP DAY NEW 2025",
+      "schedulerEvent": "Rosendale Elementary Makeups (1 Team)",
+      "canonicalSchool": "Rosendale Elementary School (Niskayuna School District)",
+      "score": 1.03
+    },
+    {
+      "date": "2025-11-05",
+      "icsSummary": "TSL Daycare, Troy (REQ Lauren)",
+      "schedulerEvent": "TSL Kid's Crew, Troy (REQ: Lauren)",
+      "canonicalSchool": "TSL Kid's Crew Troy",
+      "score": 0.733
+    },
+    {
+      "date": "2026-05-15",
+      "icsSummary": "Jefferson 4th Grade Pano (1 photog)",
+      "schedulerEvent": "Jefferson 4th Grade Pano (1 Photog)",
+      "canonicalSchool": "Jefferson Elementary School (Schalmont School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-11",
+      "icsSummary": "Milton Terrace Spring Photos + 5th Grade Pano (2 teams)",
+      "schedulerEvent": "Milton Terrace Spring Photos & Pano (2 Photogs)",
+      "canonicalSchool": "Milton Terrace Elementary School (Ballston Spa School District)",
+      "score": 0.866
+    },
+    {
+      "date": "2025-11-13",
+      "icsSummary": "Maple Leaf Burnt Hills/Glenville (2 teams)",
+      "schedulerEvent": "Maple Leaf Burnt Hills (2 Teams)",
+      "canonicalSchool": "Maple Leaf Burnt Hills",
+      "score": 1.048
+    },
+    {
+      "date": "2025-12-04",
+      "icsSummary": "Airline Drive Academy Makeups (1 Team)",
+      "schedulerEvent": "Airline Drive Academy Makeups (1 Team)",
+      "canonicalSchool": "Airline Drive Academy",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-09",
+      "icsSummary": "Capital Region BOCES Schoharie (1 Team)",
+      "schedulerEvent": "Capital Region BOCES Schoharie (1 Team)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-18",
+      "icsSummary": "Duanesburg Family Photo Night",
+      "schedulerEvent": "Duanesburg Family Photo Night",
+      "canonicalSchool": "D'burg Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-12",
+      "icsSummary": "Milton Terrace RAIN 5th Grade Photo (1 photog)",
+      "schedulerEvent": "Milton Terrace PANO RAIN (1 Photog)",
+      "canonicalSchool": "Milton Terrace Elementary School (Ballston Spa School District)",
+      "score": 0.921
+    },
+    {
+      "date": "2026-04-08",
+      "icsSummary": "Lawton Social Branding STEPH",
+      "schedulerEvent": "Lawton Social Branding",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-09",
+      "icsSummary": "Central Park Middle MAKEUPS (1 team)",
+      "schedulerEvent": "Central Park Middle MAKEUPS (1 team)",
+      "canonicalSchool": "Central Park Middle School",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-12",
+      "icsSummary": "Okte Elementary OUTDOOR (2 teams)",
+      "schedulerEvent": "Okte Elementary (2 Teams) 99IRM",
+      "canonicalSchool": "Okte Elementary School (Shenendehowa School District)",
+      "score": 0.875
+    },
+    {
+      "date": "2026-05-11",
+      "icsSummary": "Wood Road 5th Grade PANO RAIN DATE (1 photog)",
+      "schedulerEvent": "Wood Road PANO RAIN (1 Photog)",
+      "canonicalSchool": "Wood Road Elementary School (Ballston Spa School District)",
+      "score": 0.9
+    },
+    {
+      "date": "2026-03-04",
+      "icsSummary": "Rivers Finest Gala 2 Photogs",
+      "schedulerEvent": "Rivers Finest Gala 2 Photogs EVENING",
+      "canonicalSchool": null,
+      "score": 1.05
+    },
+    {
+      "date": "2025-11-10",
+      "icsSummary": "Albany Law Headshots",
+      "schedulerEvent": "Albany Law Headshots 10-2",
+      "canonicalSchool": null,
+      "score": 1.112
+    },
+    {
+      "date": "2026-04-16",
+      "icsSummary": "Malta Ave Picture Day & 5th Grade Pano (2 teams)",
+      "schedulerEvent": "Malta Ave Picture Day & Pano (2 Teams)",
+      "canonicalSchool": "Malta Avenue Elementary School (Ballston Spa School District)",
+      "score": 0.855
+    },
+    {
+      "date": "2025-11-06",
+      "icsSummary": "Chango Makeup Day (1 Team)",
+      "schedulerEvent": "Chango Makeup Day (1 Team)",
+      "canonicalSchool": "Chango Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-04",
+      "icsSummary": "Maywood Academy MAKEUPS (1 team)",
+      "schedulerEvent": "Maywood Academy MAKEUPS (1 team)",
+      "canonicalSchool": "Maywood Academy BOCES",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-06",
+      "icsSummary": "Duanesburg SENIORS (1 team)",
+      "schedulerEvent": "Duanesburg Seniors",
+      "canonicalSchool": "Duanesburg Seniors",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-19",
+      "icsSummary": "NEW Precious Hearts Daycare (1 team)",
+      "schedulerEvent": "Precious Hearts Daycare NEW (1 Team)",
+      "canonicalSchool": "Precious Hearts Daycare",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-18",
+      "icsSummary": "Eagle Point Elem Makeups (1 team)",
+      "schedulerEvent": "Eagle Point Makeups (1 Photog)",
+      "canonicalSchool": "Eagle Point Elementary School (Albany School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-11",
+      "icsSummary": "Arongen Yearbook Photos (1 photog)",
+      "schedulerEvent": "Arongen Yearbook Photos",
+      "canonicalSchool": "Arongen Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-30",
+      "icsSummary": "Union College Career Fair EVENING",
+      "schedulerEvent": "Union College Career Fair EVENING",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-03",
+      "icsSummary": "Latham Christian Academy Makeups (1 team)",
+      "schedulerEvent": "LCA Makeups 8IRM",
+      "canonicalSchool": "Latham Christian Academy",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-22",
+      "icsSummary": "Loudonville Christian Makeup/Seniors Day (1 team)",
+      "schedulerEvent": "Loudonville Christian Makeups & Senior Makeups (1 Photog)",
+      "canonicalSchool": "Loudonville Christian",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-24",
+      "icsSummary": "TSL Rotterdam (1 photog REQ LAUREN)",
+      "schedulerEvent": "TSL Rotterdam Supercenter (moved from 10/29) REQ Lauren",
+      "canonicalSchool": "TSL Rotterdam Supercenter",
+      "score": 0.976
+    },
+    {
+      "date": "2026-02-24",
+      "icsSummary": "Sara Marie School \"Gala\" Headshots (Steph?)",
+      "schedulerEvent": "Sara Marie School Gala Headshots",
+      "canonicalSchool": "Sara Marie Preschool",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-18",
+      "icsSummary": "Duanesburg Color Run (Steph)",
+      "schedulerEvent": "Duanesburg Color Run",
+      "canonicalSchool": "Duanesburg",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-25",
+      "icsSummary": "Jefferson 4th Grade Grads (2 teams)",
+      "schedulerEvent": "Jefferson 4th Grade Grad Photos (2 Teams)",
+      "canonicalSchool": "Jefferson Elementary School (Schalmont School District)",
+      "score": 1.026
+    },
+    {
+      "date": "2026-05-13",
+      "icsSummary": "Alb School of Humanities & 5th Grade Grads (2 teams)",
+      "schedulerEvent": "ASH Spring Photos & 5th Grade Grads (2 Teams)",
+      "canonicalSchool": "Albany School of Humanities (Albany School District)",
+      "score": 0.742
+    },
+    {
+      "date": "2026-05-18",
+      "icsSummary": "Alb School of Humanities RAIN Date",
+      "schedulerEvent": "ASH Rain Date (2 Photogs)",
+      "canonicalSchool": "Albany School of Humanities (Albany School District)",
+      "score": 0.722
+    },
+    {
+      "date": "2026-04-20",
+      "icsSummary": "NEW Childtime Preschool (w/grads) (2 teams)",
+      "schedulerEvent": "Childtime Preschool (2 teams)",
+      "canonicalSchool": "Childtime Preschool",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-04",
+      "icsSummary": "Tesago 5th Grade Group RAIN (1 photog)",
+      "schedulerEvent": "Tesago 5th Grade Pano RAIN",
+      "canonicalSchool": "Tesago Elementary School (Shenendehowa School District)",
+      "score": 0.836
+    },
+    {
+      "date": "2026-04-28",
+      "icsSummary": "Green Tech Seniors 11;30am start (Photog + 1)",
+      "schedulerEvent": "Green Tech Seniors Day 1 AFTERNOON",
+      "canonicalSchool": "Green Tech Seniors",
+      "score": 0.993
+    },
+    {
+      "date": "2025-11-07",
+      "icsSummary": "NEW Craig Elementary MAKEUPS (1 teams)",
+      "schedulerEvent": "Craig Elementary Makeups (1 Team)",
+      "canonicalSchool": "Craig Elementary School (Niskayuna School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-06",
+      "icsSummary": "Van Corlaer Elem (2 teams)",
+      "schedulerEvent": "Van Corlaer Elementary (2 Teams) 51IRM",
+      "canonicalSchool": "Van Corlaer Elementary School (Schenectady School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-11",
+      "icsSummary": "Eagle Point Spring Photos PK-4 (2 teams)",
+      "schedulerEvent": "Eagle Point Spring Pictures (2 Teams)",
+      "canonicalSchool": "Eagle Point Elementary School (Albany School District)",
+      "score": 1.084
+    },
+    {
+      "date": "2026-05-27",
+      "icsSummary": "AW Becker Elem Spring Photos (2 teams)",
+      "schedulerEvent": "AW Becker Elem Spring Photos (2 teams)",
+      "canonicalSchool": "A.W. Becker Elementary School (Ravena-Coeymans-Selkirk School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-15",
+      "icsSummary": "TSL New Karner Spring Photos (1 team)",
+      "schedulerEvent": "TSL New Karner (1 Team)",
+      "canonicalSchool": "TSL New Karner",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-01",
+      "icsSummary": "Latham Christian Academy (1 team)",
+      "schedulerEvent": "Latham Christian Academy (1 Team) 8IRM",
+      "canonicalSchool": "Latham Christian Academy",
+      "score": 1.15
+    },
+    {
+      "date": "2026-02-11",
+      "icsSummary": "Siena Career Fair 1 Photog",
+      "schedulerEvent": "Siena Career Fair 1 Photog",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-29",
+      "icsSummary": "Chango Elem Picture Day (2 Teams)",
+      "schedulerEvent": "NEW Chango Elementary [Shen] (2 Teams) ~80IRM",
+      "canonicalSchool": "Chango Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-11",
+      "icsSummary": "Kira's Kids Corner - Rotterdam (Lauren)",
+      "schedulerEvent": "Kira's Corner (Rotterdam)",
+      "canonicalSchool": "Kira's Corner",
+      "score": 0.777
+    },
+    {
+      "date": "2025-11-13",
+      "icsSummary": "Albany JCC (1 team)",
+      "schedulerEvent": "Albany JCC DAY 1 (1 Team) 46IRM",
+      "canonicalSchool": "Albany JCC",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-08",
+      "icsSummary": "Duanesburg Fall Sports (1 team)",
+      "schedulerEvent": "Duanesburg Fall Sports 7IRM",
+      "canonicalSchool": null,
+      "score": 1.04
+    },
+    {
+      "date": "2025-10-30",
+      "icsSummary": "Arongen Elem MAKEUP DAY (1 team)",
+      "schedulerEvent": "Arongen Makeup Day (1 Team)",
+      "canonicalSchool": "Arongen Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-10",
+      "icsSummary": "Green Tech MS/HS (1 team)",
+      "schedulerEvent": "Green Tech MS/HS (1 Team) 10IRM",
+      "canonicalSchool": "Green Tech MS/HS",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-08",
+      "icsSummary": "Gardner-Dickinson Elem/Middle School (2 teams)",
+      "schedulerEvent": "Gardner-Dickinson Spring Photos (2 Teams)",
+      "canonicalSchool": "Gardner Dickinson",
+      "score": 1.056
+    },
+    {
+      "date": "2026-03-24",
+      "icsSummary": "Academy Spring Sports ALL",
+      "schedulerEvent": "Academy Spring Sports (7 teams, 1 Photog team?)",
+      "canonicalSchool": null,
+      "score": 1.028
+    },
+    {
+      "date": "2025-09-25",
+      "icsSummary": "Skano Elem Picture Day (3 teams)",
+      "schedulerEvent": "Skano Elementary (3! Teams) 94IRM",
+      "canonicalSchool": "Skano Elementary School (Shenendehowa School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-30",
+      "icsSummary": "Mother Teresa Academy (2 teams)",
+      "schedulerEvent": "Mother Teresa Academy (2 Teams)",
+      "canonicalSchool": "Mother Theresa Academy",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-30",
+      "icsSummary": "BKW Prom & PHOTO BOOTH",
+      "schedulerEvent": "BKW Prom",
+      "canonicalSchool": "BKW Secondary",
+      "score": 1.0
+    },
+    {
+      "date": "2026-03-31",
+      "icsSummary": "Mother Teresa GROUP pics (1 team)",
+      "schedulerEvent": "Mother Teresa Group Pics",
+      "canonicalSchool": "Mother Theresa Academy",
+      "score": 1.15
+    },
+    {
+      "date": "2026-05-01",
+      "icsSummary": "Heatly School GR PK-5, 8th grade pano",
+      "schedulerEvent": "Heatly PK-5 (1 Team) Pano?",
+      "canonicalSchool": "Heatly School",
+      "score": 0.826
+    },
+    {
+      "date": "2026-05-04",
+      "icsSummary": "Little Achiever's Preschool (1 team)",
+      "schedulerEvent": "Little Achievers Day 1 (1 Photog)",
+      "canonicalSchool": "Little Achievers",
+      "score": 0.654
+    },
+    {
+      "date": "2025-09-30",
+      "icsSummary": "Hudson Valley Consortium Day 1 (1 team)",
+      "schedulerEvent": "Hudson Valley Consortium Day 1 (1 Team) 21IRM",
+      "canonicalSchool": "Hudson Valley Consortium",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-16",
+      "icsSummary": "Hoosic Valley MS/HS (1 team) Underclass",
+      "schedulerEvent": "Hoosic Valley Underclass (1 Photog) 43IRM",
+      "canonicalSchool": "Hoosic Valley MS/HS",
+      "score": 1.027
+    },
+    {
+      "date": "2026-02-03",
+      "icsSummary": "Columbia Kicks Cancer Family Photo Night",
+      "schedulerEvent": "Columbia Kicks Cancer Family Photo Night 4-8pm",
+      "canonicalSchool": "Columbia High School",
+      "score": 1.119
+    },
+    {
+      "date": "2026-05-12",
+      "icsSummary": "Colonie Comm Daycare RAIN",
+      "schedulerEvent": "Colonie Community Daycare (1 Photog) RAIN",
+      "canonicalSchool": "Colonie Community Daycare",
+      "score": 0.789
+    },
+    {
+      "date": "2025-09-23",
+      "icsSummary": "Gardner-Dickinson Elem/Middle School (2 photogs + 1 asst)",
+      "schedulerEvent": "Gardner Dickinson Elementary/Middle (2 Photogs + 1 Asst) 57IRM",
+      "canonicalSchool": "Gardner Dickinson",
+      "score": 1.089
+    },
+    {
+      "date": "2026-05-11",
+      "icsSummary": "Eagle Point 5th Grade Group Photo (1 photog)",
+      "schedulerEvent": "Eagle Point 5th Grade Group Photo (1 Photog)",
+      "canonicalSchool": "Eagle Point Elementary School (Albany School District)",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-08",
+      "icsSummary": "Matt Meeting with REMOVE.BG 10am",
+      "schedulerEvent": "Matt Meeting w/ Remove.bg 10AM",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2026-04-09",
+      "icsSummary": "Brad Rose Landscaping branding and headshots",
+      "schedulerEvent": "Brad Rose Landscaping Headshots and Branding",
+      "canonicalSchool": null,
+      "score": 0.876
+    },
+    {
+      "date": "2025-09-18",
+      "icsSummary": "Waterford-Halfmoon Elementary (2 teams)",
+      "schedulerEvent": "Waterford-Halfmoon Elementary (2 Teams) 40IRM",
+      "canonicalSchool": "Waterford Halfmoon Elem",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-17",
+      "icsSummary": "Blessed Sacrament Makeups (1 photog)",
+      "schedulerEvent": "Blessed Sacrament Makeups (1 Photog)",
+      "canonicalSchool": "Blessed Sacrament",
+      "score": 1.15
+    },
+    {
+      "date": "2026-03-20",
+      "icsSummary": "Story Place Preschool (2 teams)",
+      "schedulerEvent": "Story Place Preschool (2 Teams?)",
+      "canonicalSchool": "Story Place Preschool",
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-05",
+      "icsSummary": "Turner's Tots Preschool NEW AM only (Lauren)",
+      "schedulerEvent": "Turner's Tots Preschool NEW AM only (Lauren)",
+      "canonicalSchool": "Turner's Tots Preschool",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-29",
+      "icsSummary": "Keane Elementary Picture Day (1 team)",
+      "schedulerEvent": "Keane Elementary (2 Teams) 40IRM",
+      "canonicalSchool": "William C. Keane Elementary School (Schenectady School District)",
+      "score": 0.944
+    },
+    {
+      "date": "2025-12-03",
+      "icsSummary": "Pieter B. Coeymans Makeups (1 team)",
+      "schedulerEvent": "Pieter B. Coeymans Makeups (1 team)",
+      "canonicalSchool": "Pieter B Coeymans",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-16",
+      "icsSummary": "Cairo-Durham Elementary Gr 3-5 (1 team)",
+      "schedulerEvent": "Cairo Elementary 3-5 (1 Team) 80IRM",
+      "canonicalSchool": "Cairo-Durham Elem",
+      "score": 1.089
+    },
+    {
+      "date": "2025-12-08",
+      "icsSummary": "NEW DATE Zoller Elementary (2 teams)",
+      "schedulerEvent": "NEW DATE Zoller Elementary (2 teams)",
+      "canonicalSchool": "Zoller Elementary",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-17",
+      "icsSummary": "Blessed Sacrament School (1 team)",
+      "schedulerEvent": "Blessed Sacrament Elementary (1 Team) 13IRM",
+      "canonicalSchool": "Blessed Sacrament",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-01",
+      "icsSummary": "Wonderland Co-op Nursery (REQ Lauren)",
+      "schedulerEvent": "Wonderland Day 1 (Req Lauren) 20IRM",
+      "canonicalSchool": "Wonderland",
+      "score": 0.924
+    },
+    {
+      "date": "2026-05-14",
+      "icsSummary": "Maple Leaf Burnt Hills/Glenville (2 teams)",
+      "schedulerEvent": "Maple Leaf Burnt Hills/Glenville & GRADS (2 Teams)",
+      "canonicalSchool": "Maple Leaf Burnt Hills",
+      "score": 1.103
+    },
+    {
+      "date": "2025-10-20",
+      "icsSummary": "Learning Garden Childcare LATHAM (1 team)",
+      "schedulerEvent": "NEW Learning Garden Childcare Latham (1 Team) ~40IRM",
+      "canonicalSchool": "Learning Garden Childcare Latham",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-15",
+      "icsSummary": "Capital Region BOCES Albany CTE Main (2 Teams)",
+      "schedulerEvent": "Capital Region BOCES Albany CTE Main (2 Teams)",
+      "canonicalSchool": null,
+      "score": 1.15
+    },
+    {
+      "date": "2025-12-09",
+      "icsSummary": "Chamber Conference on short videos STEPH",
+      "schedulerEvent": "Chamber Conference Videos",
+      "canonicalSchool": null,
+      "score": 0.916
+    },
+    {
+      "date": "2026-03-05",
+      "icsSummary": "Walter B Howard 6th Grade Full Body Shots (1 photog)",
+      "schedulerEvent": "Walter B Howard 6th Grade Photos",
+      "canonicalSchool": "Walter B Howard",
+      "score": 1.008
+    },
+    {
+      "date": "2025-09-24",
+      "icsSummary": "Loudonville Christian Fall Photos (1 team)",
+      "schedulerEvent": "Loudonville Christian School (1 Team) 30IRM",
+      "canonicalSchool": "Loudonville Christian",
+      "score": 1.15
+    },
+    {
+      "date": "2025-10-16",
+      "icsSummary": "Hoosic MS/HS Makeups (1 team)",
+      "schedulerEvent": "Hoosic MS/HS Makeups (1 Team)",
+      "canonicalSchool": "Hoosic Valley MS/HS",
+      "score": 1.15
+    },
+    {
+      "date": "2025-09-02",
+      "icsSummary": "Academy (US Campus) Senior Photos (2 photogs)",
+      "schedulerEvent": "Academy Seniors",
+      "canonicalSchool": "The Academies Seniors",
+      "score": 1.15
+    },
+    {
+      "date": "2025-11-25",
+      "icsSummary": "Academy Winter Sports Day 2",
+      "schedulerEvent": "Academy Winter Sports Day 2 (swim, table tennis, squash, track, skiing)",
+      "canonicalSchool": null,
+      "score": 1.15
+    }
+  ],
+  "ambiguous_count": 8,
+  "ambiguous_examples": [
+    {
+      "date": "2026-02-11",
+      "summary": "RPI Career Fair (11a-3pm)",
+      "description": "Matt iSmile Studios\n\n6:37 PM (0 minutes ago)\n\nto Stephanie, Erika\n\nHi Erika!\n\nYes, we're available and can be there! Please share any other details you have for us once they're ready :)\n\nThank you for thinking of us. I hope you have a great evening!\n\nBest,\nMatt\n\nOn Tue, Jan 13, 2026 at 1:07 PM Cary, Erika <carye@rpi.edu> wrote:\n\nHi there!\n\nYou all have come to our career fair each year to do headshots for our students – we were hopeful you all would be free again this year? Our event is Wednesday February 11th from 11am-3pm – thank you!\n\nErika\n\nErika Cary(she.her)\nDeveloper-Empathy-Maximizer-Relator-Futuristic\nAssociate Director, Career Development\nRensselaer Polytechnic Institute, Center for Career and Professional Development (CCPD)\nConnect with me on LinkedIn | Schedule an Appointment with a Career Counselor | Invite the CCPD to a Club or Class | Follow CCPD Discord Server\nP: (518)262-8233\nE: carye@rpi.edu",
+      "uid": "308cjvf0d9jq10lhcdvv1lgofg@google.com",
+      "top": [
+        [
+          1.1,
+          "RPI Career Fair 11-3"
+        ],
+        [
+          1.065,
+          "Siena Career Fair 1 Photog"
+        ],
+        [
+          0.163,
+          "Cairo-Durham Spring Photos Day 2"
+        ]
+      ]
+    },
+    {
+      "date": "2025-09-16",
+      "summary": "Hoosic Valley Seniors (1 team)",
+      "description": "work with main office admin:\nAmy Vautrin\navautrin@hoosicvalley.org\n\nYearbook editor:\nRochelle Dinallo\nrdinallo@hoosicvalley.org\n\nSeniors 2:30-5:15pm on 9/17 and 9/18 - SETUP -  2pm\nSeniors during school day starting at 8am 9/19 - SETUP -  7:30am\n\nSeniors - 70-ish\n15 minutes increments per Trish",
+      "uid": "2a6o139ri3djafcbq6cu5s7q7d@google.com",
+      "top": [
+        [
+          1.047,
+          "Hoosic Valley Underclass (1 Photog) 43IRM"
+        ],
+        [
+          0.997,
+          "Hoosic Valley Seniors Afternoon"
+        ],
+        [
+          0.129,
+          "Okte Rain Date (2 Teams)"
+        ]
+      ]
+    },
+    {
+      "date": "2025-09-12",
+      "summary": "Cairo-Durham Fall Sports (1 team) 2p",
+      "description": "Greg Hagan, AD\nghagan@cairodurham.org\n\nSet up at 2pm, start at 2:30pm (MAKE SURE WE HAVE TIME TO MOVE IF NECESSARY)\n\nTeam photos\nIndividual photos\nNEED BANNERS FOR EARLY OCT PEP RALLY\n\nIndoors in the HS Gym CONFIRMED 9/6 with Greg ckg\n\n2:30 - Boys Modified Soccer\n2:40 - Girls Modified Soccer\n2:50 - Varsity Golf\n3:00 - Girls Modified Volleyball\n3:10 - Modified Football\n3:20 - Varsity Football\n3:30 - Girls JV Volleyball\n3:40 - Girls Varsity Volleyball\n3:50 - Cross Country\n4:00 - Girls Varsity Soccer\n4:10 - Boys Varsity Soccer\n4:20 - Girls Varsity Tennis",
+      "uid": "02uqiuie314de1dveuc25ipbs6@google.com",
+      "top": [
+        [
+          0.733,
+          "Cairo Middle School (1 Photog) 37IRM"
+        ],
+        [
+          0.733,
+          "Cairo High School (1 Photog) 37IRM"
+        ],
+        [
+          0.563,
+          "Cairo Fall Sports 19IRM"
+        ]
+      ]
+    },
+    {
+      "date": "2025-09-03",
+      "summary": "Latham Christian Academy First Day & Stock (BETH)",
+      "description": "Sarah Kettlewood, principal\nskettlewood@lcany.org\n\nArrive: 7:30am to capture kids arriving between 7:30-8:15am (emailed Sarah asking what time students arrive so we can be there beforehand to take stocks and then photograph kids coming off buses and being greeted by teachers ckg)\n\nFirst day of school shots and stock shots\n\nWe took stock shots back in Nov 2023, but lost them. School has new website and is with Treering, and was hoping to use these shots, but since we couldn't find them, I offered us to do them on the first day of school when classrooms are neat and clean, and the outdoors is freshly manicured.\n\nBeth Picciano\n\n10:11 AM (6 hours ago)\n\nto skettlewood, me, Matthew\n\nGood morning Sarah!\nI am reaching out today to confirm the details for LCA's upcoming first day and stock photos on Wednesday, September 3rd. My name is Beth and I will be your photographer for the morning.\n\nOur notes have us arriving at 7:30 to capture first day arrivals, as well as getting some photographs of the building, classrooms, and grounds. Does this work for you? Is there a specific place you would like me to park when I arrive?\n\nBest,\nBeth\n--\n\nBeth Picciano\nPhotographer\nwww.ismilestudios.com\nShare your great experience on Google!\n\nSarah Kettlewood\n\n4:31 PM (2 minutes ago)\n\nto Beth, me, Matthew\n\nHello,\n\nThank you so much for reaching out! We are looking forward to having you. We are all set for Wednesday Sept 3rd.\nOur staff park on the edge closest to the field edge of the parking lot. That would be the best place to park. Our door doesn't unlock until 7:30am. But I will try to be out there to meet you. I usually get in around 7:00am. If you want pictures of the rooms empty they will be empty between 7:30am-8:00am then the students start to go to the classrooms and many more arrive.\n\nPlease let me know if you have any questions or if there is anything else I can accommodate. You are welcome to grab coffee in our kitchen that morning as well.\n\nSarah Kettlewood\n\n7/9/2025 1:18 PM (5 minutes ago)\n\nto me\n\nHello Carrie,\n\nI apologize for the delayed response. Kids can be dropped off as early as 7:30am. Buses usually come around 7:45-8:15am. The day officially starts at 8:20am.",
+      "uid": "3he1mvtajsd6sjp09pdgevdml0@google.com",
+      "top": [
+        [
+          1.1,
+          "Latham Christian Academy First Day"
+        ],
+        [
+          1.04,
+          "Laila Fowler LCS Make Up 4:30"
+        ],
+        [
+          1.04,
+          "Miarh LCS Make Up 4:45"
+        ]
+      ]
+    },
+    {
+      "date": "2025-09-11",
+      "summary": "Cairo-Durham MS & HS (2 days, 2 teams)",
+      "description": "CHECK INTO MAIN OFFICE UPON ARRIVAL\n\nCHECK for 2025! 9/12/24 - per Andrew& Molly, organize the HS folders by grade, alphabetical order. PE class doesn't work according to the PE teachers. ckg\n\nCheryl Dorpfeld, admin who pulls the rosters for uscdorpfeld@cairodurham.org (518) 622-0490\n\nAlyssa Bratton, HS Admin\nabratton@cairodurham.org\n\nDanielle Czech, middle school principal\ndczech@cairodurham.org\n518-622-0490\n\n9/3/25 all confirmed with Alyssa ckg\n9/11 is a DAY 2\n9/12 is a DAY 1\n\nSetup: 7am - check into main office upon arrival - will need photo ID\nStart: 7:45am\n\nPhotos taken during PE classes that run all the school day, until 2:14pm\nIndoor IN TWO LOCATIONS - MS team IN MS GYM AT THE FAR END on 9/11 and the Media Center on 9/12, THE HS Team IN THE HS AUDITORIUM. ONE BINDER FOR MS, ONE FOR HS AND TWO MORE FOR FACULTY (ONE FOR EACH TEAM).\n\nIndividuals of students and all faculty/staff\nAll service items - ID cards, yearbook, attendance files",
+      "uid": "17siufb2us8743kps69rc2ghat@google.com",
+      "top": [
+        [
+          1.15,
+          "Cairo Middle School (1 Photog) 37IRM"
+        ],
+        [
+          1.15,
+          "Cairo High School (1 Photog) 37IRM"
+        ],
+        [
+          0.484,
+          "Green Tech MS/HS (1 Team) 10IRM"
+        ]
+      ]
+    },
+    {
+      "date": "2025-10-20",
+      "summary": "Northville Makeup Day (1 team)",
+      "description": "Sue Schmitt, new yearbook editor\nsschmitt@northvillecsd.org\n\n10/17/25 updated by Sue;\n10/15/25 updated by Sue at 4:45pm ckg (Kindly asked her not to change it again.)\nArrive: 11:00am\nStart: 11:30am makeups, then 12:15pm with the Senior, then makeups again at 12:30 until they end. Told school you have to be gone by 3-3:15pm, no later (had already stated that in an earlier email). ckg\n\nIndoor - regular school photo makeups - 10/14 Sue is now asking for the afternoon.\n\nRylan Czadzeck - Will need makeups done, is missing senior portrait days Hoping to do this at 12:15pm on 10/20\n\n10/15/25 NO SPORTS PICS TODAY! Doing all sports on Dec 1. ckg\n\n10/14/25 Per Steph, we can shoot winter senior-athletes this time, but we need to encourage them to either not request this, or charge for an extra sports photo session, before all of the other athletes are photographed. ckg\n\nSchmitt, Susan\n\n8:51 AM (37 minutes ago)\n\nto me, Stephanie\n\nGood morning,\nI hate to ask this at the 11th hour...I'm putting together a schedule for teachers to send their students on Monday for pictures & I'm trying to work around their lunch & recess times.  Could we possibly start at 11:30?  You should be finished by 12:45.  You will be able to set up in the Library area .\nI can send you what I have in place as far as a schedule when I finalize it.\nThank you,\nSue\n\nCONFIDENTIALITY NOTICE: The contents of this email message and any attachments or enclosures are intended solely for the addressee(s) and may contain confidential and/or privileged information and may be legally protected from disclosure. If you are not an intended recipient of this message or this message has been sent to you in error, please immediately notify this sender and delete this message and any attachments or enclosures.\n\nStephanie McCauley\n\n8:54 AM (34 minutes ago)\n\nto Susan, me\n\nHi Sue!  Sure, I can be ready for 11:30 - I will plan to arrive at 11 to set up if someone can let me in the library doors?\n\n:)\nSteph",
+      "uid": "5nc8mdqnsaafvcjf0kak3mqgps@google.com",
+      "top": [
+        [
+          1.15,
+          "Northville Makeup Day (1 Team)"
+        ],
+        [
+          1.15,
+          "Northville 2:45pm Senior Makeup Czadzeck, Rylan"
+        ],
+        [
+          0.183,
+          "Hamilton Elementary School (2 Teams) 40IRM"
+        ]
+      ]
+    },
+    {
+      "date": "2025-09-10",
+      "summary": "Albany Academy 2 teams +1",
+      "description": "TWO TEAMS PLUS CLASS PHOTOGRAPHER - LOWER AND MIDDLE SCHOOL\nONE TEAM - UPPER SCHOOL\n\nRebecca Trainor\nTrainorR@albanyacademies.org\n\n8/28/25 confirmed with Rebecca and Steph ckg\nSet-up: 7:15am; Start: 7:45am\n\n8/28/25 confirmed with Rebecca and Steph ckg\nIndoor: LS/MS in Silipigno Lobby; US on Chapel Stage\n\nIndividuals of all students and faculty\ngroup class photos of grades PS-4th Outdoors\nIDs for grades 5-12 and faculty\nYearbook Upload to Treering x2\n\nWednesday, September 10 - Day 3\n\nINDIVIDUAL PICTURES (Silipigno Lobby)\n\nTIME SLOT\nGRADE\n\n8:10-8:30\n1-2 (Ford)\n\n8:30-8:50\nK 1 (Hanifin)\n\n8:50-9:10\n2 (Kelly)\n\n9:10-9:25\nPreK 1 (Caschera)\n\n9:25-9:45\nK 2 (Valentine)\n\n9:45-10:05\n1-1 (Cooney)\n\n10:05-10:20\n7 boys\n\n10:20-10:40\n7 girls\n\n10:40-11:00\n6 boys\n\n11:00-11:25\n6 girls\n\n11:35-11:55\n4-1 (Lois)\n\n11:55-12:15\n4-2 (Lester)\n\n12:15-12:35\nPreK 2 (Stevens)\n\n12:35-12:55\n3 (Miorin)\n\n12:55-1:15\n5 boys\n\n1:15-1:35\n5 girls\n\n1:35-1:55\n8 boys\n\n1:55-2:15\n8 girls\n\nCLASS PICTURES (LS/MS Front Steps)\n\nTIME SLOT\nGRADE\n\n8:20-8:30\nK 1 (Hanifin)\n\n8:30-8:40\n1-2 (Ford)\n\n8:40-8:50\n2 (Kelly)\n\n9:00-9:10\nPreK 1 (Caschera)\n\n9:10-9:20\nK 2 (Valentine)\n\n9:30-9:40\n1-1 (Cooney)\n\n9:50-10:00\n7 boys\n\n10:00-10:10\n7 girls\n\n10:30-10:40\n6 boys\n\n10:50-11:00\n6 girls\n\n11:40-11:50\n4-2 (Lester)\n\n12:00-12:10\n4-1 (Lois)\n\n12:20-12:30\n3 (Miorin)\n\n12:40-12:50\nPreK 2 (Stevens)\n\n1:00-1:10\n5 girls\n\n1:20-1:30\n5 boys\n\n1:40-1:50\n8 girls\n\n2:00-2:10\n8 boys",
+      "uid": "396i85ic17nkno0ojiblb60gov@google.com",
+      "top": [
+        [
+          1.053,
+          "Albany Academy Lower School"
+        ],
+        [
+          0.976,
+          "Albany Academy Upper School 110IRM"
+        ],
+        [
+          0.157,
+          "Herba Senior Makeup / Eva Lu / Koral Hernandez Senior Makeup"
+        ]
+      ]
+    },
+    {
+      "date": "2026-05-12",
+      "summary": "Saint Mads Photos & 5th grade group (1 team)",
+      "description": "Kelly Sloan, Principal\nksloan1@smsschool.org\n\nCrystal Quatrini, main office admin\ncquatrini@smsschool.org\n\n5/5/26 Crystal confirmed ckg; 4/27/26 emailed Kelly & Crystal cc Beth, Erin ckg\nSetup: 7:45am (school opens at 7:10am)\nStart pics at 8:15am\n\nOutdoor  - all students, push inside if bad weather per Crystal in main office\n5th grade group class photo in sanctuary - provide 8x10s and 5x7s of these to school to include in diplomas",
+      "uid": "3e81ls2qa1epcualbgargfkoiv@google.com",
+      "top": [
+        [
+          0.685,
+          "St. Madeleine Sophie Spring & 5th Grade Group (1 Team)"
+        ],
+        [
+          0.624,
+          "AW Becker 5th Grade Group Pano"
+        ],
+        [
+          0.175,
+          "Happy Kids Daycare (1 Photog)"
+        ]
+      ]
+    }
+  ],
+  "unmatched_count": 3167,
+  "unmatched_examples": [
+    {
+      "date": "2020-09-21",
+      "summary": "MOLLY(EDITS) +ANDREW(STUDIO AFTER)  Wonderland CO-OP (9/21 AM&PM / 9/22 AM)",
+      "description": "Diane Chrysler, Co-op Director\nfluffernutter143@aol.com\n\nOutdoor photos\nCollage (group photos being discouraged due to COVID)\n\n9:15am start, set-up at 9am\n\nDay 1: AM and PM classes\nDay 2: AM class only\n\nDiane\n\n11:10 AM (20 minutes ago)\n\nto me\n\nHi Carrie,\nIt is nice to e-meet you!  Attached are the class lists for Molly.  The photos will be outside, and the kids will be ready at 9:15.  She can arrive at 9am, if she needs to set up, for both days.  Can you please re-send me the flyer to e-mail to parents?  It did not come through in the foward from Kristina.\nThank you, and please let me know if you need anything else!\n-Diane Chrysler\n\nPerfect! I've got our calendars marked!\n\nOn Thu, May 21, 2020 at 11:30 AM kristina Edick <kristina.edick@gmail.com> wrote:\nMatt,\nThat will be great! Thank you so much !\nKristina\n\nOn Thu, May 21, 2020, 10:22 AM Matt iSmile Studios <matt@ismilestudios.com> wrote:\n\nHi Kristina & Diane,\nKristina, thank you so much for reaching out! It's been great to work with you over the past couple years and I look forward to continuing to work with Wonderland :)\n\nBased on previous years, we generally will shoot on a Monday and Tuesday (Monday being the AM & PM classes, Tuesday being just AM). We're available Monday September 21 and Tuesday September 22. Would you guys like to book for those dates? We could also perhaps book the rain date for the first week of October (Oct 5/6)?\n\nJust let me know! Thanks!\n\nBest,\nMatt\n\nOn Wed, May 20, 2020 at 6:27 PM kristina Edick <kristina.edick@gmail.com> wrote:\nHi Matt\nI hope everything is well. I just wanted to touch base with you about class pictures for next year. This is my last year as Wonderland president so I just wanted to get the ball rolling before stepping down. I did cc our new president Diane to this email. So for pictures for next year we know we will have to wait and see how everything goes with the reopening but we were hoping to secure dates for the week of September 21st. If not then maybe the 1st week of October. Let me know what you think.  Thanks so much\nKristina Edick\n\n--\n\nMatt MinardiiSmile Studios\nJoin the conversation online at www.facebook.com/ismilestudios\nwww.ismilestudios.com\n518-435-1146",
+      "uid": "86FE508B-CF39-432D-80B0-0C1B716EC48F",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-05-02",
+      "summary": "Wood Road 5th Grade Pano REDO (same photog as Malta Ave)",
+      "description": "MaryBeth Leslie, main office admin\nmleslie@bscsd.org\n\nOUTDOOR REDO of 5th grade class photo!\n\n***NEED TIMING FROM A PHOTOG****\nSetup:\nTake photo:\n\n4/12/22 take this one AFTER Malta Ave'a at 9:45am",
+      "uid": "B26284BF-6E8F-4F03-AA4C-EAFFAC7CCC5D",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-23",
+      "summary": "Duanesburg Elementary (1 team)",
+      "description": "Leah Simpson, secretary to the principal\nlsimpson@duanesburg.org\n\nPlease check in at the main office upon arrival. Need a photo ID. Leah will have a photo schedule for you then.\nSet-up: 8am; Start time: 8:30am\nIndoor in Library\nIndividuals of all students and faculty/staff\nAll service items\nCOLLAGES",
+      "uid": "DE681FB1-FB45-40D7-BF16-317C939E0D55",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-10-26",
+      "summary": "Van Corlaer Elem (2 teams)",
+      "description": "Fernando Jimenez, (school secretary that works with Tanya Delameter)\njimenezfe@schenectady.k12.ny.us\n518-370-8270 (prefer phone calls)\n\nCheck in at main office with photo ID first!\n\nSetup at 8am; Start at 8:30am, every 20 minutes\n460 students (hence the two photo teams)\nall faculty too\nIn the gymnasium\nYearbook maybe\nClass collages\nAttendace files",
+      "uid": "3lqks83tvordst83mjjgvhd6d5@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-05-27",
+      "summary": "Mechanicville Elem (Grades Virtuals) (Steph, Matt + 2)",
+      "description": "Kerry Amberger\nkambergerpta@yahoo.com\n\n5/25/21: start virtual at 1:30p if possible per Kerry. ckg\n\nHi!\n\nOk so we will start at 12pm with the 4th and 5th graders and go until 1:30. Then the virtual kids will start at 2:10pm. Hope this is ok!\n\nKerry\n\nSent from Yahoo Mail for iPhone\nOn Thursday, May 20, 2021, 10:02 AM, Kerry Amberger <kambergerpta@yahoo.com> wrote:\n\nI have no doubt you will knock it out of the park like you always do!! Hopefully I will be able to bring my virtual kiddo for pics too! I have loved helping you!!\n\nKerry\n\nSent from Yahoo Mail for iPhone\n\nOn Wednesday, May 19, 2021, 10:49 PM, Stephanie McCauley <stephanie@ismilestudios.com> wrote:\n\nKerry - never worry about helping us!!!!  We are so grateful for EVERYTHING you’ve done for us, and we can handle this no problem.  We will knock it out of the park!   THANK YOU!\n\n:)\nSteph\n\nStephanie McCauley\niSmile Studios\nwww.ismilestudios.com\n\nFamily Portraiture\nCorporate Branding\nSchools and Sports\n\n❤️ Thank you for supporting our small business ❤️\n\nOn May 19, 2021, at 7:48 PM, Kerry Amberger <kambergerpta@yahoo.com> wrote:\n\nHi!\n\nLet me find out what time the 4th and 5th graders have lunch and I’ll pin down the time for sure! That spot looks beautiful! I’m really sorry I have not been able to be there to help you all this year! My little guy has been fully virtual this year and he is in special education and just cannot do the virtual classes on his own, so I haven’t been able to leave him to come help!\n\nSteph- I will ask if you can drive on the path to get your supplies to the spot! Hopefully the principal will be more responsive than he was today, lol!\n\nThanks!\n\nKerry\n\nSent from Yahoo Mail for iPhone\n\nOn Wednesday, May 19, 2021, 2:29 PM, Stephanie McCauley <stephanie@ismilestudios.com> wrote:\n\nHi Kerry, Carrie, Matt and Kyle!\n\nKerry - timing works for us!  I purposely went to school today at the same time to try to find a spot to set up.  Found the perfect one!  This is basically the ONLY spot on campus where we will have shade that time of day and kids won’t be super squinty.  It is in the back of the school on the edge of the soccer field.  I left the pile of dirt in my picture below to help identify the spot.\n\nQUESTION - our setup this year is super cute but a little heavy to carry long distances.  There is a paved path to this spot, can we drive SLOWLY over there to unload a car?\n\nStephanie McCauley\niSmile Studios\nwww.ismilestudios.com\n\nFamily Portraiture\nCorporate Branding\nSchools and Sp",
+      "uid": "2gljlce6eslv5pgjn029lb7cji@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-03-20",
+      "summary": "EASTER BUNNY (Matt 20th Kyle 21st + 1 each day)",
+      "description": "Saturday 3/13 - 10-11, 11-5\n\nSunday 3/14 - 11-12, 12-5\n\nSaturday 3/20 - 10-11, 11-5\n\nSunday 3/21 - 11-12, 12-5\n\nFriday 3/26 - 11-6\n\nSaturday 3/27 - 10-11, 11-6\n\nSunday 3/28 - 11-12, 12-5\n\nMonday - Thursday 3/29 to 4/1 - no “special hours” – just 11-5\n\nFriday 4/2 - 9-10, 10-6\n\nSaturday 4/3 - 8-9, 9-7",
+      "uid": "71A58083-BB58-4A52-BD8A-C8C0B60C3382",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2019-09-30",
+      "summary": "Erik Interview: Cora Salvo",
+      "description": "Carrie met at HVCC\n\nhttps://meet.google.com/ykz-dcvj-qec\nOr dial: (US) +1 804-442-7750 PIN: 416236861#\n\nLearn more about Meet at: https://support.google.com/a/users/answer/9282720\n\nPlease do not edit this section.",
+      "uid": "0m7f8j52e1ghq8uu83oosqpjem@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-29",
+      "summary": "Walter B. Howard Elem (2 teams)",
+      "description": "Lisa Kreutziger, main office admin\nlkreutziger@newlebanoncsd.org\n\nSandra Siciliano, PTA VP\njustjune19@gmail.com\n\nSetup 8:15am; start: 8:45am; classes every 15 minutes\n\n**school has requested  NO CHAIR be used in the photos - at least visibly.**\n\nOutdoor\nIndividuals of all students and faculty/staff\nAll service items\nFaculty ID cards\nfull yearbook support\nCOLLAGES",
+      "uid": "4E08C7CB-3C18-4363-9358-A78584EB3C35",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-10-05",
+      "summary": "Abby Rock Birthday Party - Andi",
+      "description": "1st birthday party for Kadence\n(518)441-3308 moms cell number\nflowers2188@aol.com\n\n11:30 am - 1pm\nwith ANDI",
+      "uid": "k7cqiplm6d3jjbtndpvd4l4ekg@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2010-09-25",
+      "summary": "Alzheimer's Walk - Saratoga - Team Photos",
+      "description": "Hey lady,\n\nI hope you’re having a fabulous week!\n\nI just wanted to confirm that you guys will be available for the team photo’s at the September 25th Walk at Saratoga Gaming & Raceway. Registration runs from 9am-10:30am and we typically have teams sign up for photos in five minute increments. This year, seeing as we’ve grown in numbers I’d LOVE if we could run team photos from either 8am-11am or 8:30am-11am to give more teams the opportunity to get their pictures taken! Let me know if that works for you.\n\nWe will provide a volunteer that will have the list of team names, their captain and their assigned photo time to help keep things moving.\n\nPlease send over your logo when you get a chance, preferably in a jpeg format. I’m ordering our t-shirts this week and would love to include it there and on our website with a link to your website. If you have anything that you’d like to include in our 1,000 goody bags let me know!\n\nKeep me posted if you’d like to move forward with the Board. I think you’d really enjoy the group.\n\nThank you for everything. Let’s set up a date soon so I can see the boysJ!\n\nXOXOXOXOXO,\n\nKatie\n\nKatie Weklar\nAssistant Director of Development\nAlzheimer's Association of NENY\n518-867-4999 ext 305\nwww.alz.org/northeasternny",
+      "uid": "lpgaiembkqfifl78gr0gfr4s20@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2019-11-21",
+      "summary": "Duanesburg Winter Sports after school Steph/Matt",
+      "description": "Chris Herron\nchrisherron32@yahoo.com\n**We can get into the gym starting at 2:30pm**\n\nIndividual and team photos\n\nChristopher Herron\n8:16 AM (2 hours ago)\n\nto me, Nancy\n\nThank you again for coming in yesterday! Would you be willing to do the same thing for the winter season? I coach girls basketball and Ryan coaches wrestling and we would love for you to come in again for both programs. We would do modified, jv and varsity for both programs. We were thinking November 21 if interested. Thank you!\n\nCarrie Graziano\n10:55 AM (1 minute ago)\n\nto Stephanie, Matthew, Christopher, Nancy\n\nHello Chris,\n\nAbsolutely! I have scheduled your winter teams for the same timing on November 21. When you have rosters, just email them over to me like you did for the fall teams.\n\nThank you for entrusting these important photos to our team - we are honored to work with you, Ryan and the Duanesburg sports community.\n\nAll my best,\nCarrie",
+      "uid": "19640FC0-4070-4DE4-A368-4D223351922C",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-03-14",
+      "summary": "Weekly School/Event Planning Meeting (8:30am)",
+      "description": "https://hangouts.google.com/hangouts/_/calendar/MjE5dWo4bzkwY2Q5czNubGwwMHJqYTZkZWtAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ.2iob1igq2p12dlbchptp8lkfc5?hs=121\n\nPlease do not edit this section.",
+      "uid": "2iob1igq2p12dlbchptp8lkfc5_R20210301@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-10-24",
+      "summary": "Pineview Preschool",
+      "description": "Thanks for getting back to me. We would definitely prefer to have the two\ndays together, October 24 & 25. But if the other school really needs it,\nI guess we could do separate days. Its just easier if it's two days\ntogether. Missy\n\nHi Missy!\n\nWe can definitely add the new background and make that a possibility with\nour other five (no need to eliminate one, we can just bring all of them).\nWhat I'd do is attach a note to the envelopes to that effect. Maybe we\ncould also send out an email to all parents? If we can I will draft one\nthat you can just download and forward, if you want.\n\nEither Oct 24/25 or Nov 5/8 work for us. Do you have a preference? I\nhave someone else asking for Oct 24 and 25, but I won't answer them until\nI hear back from you.\n\nThank you so much for renewing with us. We are super excited to see you,\nyour staff, and all the kids again!!!\n\nI'll wait to hear from you on dates, and if you'd like me to mock\nsomething up regarding the additional background.\n\n:)\nSteph\n\nOn Sep 13, 2013, at 12:14 PM, office@pineviewpreschool.org wrote:\n\nHi Stephanie - I think we would like to do a Thursday and Friday, so we\nwould like October 24 & 25, or if we can separate the days, maybe\nNovember\n5th and the 8th. I like the idea of giving the parents the choice of\nbackground, but I also like your new one. Can we give them maybe 4\nchoices, with one of them being the new background? Let me know - Missy\n\nHi Missy!\n\nWe have tons of neutral backdrops. We usually bring blue, red, gold,\npink, and green, and let the parent choose what color they'd like on\nthe\norder form. That works well with the other preschools we photograph.\nParents will usually coordinate the kids' outfits with the color they\nchose and they look adorable. :)\n\nIf you wanted to go with just one background for everyone, we can do\nthat\ntoo (there are a few preschools that opt for that). I just ordered\nthis\none and expect it in soon, I love it … but I would happily order\nanything\nyou wanted. We always use it for multiple things!\n\nHere are our available dates as of this morning. We'll get everything\nback in plenty of time, no worries. Using our pre-order method, all\norders are back to you within 72 hours.\n\nI'm expecting a call today from a school district, so they may take a\ncouple of these dates, but as of now we have:\n\nOCTOBER\n17, 18, 21, 24, 25\n\nNOVEMBER\n4, 5, 6, 8, 12, 18, 19, 20, 21, 22, 25, 26, 27\n\nThanks Missy!\n\n:)\nSteph\n\nOn Sep 12, 2013, at 9:26 AM, office@pineviewpreschool.org wrote:\n\nWhat days if any do you have available in October? And/or early\nNovember?\nI just want to be sure to have them well before Christmas. Also, I\nthink\nwe will do a neutral background this year. Some people don't care for\nthe\nChristmas one. What do you have on hand? I'd hate to make you get\nanother one just for us... Thanks, Missy\n\nHi Missy!\n\nNo problem at all! Please don't feel pressure from us. We still\nhave\nsome dates (I think you prefer November, right? If so we are ok!)\n\nHere's a link to some nice Christmas backdrops from our favorite\ncompany.\nIt's the company we bought the one we used last year, which we still\nhave\nif you liked it. This links the Christmas ones, but they have some\nbeautiful fall and generic winter ones too. You can pick whatever\none\nyou\nlike and I'll order it. Remember they all look weirdly \"long\",\nthat's\nbecause they have a forced perspective. They will look normal in\nreal\nlife.\n\nhttp://www.photopie.com/christmas-backdrops/\n\nAlso, don't forget, we can photograph outside in natural\n\n[Google Calendar note truncated for readability.]",
+      "uid": "8krllut43eqjmivd9o1cjobdjs@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2012-11-08",
+      "summary": "Mayfair Nursery School (Glenville)",
+      "description": "BOOKED PER STEPH ON 9/4\n\n2 classes 14 kids each\n\nHi Debbie!\n\nIt was great talking with you tonight, and thank you again so much for booking your school pictures with iSmile! We are so excited!\n\nTo summarize, we are set to photograph your wonderful kids on November 7 and 8 (Wednesday and Thursday) in the morning. We will arrive by 9:00 to set up and be ready to photograph at 9:30. Based on our conversation, we will be shooting outdoors if the weather permits, and have the backdrops handy if it is really bad outside.\n\nI will touch base with you mid-October to arrange for class lists and to send you all the parent order envelopes (with plenty of extras). Between now and picture day, you'll have to choose whether you'd like a class photo or a collage made of the individual photos. I have attached examples of both to help you decide. There's no rush and no wrong answer, both options are great. (We will caption the class photo with your school name, year, teacher, etc., if you choose that one.)\n\nI'll wait to hear back from you on scheduling the \"Family Photo Night\" fundraiser, too. I'll attach a flyer separately of that, so you can see what we have done for other schools.\n\nWe are so excited to work with you! Thank you again so much!\n\nSincerely,\nStephanie :)\n\nHi Stephanie,\n\nI left a message for you Friday evening and would like to touch base with you regarding doing our pictures at Mayfair Nursery School. Can you please give me a call at\n221-8190 at your earliest convienence? Thanks again and we look forward to working with you!\n\nDebbie LaFleche\ndanger1277@yahoo.com",
+      "uid": "2bdi7lfqeed19tvpbbjubdcv2o@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-03",
+      "summary": "Bondari On Location- 6:00PM",
+      "description": "15 Kids, 11 Adults - All breakdowns. Birthday party for Marina’s sister. Majority of the family hates getting their photo taken, Marina insists that it be a surprise that we are doing a photoshoot. Photos outside their home and inside.\n\nBring light kit.\n\n- MT",
+      "uid": "3lduriavm5uklhrceon647o3o4@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2011-10-27",
+      "summary": "Our Savior's Lutheran School",
+      "description": "Morning only",
+      "uid": "ngqncua48voi17basd7uv3lbls@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2011-06-03",
+      "summary": "Drama Kids Spring Performances",
+      "description": "Hello Stephanie! It’s been a while since we spoke, so I wanted to touch base with you to confirm that we are still all set for June 3-5. I’d love to touch base with you over the phone to explain our event in better detail and answer any questions that you may have. But in the meantime, here is our schedule of performances, with the number of students in each class. .\n\nFriday, June 3\n5:15pm CLPK Acting Academy Rehearsal (16 students – 19th Century Melodrama)\n5:45pm CLPK Dress Rehearsal (Pirate: 20 students; Circus: 22 students)\n7:00-8:30pm CLPK Performance\n\nSaturday, June 4\n10:45am Colonie WED. Dress Rehearsal (Pirate: 16 students; Circus: 24 students)\n12:00am-1:00pm Colonie WED Performance\n\n1:15pm Loudonville Acting Academy Rehearsal (20 students)\n1:45pm Loudonville Rehearsal (Pirate: 16 students; Circus: 21 students)\n3:00-4:30pm Loudonville Performance\n\n4:15pm Sat. Colonie Dress Rehearsal (Old Woman in the Shoe (4-5yrs: 13 students; Circus: 19 students)\n5:30-6:30pm Sat. Colonie Performance\n\nSunday, June 5\n9:45am Delmar Rehearsal (Pirate: 12 students; Circus: 20 students)\n11:00am-12:00pm Delmar Performance\n\n12:15 SCHDY/CLPK Rehearsal (Old Woman: 10 students; Circus: 14 students)\n1:30-2:30pm SCHDY/CLPK Performance\n\n2:45 Guilderland UP Rehearsal (Circus: 22 students)\n3:15 Guilderland Rehearsal (Old Woman: 7 students; Pirate: 16)\n4:30-6:00pm Guilderland Performance\n\nDeanna Stickles-Bach, Director\nDrama Kids International\nPhone: (518) 458-1313\nwww.dramakids.com\nDrama Develops Kids!\n\nFrom: Stephanie McCauley [mailto:stephaniemccauley@mac.com]\nSent: Thursday, February 03, 2011 9:39 PM\nTo: Drama Kids International\nSubject: Re: Possible Marketing Opportunity\n\nDeanna!\n\nThat is so funny, I met Nate Whitchurch last year, when he came to photograph us for an article Latham Life did on iSmile last year. It was weird because we kind of thought we'd submit our own photograph but he was under some kind of contract where he HAD to take all their pictures. Anyway he wasn't with us for long but it was a weird and uncomfortable experience. SMALL WORLD, huh?\n\nLunch sounds great. We will be pretty busy opening the new studio the week of Feb 21-25 but I can try to set aside a day for you ... or if you can get away next week, that would work for me too as I am more likely to be in Albany. Whatever works best for you, I can make work for me! Just let me know!\n\nNext week I can do Monday, Wednesday, or Friday. The week of Feb 21-25 I can do any day but Thursday, as of right now. :)\n\nThanks!\nSteph\n\nOn Feb 1, 2011, at 8:30 PM, Drama Kids International wrote:\n\nScouting out a new studio? Good for you! Glad to hear that business is going so well for you! And no apologies necessary – believe me, I know how that goes! LOL\n\nI’m so happy to hear that you are willing to do our event!!! I’d love to set up a time for lunch to plan out the logistics. I’m pretty open during the schools’ Feb. break as I won’t be teaching that week. That’s Feb. 21-25. If that’s not a good week, I’m mostly available on Mondays or Fridays.\n\nI’m kicking myself for not keeping the pricing information from our old photographer. I really was hands-off with the whole process…I have enough to worry about at that event. LOL I know he wasn’t cheap. I tried to find his pricing on the website, but no luck. Perhaps you know of him? Nate Whitchurch? Here’s a link to his website: http://whitchurchphotography.com/ Honestly, after the issues many of our families had with him last year, I think they’ll be thankfu\n\n[Google Calendar note truncated for readability.]",
+      "uid": "o5tf0o8hibvk9lkb3hm5ina4ag@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-11-29",
+      "summary": "Van Corlaer Elem Makeup Day (1 team)",
+      "description": "Fernando Jimenez, (school secretary that works with Tanya Delameter)\njimenezfe@schenectady.k12.ny.us\n518-370-8270 (prefer phone calls)\n\nSet-up: 8am; Start: 8:30am\nIn gym",
+      "uid": "77B49AC1-E329-4EAD-8355-AEF4D4AFD8F0",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2019-11-15",
+      "summary": "Yates Elem Makeup Date",
+      "description": "Samantha Eichele, Vice Principal\n518-370- 8320\neicheles@schenectady.k12.ny.us\n\nJenn Goldman, Building Secretary (and our main point of contact)\nGoldmanJ@schenectady.k12.ny.us\n\nSet up 8:00am; 8:30am start time\nCollage, indoor, NO SIBLING PHOTOS\n370 students\n**May Need pic of Principal for collages!**",
+      "uid": "698FFCB2-6610-4B65-9766-95F52105FE58",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-09-01",
+      "summary": "AA Seniors",
+      "description": "6/30/21 Scott Milliken confirmed date ckg",
+      "uid": "ECE97613-48D9-4973-9F20-01724EAD65C6",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-06-08",
+      "summary": "Albany School of Humanities 5th Grade Makeup (1 hour)",
+      "description": "Marie Culihan, principal\nmculihan@albany.k12.ny.us\n\nSetup 8:30am, start photos at 9am ONE HOUR to photograph remaining 5th graders, reg clothes and then cap & gown.\n\nBring Eagle Point's caps & gowns from studio",
+      "uid": "6rp59cvn4eee34b2ronvrcrgbn@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-10-20",
+      "summary": "Duanesburg Makeup Day (DES and MSHS)",
+      "description": "ES\nSet up 7:30\n8:00 - Staff\n8:15 - PK and K\n8:35 - Grades 1 and 2\n8:55 - Grades 3 and 4\n9:15 - Grades 5 and 6\n\n** pack up and move to HS **\n\n10:30 - 12:00 - any staff or student retakes grades 7-12",
+      "uid": "A29FC34F-680A-4AC2-8672-8A8A39356A09",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-05-26",
+      "summary": "Matthew & Anna Brooks - Washington Park 10AM - Erik",
+      "description": "Potentially a cake smash session at Washington Park depending on their vacation plans, which may prevent them from having the 1 year session completed as they will be away for awhile. 10AM at Washington park - Meeting point TBD",
+      "uid": "65EBFB5C-3D9D-458C-9A16-9A58C74F273C",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-17",
+      "summary": "Smile Lodge Fall Party STEPH",
+      "description": "Hello Stephanie!\n\nI hope you’re doing well and enjoying the start of Summer. We are currently starting the process of planning our fall event and would love to have you there for photos if you’re available. The event will be held at the office (713 Pierce Road, Clifton Park) on Saturday, September 17th from 1-4pm. This event will be similar to our recent spring event, but with some additional activities for the team to enjoy. Let us know if this may be something that you’re available for. Thank you so much!\n\nErin DuPont, SHRM-CP\nHuman Resources Generalist\nThe Smile Lodge Pediatric Dentistry\n713 Pierce Road\nClifton Park, NY 12065\nPhone (518) 373-1181\nFax (518) 373-0130",
+      "uid": "EF4C9102-1195-4C91-9041-BC835260BC6F",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-12",
+      "summary": "School team meeting 1:30pm",
+      "description": "https://meet.google.com/qcc-pcbp-eob\nOr dial: (US) +1 443-671-8397 PIN: 215770909#\nMore phone numbers: https://tel.meet/qcc-pcbp-eob?pin=9066032398703&hs=7\n\nLearn more about Meet at: https://support.google.com/a/users/answer/9282720\n\nPlease do not edit this section.",
+      "uid": "5f79mjdqc71bt107n47iaac5os@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-03-18",
+      "summary": "Eagle Point Grad Photos (Matt/Molly)",
+      "description": "Leah Hoey\nleah.hoey@nystrs.org\n\nGrad photos, reg clothes and cap & gown (provided by the school)\n\n***ALSO, take full body shots to the right and left in regular clothes JUST IN CASE a group 5th grade photos isn't possible in May due to COVID.\n\n5th grade teachers should also be photographed in full body shots for composite.***\n\nSee Mar 10 for timing\n\nBookcase backdrop\n\nYou may get stragglers from PK-grade 4 in, in case they missed picture day on Mar 10.",
+      "uid": "CE33541F-5D3A-48DE-9A57-FFE93D69F482",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-12-06",
+      "summary": "Whispering Pines Preschool (Molly/Zoe)",
+      "description": "Martha Frank\n518-875-6724\nmfrank@wppkids.com\n\nNEED SUPER QUICK TURNAROUND FOR HOLIDAY DELIVERY - director is aware of tight time frame.\n\nDelanson & Cobleskill branches of Whispering Pines. They are a special needs preschool with about 45 kids in Delanson and 10 kids in Cobleskill toddler to 5 years old.\n\nBackdropped photos USING NEW WOODEN WINTER SCENE (used at KinderCare & Maple Leaf)\nGROUP unmasked class photos with teachers. BRING A CHAIR!!!!\n\nDelanson first:\nSetup: 8:30am\nStart: 9am\n\nThen onto Cobleskill....\n\nBoth schools close at 1:30pm\n\nIndividuals of all students and teachers, staff\nDelanson:\nWhispering Pines Preschool Inc.\n2841 Thousand Acre Road\nDelanson, NY  12053\nTEL: 518-875-6724\nFAX: 518-875-6389\n\nCobleskill:\n395 No Grand Street\nCobleskill, NY 12043\n\nAlso have Amsterdam location (already had photos).",
+      "uid": "E5433379-4A5E-4AB8-AFF4-8F46F4A29969",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-05-03",
+      "summary": "Belanger School of Nursing Matt+1",
+      "description": "Hi Danielle!\n\nYou are CONFIRMED for May 3 from 1-6 pm!  Linked below is a sign up page for everyone to pick a time that works for them on that day.  We will need to arrive around 12:15 to get set up, and will be done breaking down by 6:30 - just in case you need to know that to reserve a space for us.\n\nWe will need the following:\n\n1.  A roster of students (first and last names as you would like them to appear on the collage) and any faculty that should also be included (they should also make an appointment for a portrait)\n\n2.  A space on campus to do the portraits - doesn’t have to be anything special - we just need about a 20’ by 20’ space near an electrical outlet.  A table and a couple of chairs will also be helpful if possible.\n\nWe will send an email out to all students who sign up for times a couple days before May 3 - with instructions and directions, including what to wear to make changing in and out of the drape easy.\n\nYou can email me anytime if you have any questions leading up to the shoot.  My cell is 518-225-0999 if you need me urgently.\n\nStephanie McCauley\niSmile Studios\n\nBlogging is still cool:  https://www.ismilestudios.com/blog\n\nCreating what people run into burning buildings to save ❤️\n\nOn Mar 30, 2022, at 4:42 PM, Danielle Pantuosco <daniellepantuosco@gmail.com> wrote:\n\nHi Stephanie,Can we secure May 3rd from 1pm to 6pm?Thank you,Danielle\n\nOn Wed, Mar 30, 2022, 12:08 PM Danielle Pantuosco <daniellepantuosco@gmail.com> wrote:\nHello Stephanie,\n\nI've attached an example of what the school hangs on their walls.  After speaking to the powers that be, our logo must be on the collage (also attached).  Please let me know if this is something you can do and if so pricing.  Please give me a few more days on dates.  Thank you for everything.\n\nIf you have any questions, please feel free to contact me.\nSincerely,\nDanielle\n<PXL_20220330_144817637.MP.jpg>\n\n<image.png>\n\nOn Tue, Mar 29, 2022 at 10:30 AM Stephanie McCauley <stephanie@ismilestudios.com> wrote:\nHi Danielle!\n\nWe can definitely help you!  We have a drape and complete portable studio lighting setup that we can bring to your school and photograph your 59 graduates within a 4-5 hour time frame.    There is no charge for us to come to you and no sitting fee for any student.\n\nIf someone can’t make it, they can go to our studio in Colonie Center to do a make-up - but I would caution you to NOT publicize that because it will delay your collage significantly if you/we have to start chasing people down.\n\nI would recommend having us set up a sign-up platform where each student can pick their time slot - does that sound ok?\n\nWe will create a personalized gallery for each student to view their pictures (each will have roughly 7-10 images to choose from) and they will be able to select their favorite one to be used in the collage.   Once selections are made, we can make a file of all the chosen pictures.\n\nWe can make the collage for you if you want us to - and there would be no charge other than our photoshop and printing costs - ballpark $100 unless you are looking for something really big or expensively framed.   If you wanted us to provide the digital files for someone else to make the collage, we can do that too - our fee would be $250 for 59 student digital files with print and copyright release.   You do not have to decide this right away!\n\nNext steps if this all sounds good:\n\n1.  We need to pick a date where all 59 students are likely to be able to be photographed (weekends are\n\n[Google Calendar note truncated for readability.]",
+      "uid": "D898B712-2743-4846-A117-E33E48A64E87",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-05-06",
+      "summary": "Orenda rain date (see May 2)",
+      "description": "Kristen Cook, PTA\nkristencook.11@gmail.com\n\nNEW SCHEDULE due to date change:\n\nPTA Spring Picture Day 2022 -Friday, May 6th\nTime Class Class\n8:15 wheeler Herrington\n8:35 Smith Hubbard/ Matura\n8:55 Brimhall Keyes\n9:15 Moore Graybeal\n9:35 Lemieur Peters\n9:55 Kilgallon gwiz\n10:15 rockwell Schunk\n10:35 Weeks Keller\n10:55 Beidl\n11:15 Corrigan\n11:35 Stevens\n11:55 Smith Pelletier\n12:15 Beyer Treacy\n12:35 5th grade Class Picture 5th grade Class Picture\n12:55\n1:15 Brimhall",
+      "uid": "9E86179E-AD74-4F39-BC1F-0C8E462D11CA",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2019-09-19",
+      "summary": "Walter B Howard Open House (KYLE) 6:15pm",
+      "description": "Rob Long, PTO President\nrgl1101@yahoo.com\n\nEvent begins at 6:30pm, Someone to stay about an hour? CARRIE CANNOT DO\nParent Open House - set up a table with samples to show parents what iSmile school photos look like.",
+      "uid": "09F77E35-DBCC-41B0-804C-F87D1F792167",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-10-20",
+      "summary": "Hackett Middle School Picture Day set-up 11:45am (2 Days) (Kyle)",
+      "description": "Mike Paolino, Principal\nmpaolino@albany.k12.ny.us\n\nCafeteria both days for ALL photos (set-up at 11:45am)\n12:15p-2:15p both days for in-school students and faculty\n3p-6:30p both days for virtual leaners (scheduled through Acuity)\n\nHackett School Photos Confirmation\n\nCarrie Graziano <carrie@ismilestudios.com>\n\nFri, Oct 2, 2:19 PM (12 days ago)\n\nto mpaolino, Matthew\n\nHello Mike,\n\nIt was great speaking with you today! To summarize the notes from our conversation:\n\nWe will be taking indoor photos of your in-school students on October 20 and 21 in the cafeteria. We can have one photo team of 2 people begin taking photos of students at 12:15pm and continue until 2:15pm each day. That is enough time for all of your approximately 100 in-school students.\n\nWe will plan to begin photographing your virtual learners beginning at 3pm until 6:30pm. The same photographer will stay on site, in the cafeteria, for these photos. This will ensure photography consistency.\n\nI will email you shortly a draft message with the link to for parents of virtual learners to use to book a 5 minute appointment for their student(s). One family can come during the same 5 minute session. We will watch how the sessions fill, and if needed we can add additional days. These days will need to be in early November, as our October calendar is fully booked at this point.\n\nI have requested class and faculty/staff rosters from the school district. If I do not see them timely, I will reach out to you.\n\nLet me know if I got everything we discussed. We're excited to capture your student body this fall!\n\nAll my best,\nCarrie",
+      "uid": "3qc03qmq14ujbsuemk3e7fubuu@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-03-03",
+      "summary": "Greenbush Soccer Club Board Meeting ( 7pm start) Carrie & matt",
+      "description": "Eric Lurie, President\neric_lurie@yahoo.com\nMeeting being held in the Allstate Building at 146 Columbia Tpke, East Greenbush\n**WE ARE FIRST ON THE AGENDA! To present our sports photo program!**\n\nEmails:Greenbush Soccer Club - Travel Team Photos\nInbox x\nCarrie Graziano <carrie@ismilestudios.com>\n\nTue, Jan 7, 1:52 PM\n\nto eric_lurie\n\nHello Eric,\n\nHappy New Year!\n\nI am reaching out to you today, not only because I am a parent of a Greenbush travel soccer player, but I am a manager at iSmile Studios, a premium photography studio in Colonie, NY. Many of our current photo customers are parents in the Greenbush league and some have expressed interest in professional photos of their players and teams.\n\nOur sports photography program at iSmile is customized to each league's needs. We photograph both indoors and outdoors, and create amazing images of players and teams, and make them available to the club and parents at competitive pricing.\n\nSince we are in the winter session, we could photograph your soccer players individually in several poses indoors. We will also use these poses to compile a team composite such as the baseball composite I have attached to this email. We would not charge the league or teams to come out to do the photography. We would provide information to the parents so that if they wish, they can look at the images online (in private galleries) and purchase what they'd like. These purchases help pay for our photographers and equipment, and could provide fundraising for your teams (see below).\n\nFor the teams/league benefit, we can offer your choice of sponsorships: promotional items such as trophies, banners, practice jerseys and the like, or a simple monetary commission back to teams based on related photo purchases.\n\nWe are scheduling now for January-February. If you'd like to talk more, please let me know. I am happy to answer your questions and customize a program that works best for the Greenbush Soccer Club.\n\nAll my very best,\nCarrie\n\nCarrie Graziano\nManageriSmile Studios\n\nJoin the conversation online at www.facebook.com/ismilestudios\n\nwww.ismilestudios.com\n518-435-1146\n\n2 Attachments\n\nCarrie Graziano <carrie@ismilestudios.com>\n\nFri, Feb 21, 2:20 PM (16 hours ago)\n\nto eric_lurie\n\nHello Eric,\n\nI am following up to my email from last month to see if I can answer any questions for you about our sports photography program. Please feel free to reach out. I am happy to review our program with you or other members of the Greenbush Soccer Club's board.\n\nEnjoy your weekend,\nCarrie\n\nCarrie Graziano\nManageriSmile Studios\n\nJoin the conversation online at www.facebook.com/ismilestudios\n\nwww.ismilestudios.com\n518-435-1146\n\nEric Lurie\n\nFri, Feb 21, 6:03 PM (12 hours ago)\n\nto me\n\nCarrie,\nI’ve passed this on to a few board members...I’ll follow up with them shortly.\n\nYou are also certainly welcome to attend the March board meeting, and we can set aside some time.\n\nSent from Yahoo Mail for iPhone\n\nCarrie Graziano <carrie@ismilestudios.com>\n\nFri, Feb 21, 6:12 PM (12 hours ago)\n\nto Eric\n\nGreat, thank you Eric. Can you tell me when the March board meeting is? I'll review our schedule and check availability.\n\nEnjoy your weekend,\nCarrie\n\nCarrie Graziano\nManageriSmile Studios\n\nJoin the conversation online at www.facebook.com/ismilestudios\n\nwww.ismilestudios.com\n518-435-1146\n\nEric Lurie\n\nFri, Feb 21, 7:37 PM (10 hours ago)\n\nto me\n\nNext meeting will be Tuesday March 3rd, 7:00, at 146 Columbia Turnpike. We can get you in right at the beginning...",
+      "uid": "DAFA1C5F-84DF-4BE8-BBE9-FFE354CD9635",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2015-01-06",
+      "summary": "Jacob Adams, Meerkindhous Inc. Interview for Tech Position",
+      "description": "Interview for Tech Position. Owns a small tech firm in Rensselaer; TWC in Colonie Center is a client; has three techs available 24/7.\n\nhttps://hangouts.google.com/hangouts/_/ismilestudios.com/jacob-adams?hceid=MjE5dWo4bzkwY2Q5czNubGwwMHJqYTZkZWtAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ.subs5c5eu785t2317d8cgq6gb8&hs=121\n\nPlease do not edit this section.",
+      "uid": "subs5c5eu785t2317d8cgq6gb8@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2010-10-10",
+      "summary": "Our Savior's Photo Night",
+      "description": "4 people possibly",
+      "uid": "1l3fhg2vasrgapqs9aut4op3g8@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-05-13",
+      "summary": "New Dreams Nursery School",
+      "description": "Steph +1\n\nContact: Robin Cobb 479-3049\n\n13th: 24 kids am session, 23 kids pm session (starts at 12:45)\n14th: 23 kids am session, no pm session",
+      "uid": "u95u25k9sv4am4rgm44hpfggh4@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-10-20",
+      "summary": "Kristin Komarinski on location cook park (top customers 2012)",
+      "description": "Kristin Komarinski on location cook park (top customers 2012)\n518-315-9066\n3pm\nfamily of 4 plus some with grandparents",
+      "uid": "bnkok28nb5nen6r2khcvcfhgjc@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2011-01-14",
+      "summary": "Studio set up at mall magic show",
+      "description": "Bring free 5x7 coupons, one per family",
+      "uid": "3f10itkdlbv2naehi2e6e9k3r8@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-11-03",
+      "summary": "Cairo-Durham Seniors ( 1 team)",
+      "description": "Greta Metzler\ngmetzler@cairodurham.org\n\nSet up on Acuity - need timing\n\nGirls - drape plus white cap and gown\n\nBoys - tux plus blue cap and gown\n\nsome outside\n\nWednesday 11/3 - 8:00 am - 5:00 pm (break for lunch 12:00-1:00)\nThursday 11/4 - 8:00 am -5:00 pm (break for lunch 12:00-1:00)\nFriday 11/5 - 8:00 am - 4:00 pm (break for lunch 12:00-1:00)\nSaturday 11/6 - 8:00 am - 12:00 pm\n\nEmailed to Greta from Steph on 9/7/21:\n\nSenior Program to include:\nDrape for Ladies, Tux for Gentlemen\nCap/Gown (do you have a color preference?)  (boys in blue girls in white?)\nOutdoors or other natural light options in cap/gown and/or street clothes\n\nHere is a sample from a similar school\nhttps://ismilestudios.gotphoto.com/gc/h2blEmD9PROg94L5jkDK",
+      "uid": "1r2evnj1rqfkn7v0rhermrd9ld@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-10-08",
+      "summary": "The Sara Marie School (1 photog)",
+      "description": "Katie Gifford\n\nDirector\n518-280-3982\nkgifford@thesaramarieschool.org\n\nArrive at 8:30am, to start photos at 9am.\n\ntake picture of setup for in-studio makeups!\n\nOutdoor\nclass collage\nShen feeder preschool\nNeed images for yearbook\nAll students and teachers - individuals",
+      "uid": "54b8ek48rmp7e3q95h1071inaj@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2012-02-01",
+      "summary": "Kristy Candela Interview",
+      "description": "Hi!\n\nI live in Albany all year--I rent an apartment here, and do not live in the dorms.\n\nI am available MWF at 12pm through the evening, and TTH at 3pm through the evening. I have full availability on the weekends.\n\nHope to hear back soon!\n\nKristy\n\nFrom: Stephanie McCauley [stephaniemccauley@mac.com]\nSent: Monday, January 30, 2012 12:42 PM\nTo: Candela, Kristy\nSubject: Re: Interested in P/T job opening\n\nHi Kristy!\n\nThanks for your resume!\n\nI notice that you attend college. Do you live here all year, or do you return home for holidays and over the summer?\n\nWhat days and times are you available to work?\n\nLooking forward to hearing from you, and thank you!\n\nSincerely,\nStephanie\n\nStephanie McCauley\niSmile Studios\nwww.ismilestudios.com\nwww.facebook.com/ismilestudios\n\nOn Jan 30, 2012, at 12:05 PM, Candela, Kristy wrote:\n\nAttached is my resume! Hope to hear back from you!\nKristy",
+      "uid": "29mm6c97evu44dhpjql55n96m0@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-11-29",
+      "summary": "Albany College of Pharmacy Head Shot Event 4-8 Matt/Molly",
+      "description": "BRING COMPLETED FORM TO GET INTO BUILDING, ATTACHED TO PREVIOUS EMAIL\n\nBLUE POP UP PLEASE\n\nOK to set up at 3\n\nGood Afternoon Ms.McCauley,\n\nThank for your email! We decided that we would like to do November 29th from 4-8pm and we would like to select bulk pricing! Also we were wondering how much time we should plan for each person because we are making a sign up sheet for those who would like to attend? Thank you so much!\n\nSincerely,\n\nAtalya Morgan\nAlbany College of Pharmacy and Health Sciences\nDoctor of Pharmacy, Class of 2024\n607-338-0025\nAtalya.morgan@acphs.edu\nFrom: Stephanie McCauley <stephanie@ismilestudios.com>\nSent: Monday, October 25, 2021 12:09:44 PM\nTo: Morgan, Atalya <Atalya.Morgan@acphs.edu>\nCc: Zukosky, Emily <Emily.Zukosky@acphs.edu>; Bubniak, Alyssa <Alyssa.Bubniak@acphs.edu>; Gambacorta, Elizabeth <Elizabeth.Gambacorta@acphs.edu>; Topiwala, Avani <Avani.Topiwala@acphs.edu>; Maliszewski, Nickolaus <Nickolaus.Maliszewski@acphs.edu>; Kim, Jinhyung <Jinhyung.Kim@acphs.edu>\nSubject: Fwd: Professional Headshot Booking\nHi Atalya!\n\nLauren Ramos forwarded me your request (below) for your headshot event and we would be thrilled to work with you!\n\nOur services include bringing full studio lighting and a professional photographer on site.  We DO currently have November 29 open, and can give you either three or four hours that day depending on what you think you will need.\n\nWe can photograph roughly 45 adults an hour during a typical headshot event.  We always give our subjects a few different poses to choose from, but this goes very quickly once someone is seated, since there isn’t a ton of variety with a headshot.  Men tend to be a little quicker than women, but generally our pace is one person per minute with some cushioning built in, just in case someone is nervous or needs a little extra time.\n\nAll our headshots include retouching.   Also included is our online, secure and private platform where each student will receive a unique access code showing only their photos.  They will be able to view them online and order whatever they like!\n\nWe have two different approaches to pricing, depending on what works best for you:\n\nOPTION ONE - BULK PRICING\nWe will provide headshots for everyone in attendance (at least two poses for each person) fully retouched in high resolution JPEG download at a rate of $300 per hour.  Students will be able to access their galleries and download their images at no charge to them.\n\nOPTION TWO - INDIVIDUAL PRICING\nWe will come to you for no charge and give students the option to purchase digital headshots at $20 each (an 80% savings off our regular studio pricing).\n\nStudents will be able to see their images within 48 hours of the event and our platform sorts by student name and gives them a way to download their images independently - so you wouldn’t have to worry about keeping track of anything.\n\nI know I just gave you a ton of information - so I am ready for any questions you may have!  I’m holding the date tentatively for you just in case this all looks perfect!\n\nThank you so much!\n\nSincerely,\nSteph\n\nStephanie McCauley\niSmile Studios\nwww.ismilestudios.com\n\nFamily Portraiture\nCorporate Branding\nSchools and Sports\n\n❤️ Thank you for supporting our small business ❤️\n\n---------- Forwarded message ---------\nFrom: Morgan, Atalya <Atalya.Morgan@acphs.edu>\nDate: Mon, Oct 25, 2021 at 11:27 AM\nSubject: Professional Headshot Booking\nTo: Lauren@ismilestudios.com <Lauren@ismilestudios.com>\nCC: Zukosky, Emily <Emily.Zu\n\n[Google Calendar note truncated for readability.]",
+      "uid": "45F23176-C533-48D7-ADEF-00EE4FD2C1A6",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-11-13",
+      "summary": "Faneza Ramdass - Master Photography Session (Lauren)",
+      "description": "Start Time: 5:00PM\nLocation: TBD\n\nDetails:\n\n40th birthday. Family photos and solos.",
+      "uid": "0j9npkjbv1g3pdu2d34ui1ad3b@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-04-22",
+      "summary": "Call w/ Destine Prep Charter School 4pm (Kyle, Matt)",
+      "description": "That's perfect! 4pm works for us, if you need a later time on Friday let me know! Here's the google meet link:\n\nTo join the video meeting, click this link: https://meet.google.com/zum-qivk-uue\nOtherwise, to join by phone, dial +1 818-287-0784 and enter this PIN: 454 483 772#\nTo view more phone numbers, click this link: https://tel.meet/zum-qivk-uue?hs=5\n\nLooking forward to meeting you! Kyle.",
+      "uid": "5513BF47-D993-4546-9FE6-AD42DF62B966",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2011-11-14",
+      "summary": "Tumbling Tykes 9:30am-12pm School Photos",
+      "description": "2 classes 13 students each between the time of 9:30am - 12:oopm\n\nStephanie on behalf of Stacey Myron\n(518) 783-0767",
+      "uid": "b709ei9grloupe6t31sjj68rng@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2017-10-22",
+      "summary": "Katie Wisniewski 9 AM - ERIK",
+      "description": "12 people 2 children ages 2 years and 7 months old..\n\nBooked by Katie's mom Michelle Fealey booked the appt. 5184561692\nwbf101@juno.com\n\nhttps://plus.google.com/hangouts/_/cheyenne?hceid=MjE5dWo4bzkwY2Q5czNubGwwMHJqYTZkZWtAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ.71gfm580gkfpqp0hbqpfmrt7kd&hs=121\n\nPlease do not edit this section.",
+      "uid": "2720C0DF-9205-444B-B276-A2AB8BA416EB",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-02-13",
+      "summary": "Deb Torres - LCS Headshot 8:30a (MATT)",
+      "description": "Deb Torres - Drape on blue. (Senior Advisor to Class of 2020)\n\n2 New\n\nArianna Wiltsie- 11th\nHunter Sonnekalb- PK",
+      "uid": "B0C42E37-CD7C-4AC3-BA84-53A1046786B5",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-01-24",
+      "summary": "BKW Basketball 4:00 (Kyle/Molly)",
+      "description": "Contact Tom Galvin\nTom.galvin@bkwschools.org\n518-364-0744\n\n1738 Helderberg Trail\nBerne, NY 12023\n\nHi Tom!\n\nAs promised, I wanted to follow up via email to you about basketball pictures. We are excited and grateful for the opportunity!\n\nI’m confirming we will be at BKW to do basketball pictures at 4:00 on Monday January 24 (with a 3:30 set up time). Thinking we could do your team first at 4:00 and then Andy’s at 4:30 (or when it is convenient for him)?\n\nWe will photograph all players individually and donate the senior banners. You can I can go through a quick proofing process before we print them to make sure you love them. We will also offer pictures to all the players on the team via online private galleries - we will take care of everything related to that, there is nothing you have to do or manage.\n\nJust need two things from you to prep:\n\n1. Please send me a roster for both teams (any kind of excel spreadsheet format works) asap.\n\n2. Please let me know specifically where we will be able to set up to shoot. We don’t need a lot of space, just access to an electrical outlet and an area about 15’x15’.\n\nWe will turn these around quickly and meet your February 5 deadline with no problem.\n\nThanks so much!\n\nSteph\n\nStephanie McCauley\niSmile Studios\nwww.ismilestudios.com\n\nFamily Portraiture\nCorporate Branding\nSchools and Sports\n\n❤️ Thank you for supporting our small business ❤️",
+      "uid": "4DA0BFFA-B6BF-4CD8-AB3F-BFA94DF7E1EE",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2019-11-18",
+      "summary": "Kid's Express Makeup Day 9-11 (Matt)",
+      "description": "Rescheduled from October date to November 6th, rescheduled again to November 18th. -MM 11/4/2019",
+      "uid": "54lv9jrglbiedufb46vblbed8e@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-10-12",
+      "summary": "Morrison AAG Senior Make Up",
+      "description": "730 AM\n\nConnie Morrison crpfuture@yahoo.com\n\nDrape and outdoors with family",
+      "uid": "B7D9C6D6-B249-47F4-8172-AC1AB50977A8",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-12-21",
+      "summary": "Cohoes HS Winter Sports (1 team)",
+      "description": "First time doing winter sports at this school!\n\nCaryn Dollard\ncdollard@cohoes.org\n\nafter school - need times and rosters",
+      "uid": "59B8BC22-C6CF-4D4D-BF24-7704CDD1790C",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-02-02",
+      "summary": "Cosmic Crush Volleyball (Steph, Erik & Carrie) start 8:30am",
+      "description": "Tim Renna, club director\ncrushvbc15@gmail.com\n\n8:30am\n2nd time photographing this club\nIndividuals in gym with volleyball net along side of player, player holding volleyball, etc.\nIndividuals back lit like last year and group team photo (backlit too)\n\n2 teams, 16u and 18u\n12 players per team plus coaches\n\nCarrie's daughter is on the 16u team - yay!\nClub would like team & coach images for website.\nClub may be purchasing mini photo volleyballs for their senior players!",
+      "uid": "1B9939C3-D991-4B3F-96EE-20A87193469F",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-04-24",
+      "summary": "Halfmoon Travel Softball Makeups (Andrew/Carrie)",
+      "description": "8:30am start - only about 15 players/coaches tops\nPlease see Steph's original photos from the fall 2020 for consistency and posing.\nOutdoor in dugout\nSteph will edit\nOriginal binder with QRs are in the office",
+      "uid": "CB3D49CB-9035-458B-9EC0-04C727349D4E",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-10-07",
+      "summary": "Milton Terrace Elementary (2 teams)",
+      "description": "Kristle Mathison, principal's aide\nKMathison@bscsd.org\n(518) 884-7210 ext. 3318\n\nNEW SCHOOL\nBallston Spa district\n\nSetup: 8am (can't get into room any earlier)\nStart: 8:30am\n\nIndoor\n450 students + faculty/staff\nall the usual fall service items",
+      "uid": "0F9C7A7B-0F41-4FB6-BFCD-C98768B90E92",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-12-15",
+      "summary": "Colonie Chamber Networking - Headshots",
+      "description": "Holiday Networking @ The Century House\n\nWednesday, December 15th, 5:00 to 7:00 pm\n\nThe Century House Restaurant, 997 New Loudon Road, Latham NY 12110 (map)\n\nJoin us for the Chamber's Annual Holiday Event in the white ballroom at The Century House Hotel & Restaurant! Enjoy a wide selection of beers on tap, as well as fine wines and cocktails with complimentary hors d'oeuvres and drink specials.",
+      "uid": "E0B795A7-E2EF-4B23-98E8-580F24F21175",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-07-10",
+      "summary": "Zoom Reopening Meeting",
+      "description": "Stephanie McCauley is inviting you to a scheduled Zoom meeting.\n\nTopic: Reopening Zoom\nTime: Jul 10, 2020 03:00 PM Eastern Time (US and Canada)\n\nJoin Zoom Meeting\nhttps://us04web.zoom.us/j/71653807540?pwd=NmhkZG5SbmRJOVZOVmwzZDd6NmhYQT09\n\nMeeting ID: 716 5380 7540\nPassword: ismile",
+      "uid": "5cdugn0atbbqljr0aaev3n9tvf@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-06-23",
+      "summary": "Julie Marino Birthday party! REQUEST TESA",
+      "description": "1230pm-330pm- gets extra hour because she is buying the end of the year cd so instead of two VIP memberships we are gifting her an extra hour-oked by Steph\nbooked 2/28/13 in full- ek\n\nRequests Tesa",
+      "uid": "j818kap7jnpfvef7mtp8ilhgrk@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-10-22",
+      "summary": "Little Butterflies Family Daycare S+B",
+      "description": "Rachel Carl\n\n861-1135\n\n12 kids\n\nrcarl327@aol.com\n\n477 State Rt 146\nAltamont NY 12009",
+      "uid": "dou48ikscvl52fls9lp77njf18@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2014-09-13",
+      "summary": "Ellerie Fuller Wedding",
+      "description": "Hi Ellerie!\n\nIt was great chatting with you today! Here is a schedule summary based on what we talked about today. Of course, anything can change and we are very flexible. It will be a perfect day!!!\n\nHere’s my contact information:\n\nCell 518-225-0999\nEmail stephaniemccauley@mac.com\n\nWedding Date: September 13, 2014\n\nYou’re getting ready with Danielle (hair/makeup) starting at 9:00\n\nPhotographers arrive at 1:00 - Comfort Inn at 99 Miller Road\nGirls in Bridal Suite\nBoys in Dad’s room\n\n1:00 - 1:30 Girls getting ready, robes, garters, fun pictures, also details of flowers, dress, rings, etc\n\n1:30 1 photographer go to guys’ room to get them getting ready and their detail shots\n\n1:30 - 2:15 Bridal boudoir\n\n2:15 - 2:25 Bride puts gown on\n\n2:30 “First Look” - staircase at Comfort Inn - 1 photographer behind bride to get groom’s expression, 1 photographer behind groom to get bride’s expression\n\nWedding party and family to Birch Hill\n\n2:45 - 4:15\nFormal Pictures at Birch Hill of bridal party and families\n(Ellerie - can you send me a list of anything special you’d like during this time that’s out of the ordinary? For example - a great aunt we need to make sure gets a picture with the groom, etc)\n\n4:30\nBride and girls to “hide” as guests arrive\nPhotographers getting detail shots of venue\n\n5:00 - 5:30\nCeremony\n\n5:30 - 5:40\nBride and Groom formals\n\n5:30 - 6:30 - Cocktail hour\n6:30 - 10:30 - Reception\n\nPlease let me know if this looks accurate, and if you want to change anything as it gets closer.\n\nDon’t hesitate to contact me ANYTIME with anything you need!!!!!\n\nCan’t wait to see you!!!!!\n\n:)\nSteph",
+      "uid": "9CFD2D16-2B82-4BB2-904D-00EE71A6B9C2",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2011-05-21",
+      "summary": "Cystic Fibrosis Walk (candids)",
+      "description": "Contact Tracy Van Hattum",
+      "uid": "29o6hp2l31sg8q0uiqqrqkmotc@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-01",
+      "summary": "Rivers Casino Employee Picnic 1 Photog + Photo Booth",
+      "description": "Contact Laura Primiano\n\nWHOEVER GOES TO THIS - YOUR FAMILY IS INVITED AND YOU WILL BE GIVEN TICKETS FOR FOOD AND DRINKS TOO\n\nQuestion - we are having our company picnic from 11a-7p on 9/1/22. It’s outdoors. All kinds of activities and food. Would you be interested in some candid shots? And is it possible (if we can secure power) to do the photo booth? Let me know the cost. We’d love to have you be there and you’re welcome to bring your family as well.",
+      "uid": "237AD536-7378-472D-AEDA-51ECC08DC3FB",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2019-10-03",
+      "summary": "Cohoes HS (Steph/Erik - STROBE LIGHTS)",
+      "description": "Matt iSmile Studios\n\n1:37 PM (0 minutes ago)\n\nto Caryn\nFor senior pictures, if we could have the roster for the Class of 2020 and contact information that would be great!\n\nFor underclassmen retake day, how about Friday October 25th?\n\nOn Tue, Mar 26, 2019 at 1:35 PM Caryn Dollard wrote:\n\nWhat about underclassmen retake day\n\nOn Tue, Mar 26, 2019 at 1:31 PM Matt iSmile Studios wrote:\n\nHi Caryn,\n\nBased on your dates last year, how do these dates work for you for 2019-20?\n\nSenior Portraits: July 16-20, 2019\nUnderclassmen: Thursday October 3rd & Friday October 4th\n\nBest,\nMatt\n\nOn Tue, Mar 26, 2019 at 12:39 PM Caryn Dollard wrote:\n\nMatt,\n\nWe would like to set up dates for next years Senior Portraits and underclassmen pictures.\n\nCaryn Dollard\nCohoes High School\n\n--\n\nCONFIDENTIALITY NOTICE: The contents of this email message and any attachments are intended solely for the addressee(s) and may contain confidential and/or privileged information and may be legally protected from disclosure. If you are not the intended recipient of this message or their agent, or if this message has been addressed to you in error, please immediately alert the sender by reply email and then delete this message and any attachments. If you are not the intended recipient, you are hereby notified that any use, dissemination, copying, or storage of this message or its attachments is strictly prohibited.\n\n--\nMatt Minardi\niSmile Studios\nJoin the conversation online at www.facebook.com/ismilestudios\nwww.ismilestudios.com\n518-435-1146\n\n--\n\nCONFIDENTIALITY NOTICE: The contents of this email message and any attachments are intended solely for the addressee(s) and may contain confidential and/or privileged information and may be legally protected from disclosure. If you are not the intended recipient of this message or their agent, or if this message has been addressed to you in error, please immediately alert the sender by reply email and then delete this message and any attachments. If you are not the intended recipient, you are hereby notified that any use, dissemination, copying, or storage of this message or its attachments is strictly prohibited.\n\n--\nMatt Minardi\niSmile Studios\nJoin the conversation online at www.facebook.com/ismilestudios\nwww.ismilestudios.com\n518-435-1146",
+      "uid": "4pgk9ga7p5u1355m87rco55ac5@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-04-04",
+      "summary": "CX Walter B Howard Breakfast with Easter Bunny (1 photog)",
+      "description": "Rob Long, PTO President\nrgl1101@yahoo.com\n\n10-11am breakfast\n11-noon - outside egg hunt\n\nWe can take posed EB pics before breakfast, and then some candids afterward? Timing to be worked out with school. PTO event. Pics to be uploaded to yearbook and sell on GotPhoto.",
+      "uid": "BD12DB97-B2BD-436D-94BD-45F0744655F0",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2019-10-19",
+      "summary": "Kim  Trombley Master Session - Andrew",
+      "description": "Lake George or Sacandaga",
+      "uid": "45B105BA-21C8-4351-8D6E-F3B610FD75B4",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-05-04",
+      "summary": "Green Tech Seniors Rain Date",
+      "description": "Hi Kat,\nWe'll start at 1pm and go til 4pm. I'll arrive at 12:30p. We'll do approximately 20 students per hour (we could probably go faster then that if needed). So, that's about 5 students every 15 minutes. Whatever works easiest for you guys to schedule it out is fine by me, I can also help with that if needed!\n\nBest,\nMatt",
+      "uid": "0E4EEF05-2825-4E46-B9D3-84C8337F218D",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2019-10-12",
+      "summary": "MES Color-a-thon (Kyle!!!)",
+      "description": "Not Matt please :)",
+      "uid": "7hli9jt5aoblh74o5i7oq8e1uj@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-04-29",
+      "summary": "CX due to school closure; Eagle Point 6th Grade Graduation Photos (Matt)",
+      "description": "Colleen Lemmon, new PTA president 11/2019\nColleen.Smith-Lemmon@dot.ny.gov\n\n8:00am set-up\n8:30am Individual Grad Photos (indoors on gray background)\n\nSchools PTA has cap and gowns and will have volunteers there to help.\nlocation - LIBRARY\n\nWe are photographing each student in cap/gown and plain clothes to max sales on GP.\n\nWe are providing grad folios to school at n/c (taken out of commissions)\nMaking add'l photos available for sale on GP",
+      "uid": "E5CA6A5C-1C71-416F-8BB8-2539D34A8141",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-06-03",
+      "summary": "Guilderland Prom Photo. Booth  STEPH+1 ASSISTANT",
+      "description": "bedianl@guilderlandschools.net\n\nPhoto booth and formal photo station\n\nHi Stepahanie!\nHope all is well.\nI am looking to schedule our Panoramic Senior Class photo.  I have reached out to our athletic director to get availability for the gym the week after vacation (4/25-4/29).  Do you think that may work for you?  We usually schedule for the first thing in the morning around 8:15 am, generally only taking about 15 mins.  We would go with the option that students order the pictures on their own after it's taken.  I can email order forms to students and parents for easy ordering.  I also need one extra picture for the school to frame and hang with all of the previous classes.\n\nI'm also in the process of confirming everything for Sr. Ball on June 3rd. and wanted to make sure if we are all set for the photo booth?  We normally have Lifetouch come and set up a backdrop and take formal photos, is that something you'd be interested in doing? They do not charge us a fee to do this, they simply give us a website link or order forms prior to the event for ordering.  Let me know what you think!\nLisa",
+      "uid": "3548BE51-DF58-4B47-AC9C-505E5F4C0E78",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2012-06-24",
+      "summary": "Baby Shower",
+      "description": "New mom: Katie Iannocone\nBaby shower booked by: Amanda Selby\nBaby shower is from 1-3 PM @ 536 Columbia Street Cohoes NY 12047\nBooked by Katie R\nDeposit paid!!",
+      "uid": "btoaefc2brc48p559356vo39t4@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2012-03-02",
+      "summary": "Duanesburg Staff Luncheon - Steph",
+      "description": "The time is upon us again for the Annual PTSO Teacher and Staff Appreciation Luncheon, Friday, March 2. This year's theme is \"A Day at the Circus.\" Think Red, Aqua & White!\n\nEver year through the contributions of the gracious and caring parents in our district, we are able to provide lunch to over 180 DCS faculty and staff members as a thank you for all that they do. We are once again looking for parents to provide a dish/needed supplies for the occasion.\n\nPlease contact Melanie Donahue (melanie.donahue@ge.com or 860-6053) to sign up! All items can be dropped off at the High School office on Thursday, March 1st, during business hours or Friday, March 2, in the cafeteria between 7 and 10 a.m. ( Any non-refrigerated items such as candy, etc., can be sent into the elementary/high school ahead of time marked-Staff Luncheon.)\n\nHere are a few of the items that we need: (Recommended donation size-full or half lasagna pan or a couple bags/cases of each)\n\nPrepared Items\nPulled Pork\nSausage & Peppers\nChicken & Beef Vegetable Kabobs\nBuild a Burger (prewashed lettuce, sliced-cheese, tomatoes, jalapeno, & pickles, etc.)\nSalads (fruit, potato, coleslaw, garden/side)\nDeserts (Circus Theme Cupcakes/Cakes/Cake Pops, Caramel/Candy Apples)\nUnprepared Items\nHamburger Buns / Sub Rolls (Lots)\nFrozen Bags of Corn on the Cob\nPotato Bar Sides ( Shredded Cheese, Bacon Crumbles, Sour Cream, Chives, Butter, Cubed Grilled Chicken, steamed broccoli, etc.)\nCandy Bar (Bags of…licorice, jellybeans, Swedish fish, sour patch kids, rock candy, m&ms, malt balls, lollipops, etc.)\nCases of Water bottles, old fashioned soda (bottles like izzo, root beer, coke, etc.)",
+      "uid": "vcbnjft3q34u2jsmt5gv7bhghg@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-12-02",
+      "summary": "Zoller Elementary MAKEUPS (1 team)",
+      "description": "NEED TO SHOOT TOTH’S K CLASS - Quarantined on pictureday\n\nTanekia (ton-ee-ka) Matthews\ntanekiam4u@gmail.com\n518-709-2801 (prefer phone calls)\n\nSetup:7:45am\nStart: 8:15am\nLocation: Gym C (indoor)",
+      "uid": "8307DBEB-0DF7-48B8-B320-F001BF8C10EA",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2014-04-05",
+      "summary": "Shauna Waldin Baby Shower",
+      "description": "1010 Troy Schenectady Rd, Latham, NY 11am-1pm\n(It's on route 7 behind the airport)\nBooked by Diane Burdick\ndiane757@nycap.rr.com\n518-885-1537",
+      "uid": "k4gao6l5b39bnn8fbc5kdgt1a0@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2012-08-27",
+      "summary": "LaSalle Golf Tournament (Katie Reese)",
+      "description": "Hi Stacy!\n\nThank you for thinking of us for this tournament … we'd love to be involved, and here is what we can offer in terms of sponsorship and enhancing the event.\n\niSmile could come to the tournament and photograph each foursome before they start playing, print a 5x7 for each player (4 5x7 prints for each foursome) and have the portraits ready by the 6:00 dinner and awards. We can caption the print \"LaSalle Institute 19th Annual Cadet Open\" or any other way the organizers would like to brand the prints. Normally, we charge $500 for this service, but we would do it for free in exchange for either $500 sponsorship (longest drive or closest to the pin).\n\nIt's a nice way to enhance the tournament, each player receives a free picture commemorating the day, and LaSalle would be provided with all candids and a video copyright released for their use.\n\nHere's a sample golf tournament:\nhttp://ismile.smugmug.com/Events/Events-from-2010/Colonie-Chamber-of-Commerce/12216435_jBK6TD#!i=870134625&k=yfq8R\n\nIf this works, we'd love to help. Please let me know so we can get it on our calendar!\n\n:)\nSteph",
+      "uid": "qubkphen87vkc14nsmfup3r5es@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-07-13",
+      "summary": "Orchard Creek Golf 13&Under and 17&Under (Matt)",
+      "description": "Practices are on Tuesday's from 5:00-6:15 for 13 & under and 6:30-7:30 for 17& under. Our other 13 & under group practices from 5:00-6:15 on Thursday's. Options would be July 6, 8, 23, and 15.\n\nAnother alternative would be to come during a match on Sunday's. They start at 3:00 on Sunday the 11th. If you did that you wouldn't have to come on two separate days. Let me know what you'd like to do. Thank you!",
+      "uid": "0F4C97C9-3744-4335-94DD-A20BA1188A86",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-02-05",
+      "summary": "CARRIE call with MYERS",
+      "description": "Call with Donna L\n518 475-6433",
+      "uid": "3cd7mio26lkt9ktjsg2foko809@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2012-02-12",
+      "summary": "Christina Liberatore SHOWER 430-630 PM",
+      "description": "Referral of Steph's friend Doreen Tenace -\nShower is being given by mother in law, named Dawn (210-2877).\nLiz, if you have trouble finding someone to shoot this, I will.\n\nDeposit paid Jan 28 -KTK\n50-80 guests\nChristina Liberatore - (518)-944-4053\nfirehouse 550 Albany Shaker rd\n:)\nSteph",
+      "uid": "4tmqvas5kpdljpr7mf8ms7nn5o@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-12-06",
+      "summary": "ZOE ON LOCATION Town of Colonie Memorial Town Hall",
+      "description": "Town of Colonie Memorial Town Hall (11:00AM - 12:00PM)",
+      "uid": "46oe5dcl7j36k4iah36cpvo3nf@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-01",
+      "summary": "Lauren/Zoe - Milk Bath Session (Keiona Morey)",
+      "description": "6:30 - 7:30 Strawberries & Grapefruit",
+      "uid": "7B823978-D24B-4F4C-A701-E873312AE977",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-02-16",
+      "summary": "Ebi Campbell 1st Birthday party 1pm-3pm",
+      "description": "1 - 3 1st birthday\n159 Spring St\nAlbany, NY\nPaid with $100 with visa on 1/23/2013 via phone\n(518) 253-4383\nComing in on Saturday 1/26/2013 to give zip code...please double check all info at that time.",
+      "uid": "7hl1s1gj78r8ioe7ra9hruamcs@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-21",
+      "summary": "CAIRO ELEMENTARY 1 TEAM  Grades 3-5 (1 team)",
+      "description": "Joanne Cleary, main office admin\njcleary@cairodurham.org\n\nNEED A PHOTO ID WHEN ARRIVING TO SCHOOL\n\nSet-up: 8am\nStart: 8:30am with faculty to 9am\nStart students at 9:15am\nIndividuals of all students and faculty/staff\nINDOOR, check in with Joanne at the main office - 90% sure in multipurpose room, but not 100% yet.\nClass COLLAGES with PRINCIPAL, ASST PRINCIPAL, TEACHER(S) & TA(S)\nSticker strips\nAttendance files (SchoolTool)\nYearbook support\nNO ID cards for Elementary School",
+      "uid": "F88C9B8E-E692-4355-99F9-26336EA6EEA5",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-20",
+      "summary": "Hoosic Valley MS/HS (1 team) Underclass",
+      "description": "Trish Pallozzi\nppallozzi@hoosicvalley.k12.ny.us\n\nUnderclass during school day on 9/20 and 9/21\nSeniors from 2:30-5:15pm on 9/20 and 9/21\nSeniors only on 9/22 during school day 8am - 2:30pm\n\n9/20 is DAY B\n9/21 is DAY A\n\nIndoor\nIndividuals of all students and faculty during PE classes\nIn gym (look out for the flies!)\nIDs for all, yearbook in late fall\n\nall classes have about 65-70 students in them.",
+      "uid": "B3BF8B49-7E12-4C0F-B4FE-4C5BD35CFD3B",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2012-10-27",
+      "summary": "American Cancer Society Autumn Fest  1-4",
+      "description": "2 photographers if possible, if not, one can do it if necessary.\n(KTK REALLY WANTS TO GO hint hint)\n\nBring $2 4x6 event coupons and free sheet in-studio coupons. Thanks!\n\nHi Stephanie!\n\nThe time has arrived that I begin to plan AutumnFest, American Cancer Society HopeClub's fun, family festival for capital district families touched by cancer!!\n\nThank you so much for participating last year! With your help, we put smiles on over 300 children and families faces!! I was wondering if you would like to join us again this year and bring some more happiness to families?! The photo stand is something that the families look forward to each year as they get to capture a fun and special family memory!\n\nAutumnFest is scheduled for Saturday, October 27th from 1-4pm at the clubhouse at 1 Penny Lane Latham, NY 12110.\n\nI am not in the office next week, but I will be sure to get back to you the following week. I so hope you can join us! This event is something I look forward to each year and we loved having you a part of it!\n\nThanks a bunch and I look forward to hearing from you!\n\n~Alana\n\nAlana Streifert, LMSW\nAmerican Cancer Society's HopeClub\n1 Penny Lane\nLatham, NY 12110\nalana.streifert@cancer.org\n(ph) 518-782-9833\n(fx)518-782-9835",
+      "uid": "efmni6deg1ti28r8d09mfloh9s@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2020-10-04",
+      "summary": "Kim Trombley RAINDATE",
+      "description": "Deposit Paid 9/11/20 AR",
+      "uid": "659DF5D4-73EC-4407-A510-653C0D709164",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-10-01",
+      "summary": "Eagle Point Elem School (Kyle, Molly, Britt, Abby)",
+      "description": "Cori & Emily on the PTA\neaglepointpta@gmail.com\n\nIMPORTANT - new principal Jared Fox at 9/2021\n\n*new at 9/23/21 - principal is requesting us to bring sanitizing wipes and not to use a stool for students. No touching students, verbal instruction only. He is very COVID-sensitive.\n\nSet-up: 7:30am, one team on 1st floor, other on 2nd floor\nStart: 8:00am\n\n300+ students\nIndoor\nTrying to confirm locations - usually library, main lobby or main stair landing\nall service items\nfull yearbook support\nattendance files",
+      "uid": "905B8F13-8E08-410E-BC7C-0819BC25FB08",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2011-09-22",
+      "summary": "Colonie Chamber Fun Run",
+      "description": "Kelsy Nevins (kelsy@coloniechamber.org)\nSAVE THE DATE\n\nFUN RUN\nThursday, September 22, 2011\n\nStart at Colonie Center, collect playing cards at various chamber member locations, then come to the after party at Wolf's 1-11 & see who has the best hand!\n\nWinner prize to be announced.\n\nNet proceeds go to the Women 4 Women Council program of charitable works.\nThis year the W4W has adopted Angel Names Association.\n\nWe are looking for Chamber member locations that might be interested in participating as card distribution points.\n\nFor more information contact Catherine @ the chamber at 785-6995 or via email at catherine@coloniechamber.org.\n\nSAVE THE DATE\nThursday, September 22, 2011\n4-7:30 PM",
+      "uid": "bv76h6mo2nufve38ta5bgk3rik@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-10-05",
+      "summary": "Wonderland Co-op Nursery RAIN DATES",
+      "description": "See 10/3-4 for details",
+      "uid": "A9EF72EE-90D6-4E6D-9BA9-9EFBBA412915",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-10-27",
+      "summary": "Saint Madeleine's Fall Photos (1 team)",
+      "description": "Kelly Sloan, Principal\nksloan1@smsschool.org\n\nLaura Hosey, Admin Asst\nlhosey@smsschool.org\n\nSetup: 7:45am (school opens at 7:10am)\nStart pics at 8:15am\n\nIndoor traditional photos - in a first floor classroom per Laura\nIndividuals of Students & faculty\nGroup class photos\nYearbook, all service items, attendance files, etc.\n\nHi Stephanie and Carrie\nWe are very excited about picture day tomorrow. We are going to be in the church meeting room.  The church will be unlocked so you can park right in front, unload and go into the room on the left right inside the door. I am going to move tables and chairs, but you can also do whatever you need to in order to have enough space.  We also thought the altar might be a nice place for the class picture , but we leave it up to you!\nHere is the link for the schedule   https://docs.google.com/document/d/1zThNQlajM-HDefKnPoB-N8AKnGtpl4SWQi7WA1YeXrQ/edit?usp=sharing\n\n. I am waiting for confirmation that this works for a few teachers, but I am hoping this is it.\nThanks a bunch!\n\nFondly\nKelly",
+      "uid": "BA5C0514-D90D-4834-9BA0-CE918AB9D6C9",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-04-09",
+      "summary": "EB Clifton Park Kyle + Jordin",
+      "description": "Jewels 9-1",
+      "uid": "E4048AB4-C61C-41AD-9859-FF73D27D59EF",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-10-17",
+      "summary": "HOOSIC VALLEY SENIORS ANDI/DELILAH",
+      "description": "Schedule shared with you via google docs.\n\nGear already there and set up\n\nArrive for 3:00 start",
+      "uid": "vq04gfr0bd2cal807dup6nll4o@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-06-20",
+      "summary": "Weekly School/Event Planning Meeting (8:30am)",
+      "description": "https://hangouts.google.com/hangouts/_/calendar/MjE5dWo4bzkwY2Q5czNubGwwMHJqYTZkZWtAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ.2iob1igq2p12dlbchptp8lkfc5?hs=121\n\nPlease do not edit this section.",
+      "uid": "2iob1igq2p12dlbchptp8lkfc5_R20210301@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-09-19",
+      "summary": "Northville Fall Sports (same teams)",
+      "description": "Jim Long\n\nEquipment will be there from seniors over the weekend.\nJim to get a schedule for us - a couple of teams have games and they'll go first.",
+      "uid": "304FEECE-B378-4224-81C1-A146B64A8CDC",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-10-04",
+      "summary": "Cohoes HS Fall Sports (1 team)",
+      "description": "First time doing sports at this school!",
+      "uid": "4B5B31B9-B34F-4DF3-AAD4-7C59E414BC63",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-11-30",
+      "summary": "Cairo-Durham Senior Makeup Day (1 team)",
+      "description": "LAST CHANCE makeup day",
+      "uid": "29282106-D365-4973-A991-768B140FF9BF",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-05-05",
+      "summary": "AA and AAG RAIN DATE",
+      "description": "May 3 - AA CampusPreK - 9:15amKindergarten - 9:45amGrade 1 - 8:50amGrade 2 - 9:30amGrade 3 - 8:35amGrade 4 - 10:20amRemote Learners - 10:40am\n\nMay 4 - AAG CampusPreK - 8:03amKindergarten - 8:45amGrade 1 - 9:40amGrade 2 - 9:20amGrade 3 - 10:00amGrade 4 - 9:00amRemote Learners - 10:20am\nAA Picture Schedule\nMonday, May 3rd\nAA South Door\n\n3\n8:35am\n\n1\n8:50am\n\nPreK\n9:15am\n\n2\n9:30am\n\nK\n9:45am\n\n4\n10:20am\n\nAAG Picture Schedule\nTuesday, May 4th\nAAG Courtyard\n\nPreK\n8:30am\n\nK\n8:45am\n\n4\n9:00am\n\n2\n9:20am\n\n1\n9:40am\n\n3\n10:00am",
+      "uid": "4BC9F486-1464-469D-B84D-E9AE5F513AC8",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-03-23",
+      "summary": "Arongen Yearbook Photos (Matt)",
+      "description": "Tentative Schedule:\n\n12:30-1:00 pm: 3-5 poses of Mr. Hills, Ronnie the Eagle, K-2 Classroom visits, 5th Grade lunch and recess if possible\n1:00-1:30 pm: 4th Grade Chorus, music lessons, 3rd grade classroom visits, 5th grade classroom visits\n1:30-2:00 pm: 5th Grade Chorus, music lessons, 4th Grade classroom visits\n2:05-2:15 pm: If still onsite could get photos at bus dismissal.",
+      "uid": "62g3abihf7anuudsl4g6opu2a5@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2011-10-03",
+      "summary": "Saint Rose Preschool Photos - AM/PM",
+      "description": "STEPH AND BOB\n\nHi Stephanie!\n\nSorry for taking so long to get back to you. I am definitely interested in scheduling a date for fall school pictures. I am looking at either the last week of September or first week of October. Just to remind you, we have the two classes (morning and afternoon) and would love to do outside photos if possible. Wednesday is not a good day for us because the morning class does not meet on Wednesday. Thanks!\n\nLaura\n\nLaura Sorrentino\nDirector of The Nursery School\nThe College of Saint Rose\n(518) 337-2337\nsorrentl@strose.edu\nwww.strose.edu/nurseryschool\n________________________________________\nFrom: Stephanie McCauley [stephaniemccauley@mac.com]\nSent: Friday, June 24, 2011 9:47 AM\nTo: SORRENTINO, LAURA\nSubject: School Photography with iSmile\n\nHi Laura!\n\nHope you guys had a wonderful school year and that things are winding down for you for the summer! :)\n\nJust touching base to see if you'd like to schedule a date for us this fall for the new classes.\n\nThanks so much!\n\nSincerely,\nStephanie\niSmile :)",
+      "uid": "gkqdq6umvqqom3v88iufecrnl8@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2013-09-30",
+      "summary": "Fonda Soccer Photos (Steph + 3)",
+      "description": "Hi Stephanie .\n\nThe address for the field is 190 Veeder Road, Fonda.\n\nMy cell is 848-1146 if you have any questions.\nThanks!",
+      "uid": "pvm9dpfuseebld3noum0pg663g@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2022-11-03",
+      "summary": "Mother Teresa Academy Group Pics/Makeups (1 team)",
+      "description": "Heather Staulters\nmsheathermta@gmail.com\n518-280-4227\nCurriculum Coordinator/Specials Teacher\nMother Teresa Academy\n1 Executive Park Drive\nClifton Park, NY 12065\n\nArrival: 8:30am\nPhoto Start Time: 9am\n\nGroup class and all school photos and makeups.",
+      "uid": "3oqkipd7chl6t7sc93mgmdvvd4@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2010-10-05",
+      "summary": "Candids at St Madeleine's",
+      "description": "One person for a couple hours in the morning taking candids of St Madeleine Sophie school, from 9-11 AM",
+      "uid": "mpd01i0pcoj4ihpb0lt0vp2i1c@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2012-02-11",
+      "summary": "Schenectady Basketball League Pics (Steph/Bob)",
+      "description": "Hello Stephanie-\nSounds like a great plan. I still have a ton of fliers left so I would not worry about that. As for teams I really only have them in the 2nd and 3rd grade group. My 10am group only has 16 kids and my 4th 5th and 6th grade group only has 7. I will send you all there names and make sure the flyer goes out to the 10am group this week. Thanks again.\n\nKevin Kuon\nProgram Director\nCapital District YMCA\nSchenectady Branch\n433 State Street\nSchenectady, NY 12305\n518-869-3500 ext. 4450\n518-881-0122 (Fax)\nkkuon@cdymca.org\nwww.cdymca.org",
+      "uid": "c185ff6lt77av088r8h48sqiqc@google.com",
+      "bestScore": 0,
+      "best": null
+    },
+    {
+      "date": "2021-09-20",
+      "summary": "Northville Picture Day (Matt, Kyle, Lauren, Milton)",
+      "description": "Jim Long\njlong@northvillecsd.org\n\nOutdoor\nIndividuals of students grades PK-12 (grade 12 for IDs)\nTeachers with classes and faculty as they come in (use blank QRs from photo job) Not expecting full faculty to be photographed per Jim Long. ckg\nYearbook support\nIDs for and grades 6-12\nService strips for pk-5\n\nAlso will team pics for two fall sports teams",
+      "uid": "92D5797C-F941-4609-AFC7-3E88AB1F8D71",
+      "bestScore": 0,
+      "best": null
+    }
+  ]
+}
