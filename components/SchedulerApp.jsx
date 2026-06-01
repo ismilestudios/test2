@@ -184,10 +184,14 @@ function Summary({ events, allMonthEvents }) {
   );
 }
 
-function PlanningBoard({ events, onClick }) {
+function PlanningBoard({ events, onClick, onAddEvent }) {
   const overviewStatuses = STATUSES.filter(status => status !== 'Completed');
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button type="button" onClick={onAddEvent} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
       {overviewStatuses.map(status => {
         const columnEvents = events.filter(e => e.status === status || (status === 'Needs Photographers Scheduled' && e.status === 'Needs Photographers Assigned'));
         return (
@@ -200,6 +204,7 @@ function PlanningBoard({ events, onClick }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -215,15 +220,44 @@ function WeekView({ events, selectedDate, onClick }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-semibold text-zinc-800">Week of {shortDate(start)} – {shortDate(end)}</h2>
-      <div className="grid gap-3 md:grid-cols-7">
+      <h2 className="mb-4 text-sm font-semibold text-zinc-800">Week of {shortDate(start)} – {shortDate(end)}</h2>
+      <div className="space-y-4">
         {days.map(date => {
           const dayEvents = events.filter(e => e && e.date === date);
           return (
-            <div key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-3">
-              <div className="mb-2 text-xs font-semibold text-zinc-500">{new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
-              <div className="space-y-2">{dayEvents.length ? dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} compact />) : <div className="text-xs text-zinc-400">No scheduled items</div>}</div>
-            </div>
+            <section key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-zinc-900">{formatDate(date)}</h3>
+                <Pill className="border-zinc-200 bg-cream text-zinc-600">{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Pill>
+              </div>
+              {dayEvents.length ? (
+                <div className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-100 bg-white">
+                  {dayEvents.map(event => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      onClick={() => onClick(event)}
+                      className="flex w-full flex-col gap-2 px-4 py-3 text-left transition hover:bg-[#DDE8D2]/35 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold text-zinc-900">{event.title}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                          <span>{event.time || 'TBD'}</span>
+                          {event.canonicalSchool ? <span>{event.canonicalSchool}</span> : null}
+                          {event.photographers?.length ? <span>Photographers Assigned: {event.photographers.join(', ')}</span> : null}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
+                        <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+                        {event.irm ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {event.irm}</Pill> : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-4 text-sm text-zinc-400">No scheduled items</div>
+              )}
+            </section>
           );
         })}
       </div>
@@ -465,33 +499,42 @@ function SchedulingModal({ school, photographers, assistants, onClose, onSave })
 }
 
 
-function AddEventModal({ photographers, assistants, onClose, onSave }) {
-  const [date, setDate] = useState('2026-09-01');
+function AddEventModal({ photographers, assistants, onClose, onSave, defaultDate = '2026-09-01', sourceLabel = 'prototype' }) {
+  const [date, setDate] = useState(defaultDate);
   const [title, setTitle] = useState('');
   const [schoolName, setSchoolName] = useState('');
   const [eventType, setEventType] = useState('Fall Picture Day');
   const [selectedPhotographers, setSelectedPhotographers] = useState([]);
   const [selectedAssistants, setSelectedAssistants] = useState([]);
   const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+
+  const schoolOptions = useMemo(() => SCHOOLS.map(school => school.name).sort((a, b) => a.localeCompare(b)), []);
+  const matchedSchool = useMemo(() => SCHOOLS.find(school => school.name.toLowerCase() === schoolName.trim().toLowerCase()), [schoolName]);
 
   const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
   const save = () => {
-    const cleanTitle = title.trim() || (schoolName.trim() ? `${schoolName.trim()} ${eventType}` : 'New Event');
+    const cleanName = schoolName.trim();
+    if (!cleanName) {
+      setError('Please choose an existing school/account or type a new name.');
+      return;
+    }
+    const cleanTitle = title.trim() || `${cleanName} ${eventType}`;
     const event = {
       id: `custom-${Date.now()}`,
       date,
       title: cleanTitle,
-      canonicalSchool: schoolName.trim() || null,
+      canonicalSchool: cleanName,
       type: eventType,
       status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: selectedAssistants,
       features: [],
-      irm: null,
+      irm: matchedSchool?.irm || null,
       time: 'TBD',
-      notes: notes || 'Added from Carrie View.',
+      notes: notes || `Added from ${sourceLabel}.`,
       rainInfo: '',
-      history: 'Created from Add School or Event.'
+      history: matchedSchool ? 'Created from Add School or Event using an existing school/account.' : 'Created from Add School or Event using a new school/account name.'
     };
     onSave(event);
     onClose();
@@ -506,12 +549,13 @@ function AddEventModal({ photographers, assistants, onClose, onSave }) {
               <div>
                 <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Add School or Event</Pill>
                 <h2 className="mt-3 text-2xl font-semibold text-zinc-950">Create a scheduled item</h2>
-                <p className="mt-1 text-sm text-zinc-600">Use this for a new school, meeting, special event, rain date, or placeholder.</p>
+                <p className="mt-1 text-sm text-zinc-600">Choose from the school list or type a new school/account name. The name is required.</p>
               </div>
               <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
             </div>
           </div>
           <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
+            {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Date</div>
@@ -526,12 +570,23 @@ function AddEventModal({ photographers, assistants, onClose, onSave }) {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">School / Account Name</div>
-                <input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} placeholder="Optional" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">School / Event Name <span className="text-rose-600">*</span></div>
+                <input
+                  list="school-account-options"
+                  value={schoolName}
+                  onChange={(e) => { setSchoolName(e.target.value); setError(''); }}
+                  placeholder="Select from list or type a new name"
+                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4"
+                />
+                <datalist id="school-account-options">
+                  {schoolOptions.map(name => <option key={name} value={name} />)}
+                </datalist>
+                <div className="mt-2 text-xs text-zinc-500">Existing schools auto-fill IRM when available. New names are allowed.</div>
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills if blank" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills from name/type" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                {matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
@@ -623,7 +678,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
       </div>
       <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
       <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
-      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} onClose={() => setAddingEvent(false)} onSave={onSchedule} />}
+      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
     </div>
   );
 }
@@ -799,6 +854,7 @@ export default function SchedulerApp() {
   const [photographers, setPhotographers] = useState(PHOTOGRAPHERS);
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [customEvents, setCustomEvents] = useState([]);
+  const [addingEvent, setAddingEvent] = useState(false);
   const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
 
   useEffect(() => {
@@ -848,7 +904,7 @@ export default function SchedulerApp() {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         <Summary events={filtered} allMonthEvents={monthEvents} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
-          {activeTab === 'Overview' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} /></>}
+          {activeTab === 'Overview' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} /></>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} />}
@@ -860,6 +916,7 @@ export default function SchedulerApp() {
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Rule</h3><p className="mt-2 text-sm text-zinc-600">Humans make scheduling decisions. This app supports reference, visibility, and notes — not automation.</p></div>
         </section>
       </div>
+      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={selectedDate} sourceLabel="Overview" />}
       <Drawer event={selected} onClose={() => setSelected(null)} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
     </main>
   );
