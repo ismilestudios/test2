@@ -86,7 +86,7 @@ function weekBounds(date) {
 }
 
 function displayStatus(status) {
-  return status === 'Needs Photographers Need Assistant Assigned' ? 'Needs Photographers Assigned' : status;
+  return status === 'Needs Photographers Assigned' ? 'Needs Photographers Assigned' : status;
 }
 
 function displayPhotographerAssignment(event) {
@@ -352,19 +352,36 @@ function OverviewControls({ viewMode, setViewMode, month, setMonth, selectedDate
 }
 
 function PlanningBoard({ events, onClick, onAddEvent }) {
-  const overviewStatuses = STATUSES.filter(status => status !== 'Completed');
+  const overviewColumns = [
+    {
+      key: 'needs-photographers',
+      title: 'Need Photographers Assigned',
+      filter: (event) => event.status === 'Needs Photographers Assigned'
+    },
+    {
+      key: 'needs-assistant',
+      title: 'Need Assistant Assigned',
+      filter: (event) => event.status === 'Scheduled' && (!event.assistants || event.assistants.length === 0)
+    },
+    {
+      key: 'rain-watch',
+      title: 'Rain Watch',
+      filter: (event) => event.status === 'Rain Watch'
+    }
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <button type="button" onClick={onAddEvent} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button>
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
-      {overviewStatuses.map(status => {
-        const columnEvents = events.filter(e => e.status === status || (status === 'Needs Photographers Need Assistant Assigned' && e.status === 'Needs Photographers Assigned'));
+      {overviewColumns.map(column => {
+        const columnEvents = events.filter(column.filter);
         return (
-          <div key={status} className="rounded-3xl border border-zinc-200/80 bg-white/45 p-3">
+          <div key={column.key} className="rounded-3xl border border-zinc-200/80 bg-white/45 p-3">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-800">{displayStatus(status)}</h2>
+              <h2 className="text-sm font-semibold text-zinc-800">{column.title}</h2>
               <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
             </div>
             <div className="space-y-3">{columnEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div>
@@ -708,7 +725,7 @@ function getPictureDayInfoHistory(history = []) {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
-function getFall2026Need Assistant AssignedSchools(events = EVENTS) {
+function getFall2026ScheduledSchools(events = EVENTS) {
   return new Set(
     events.filter(event => event && event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
       .map(event => schoolKey(event.canonicalSchool))
@@ -716,7 +733,7 @@ function getFall2026Need Assistant AssignedSchools(events = EVENTS) {
 }
 
 function getSchoolsToSchedule(events = EVENTS) {
-  const scheduled2026 = getFall2026Need Assistant AssignedSchools(events);
+  const scheduled2026 = getFall2026ScheduledSchools(events);
   return SCHOOLS
     .filter(school => !scheduled2026.has(schoolKey(school.name)))
     .map(school => {
