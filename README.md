@@ -116,3 +116,21 @@ npm run build
 - Notes are appended to each matched school in this format: `From School Log: ...`.
 - Included operational/logistical notes for schools such as Albany ASH, Shen Arongen, Cairo-Durham, Central Park, Childhood Friends Rotterdam, Duanesburg Elementary, Eagle Point, Gardner Dickinson, Heatly, Hoosic Valley, Keane, KinderCare Niskayuna, Lincoln, Little Scholars, Malta Ave, Okte, Orenda, Schenectady JCC, Shaker Seniors, Shen United Methodist PK, TSL Troy, and Pleasant Valley.
 - Preserved prior School List notes; School Log notes were appended, not replaced.
+
+## Update: School List Edit + Merge Controls
+
+Added School List page controls:
+
+- **Edit** button on each school detail page.
+  - Allows editing school name, IRM, and notes.
+  - Saves to browser localStorage as `ismile.schoolOverrides` while the app remains frontend-only.
+  - Existing seeded notes, including `From School Log:` notes, can be revised in-place.
+
+- **Merge** button on each school detail page.
+  - Lets the user choose another school/account to merge into.
+  - Source school is hidden from the main School List.
+  - Source school's imported schedule history appears under the target school.
+  - Source notes are appended under the target page with a `Merged from ...` label.
+  - Saves to browser localStorage as `ismile.schoolOverrides`.
+
+Build check completed successfully with `npm run build` before packaging.

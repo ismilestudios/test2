@@ -418,6 +418,23 @@ function getSchoolHistory(schoolName, events = EVENTS) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function getSchoolHistoryForNames(schoolNames = [], events = EVENTS) {
+  const names = schoolNames.filter(Boolean);
+  return events
+    .filter(event => names.some(name => schoolMatchesEvent(name, event)))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function normalizeSchoolOverride(school = {}, override = {}) {
+  return {
+    ...school,
+    ...override,
+    name: override.name || school.name,
+    irm: override.irm ?? school.irm,
+    notes: override.notes ?? school.notes
+  };
+}
+
 function getSeasonLabel(date) {
   if (date >= '2025-03-01' && date <= '2025-06-30') return 'Spring 2025';
   if (date >= '2025-09-01' && date <= '2025-11-30') return 'Fall 2025';
@@ -468,7 +485,7 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
   return dates;
 }
 
-function SchoolHistoryPanel({ school, onClickEvent }) {
+function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
   if (!school) {
     return (
       <div className="rounded-3xl border border-dashed border-zinc-200 bg-white/60 p-6 text-sm text-zinc-500">
@@ -486,12 +503,17 @@ function SchoolHistoryPanel({ school, onClickEvent }) {
   const seasons = ['Spring 2025', 'Fall 2025', 'Spring 2026', 'Fall 2026'];
   return (
     <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-zinc-950">{school.name}</h2>
           <p className="mt-1 text-sm text-zinc-600">School history page: past picture days, makeups, photographers, assistants, and future scheduling status.</p>
+          {school.mergedFrom?.length ? <p className="mt-1 text-xs text-zinc-500">Merged with: {school.mergedFrom.join(', ')}</p> : null}
         </div>
-        {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
+        <div className="flex flex-wrap items-center gap-2">
+          {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
+          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50">Edit</button> : null}
+          {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-xs font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Merge</button> : null}
+        </div>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
         {seasons.map(season => {
@@ -514,7 +536,21 @@ function SchoolHistoryPanel({ school, onClickEvent }) {
           );
         })}
       </div>
-      <div className="mt-4 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
+          <div className="font-semibold text-zinc-800">Address</div>
+          <div className="mt-1 whitespace-pre-wrap">{[school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n') || '—'}</div>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
+          <div className="font-semibold text-zinc-800">Primary Contact</div>
+          <div className="mt-1">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || '—'}</div>
+          {school.contactTitle ? <div className="mt-1 text-xs text-zinc-500">{school.contactTitle}</div> : null}
+          {school.contactPhone ? <div className="mt-2">{school.contactPhone}</div> : null}
+          {school.contactEmail ? <div className="break-words">{school.contactEmail}</div> : null}
+        </div>
+      </div>
+      {school.additionalContactInformation ? <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600"><span className="font-semibold text-zinc-800">Additional Contact Information:</span> {school.additionalContactInformation}</div> : null}
+      <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
         <span className="font-semibold text-zinc-800">Notes:</span> {school.notes || '—'}
       </div>
     </section>
@@ -651,7 +687,7 @@ function AddEventModal({ photographers, assistants, onClose, onSave, defaultDate
       features: [],
       irm: matchedSchool?.irm || null,
       time: 'TBD',
-      notes: notes || `Added from ${sourceLabel}.`,
+      notes: notes || '',
       rainInfo: '',
       history: matchedSchool ? 'Created from Add School or Event using an existing school/account.' : 'Created from Add School or Event using a new school/account name.'
     };
@@ -802,11 +838,219 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
   );
 }
 
-function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName }) {
+function EditSchoolModal({ school, onClose, onSave }) {
+  const [name, setName] = useState(school?.name || '');
+  const [irm, setIrm] = useState(school?.irm ?? '');
+  const [address, setAddress] = useState(school?.address || '');
+  const [city, setCity] = useState(school?.city || '');
+  const [stateZip, setStateZip] = useState(school?.stateZip || '');
+  const [contactFirst, setContactFirst] = useState(school?.contactFirst || '');
+  const [contactLast, setContactLast] = useState(school?.contactLast || '');
+  const [contactPhone, setContactPhone] = useState(school?.contactPhone || '');
+  const [contactEmail, setContactEmail] = useState(school?.contactEmail || '');
+  const [contactTitle, setContactTitle] = useState(school?.contactTitle || '');
+  const [additionalContactInformation, setAdditionalContactInformation] = useState(school?.additionalContactInformation || '');
+  const [notes, setNotes] = useState(school?.notes || '');
+
+  useEffect(() => {
+    setName(school?.name || '');
+    setIrm(school?.irm ?? '');
+    setAddress(school?.address || '');
+    setCity(school?.city || '');
+    setStateZip(school?.stateZip || '');
+    setContactFirst(school?.contactFirst || '');
+    setContactLast(school?.contactLast || '');
+    setContactPhone(school?.contactPhone || '');
+    setContactEmail(school?.contactEmail || '');
+    setContactTitle(school?.contactTitle || '');
+    setAdditionalContactInformation(school?.additionalContactInformation || '');
+    setNotes(school?.notes || '');
+  }, [school]);
+
+  if (!school) return null;
+
+  const handleSave = () => {
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    onSave(school.originalName || school.name, {
+      name: cleanName,
+      irm: irm === '' ? null : Number(irm),
+      address,
+      city,
+      stateZip,
+      contactFirst,
+      contactLast,
+      contactPhone,
+      contactEmail,
+      contactTitle,
+      additionalContactInformation,
+      notes
+    });
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}>
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-6 max-h-[90vh] max-w-2xl overflow-auto rounded-[2rem] bg-cream p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-zinc-950">Edit School</h2>
+            <p className="mt-1 text-sm text-zinc-600">Edits save in this browser for now. Supabase can make this shared later.</p>
+          </div>
+          <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
+        </div>
+        <div className="mt-5 grid gap-4">
+          <label className="text-sm font-medium text-zinc-700">School Name
+            <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+          </label>
+          <label className="text-sm font-medium text-zinc-700">IRM
+            <input type="number" value={irm ?? ''} onChange={(e) => setIrm(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className="text-sm font-medium text-zinc-700 sm:col-span-3">Address
+              <input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+            </label>
+            <label className="text-sm font-medium text-zinc-700 sm:col-span-2">City
+              <input value={city} onChange={(e) => setCity(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+            </label>
+            <label className="text-sm font-medium text-zinc-700">State Zip
+              <input value={stateZip} onChange={(e) => setStateZip(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+            </label>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-zinc-700">Contact First
+              <input value={contactFirst} onChange={(e) => setContactFirst(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+            </label>
+            <label className="text-sm font-medium text-zinc-700">Contact Last
+              <input value={contactLast} onChange={(e) => setContactLast(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+            </label>
+            <label className="text-sm font-medium text-zinc-700">Contact Phone
+              <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+            </label>
+            <label className="text-sm font-medium text-zinc-700">Contact Email
+              <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+            </label>
+            <label className="text-sm font-medium text-zinc-700 sm:col-span-2">Contact Title
+              <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+            </label>
+            <label className="text-sm font-medium text-zinc-700 sm:col-span-2">Additional Contact Information
+              <textarea value={additionalContactInformation} onChange={(e) => setAdditionalContactInformation(e.target.value)} rows={4} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
+            </label>
+          </div>
+          <label className="text-sm font-medium text-zinc-700">Notes
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={10} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
+          </label>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">Cancel</button>
+          <button onClick={handleSave} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">Save Changes</button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function MergeSchoolModal({ sourceSchool, schools, onClose, onMerge }) {
+  const targets = schools.filter(school => school.originalName !== sourceSchool?.originalName);
+  const [targetName, setTargetName] = useState(targets[0]?.originalName || '');
+
+  useEffect(() => {
+    const nextTargets = schools.filter(school => school.originalName !== sourceSchool?.originalName);
+    setTargetName(nextTargets[0]?.originalName || '');
+  }, [sourceSchool, schools]);
+
+  if (!sourceSchool) return null;
+  const target = schools.find(school => school.originalName === targetName);
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}>
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-10 max-w-2xl rounded-[2rem] bg-cream p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-zinc-950">Merge School</h2>
+            <p className="mt-1 text-sm text-zinc-600">Merge duplicate accounts so their notes and history appear on one School List page.</p>
+          </div>
+          <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
+        </div>
+        <div className="mt-5 rounded-2xl border border-zinc-200 bg-white/70 p-4 text-sm text-zinc-700">
+          <div><span className="font-semibold">Merge from:</span> {sourceSchool.name}</div>
+          <label className="mt-4 block font-medium text-zinc-700">Merge into
+            <select value={targetName} onChange={(e) => setTargetName(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]">
+              {targets.map(school => <option key={school.originalName} value={school.originalName}>{school.name}</option>)}
+            </select>
+          </label>
+          {target ? <p className="mt-3 text-xs text-zinc-500">After merging, {sourceSchool.name} will be hidden from the main list, and its imported records will show under {target.name}. Existing notes are appended to the target notes.</p> : null}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">Cancel</button>
+          <button disabled={!targetName} onClick={() => onMerge(sourceSchool.originalName, targetName)} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-40">Merge</button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schoolOverrides, setSchoolOverrides }) {
   const q = query.trim().toLowerCase();
-  const schools = useMemo(() => SCHOOLS.map(school => ({ ...school, history: getSchoolHistory(school.name, events) })).sort((a, b) => a.name.localeCompare(b.name)), [events]);
+  const mergedSourcesByTarget = useMemo(() => {
+    const map = {};
+    Object.entries(schoolOverrides || {}).forEach(([sourceName, override]) => {
+      if (override?.mergedInto) {
+        map[override.mergedInto] ||= [];
+        map[override.mergedInto].push(sourceName);
+      }
+    });
+    return map;
+  }, [schoolOverrides]);
+
+  const schools = useMemo(() => SCHOOLS
+    .filter(school => !schoolOverrides?.[school.name]?.mergedInto)
+    .map(school => {
+      const override = schoolOverrides?.[school.name] || {};
+      const mergedFrom = mergedSourcesByTarget[school.name] || [];
+      const mergedSourceSchools = mergedFrom.map(name => normalizeSchoolOverride(SCHOOLS.find(item => item.name === name) || { name }, schoolOverrides?.[name] || {}));
+      const mergedNotes = mergedSourceSchools.map(item => item.notes).filter(Boolean);
+      const normalized = normalizeSchoolOverride(school, override);
+      const notes = [normalized.notes, ...mergedNotes.map((note, index) => `Merged from ${mergedSourceSchools[index]?.name || mergedFrom[index]}:\n${note}`)].filter(Boolean).join('\n\n');
+      return {
+        ...normalized,
+        originalName: school.name,
+        notes,
+        mergedFrom: mergedSourceSchools.map(item => item.name),
+        history: getSchoolHistoryForNames([school.name, ...mergedFrom], events)
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name)), [events, schoolOverrides, mergedSourcesByTarget]);
+
   const filtered = q ? schools.filter(school => [school.name, school.notes, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : schools;
-  const selected = schools.find(school => school.name === selectedName) || filtered[0] || null;
+  const selected = schools.find(school => school.name === selectedName || school.originalName === selectedName) || filtered[0] || null;
+  const [editingSchool, setEditingSchool] = useState(null);
+  const [mergingSchool, setMergingSchool] = useState(null);
+
+  const saveSchool = (originalName, values) => {
+    setSchoolOverrides(prev => ({
+      ...prev,
+      [originalName]: {
+        ...(prev?.[originalName] || {}),
+        ...values
+      }
+    }));
+    setSelectedName(values.name || originalName);
+    setEditingSchool(null);
+  };
+
+  const mergeSchool = (sourceOriginalName, targetOriginalName) => {
+    setSchoolOverrides(prev => ({
+      ...prev,
+      [sourceOriginalName]: {
+        ...(prev?.[sourceOriginalName] || {}),
+        mergedInto: targetOriginalName
+      }
+    }));
+    const target = schools.find(school => school.originalName === targetOriginalName);
+    setSelectedName(target?.name || targetOriginalName);
+    setMergingSchool(null);
+  };
+
   return (
     <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
       <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
@@ -814,14 +1058,18 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history.</p>
         <div className="mt-4 max-h-[760px] space-y-2 overflow-auto pr-1">
           {filtered.map(school => (
-            <button key={school.name} onClick={() => setSelectedName(school.name)} className={`w-full rounded-2xl border p-3 text-left text-sm transition hover:bg-white ${selected?.name === school.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+            <button key={school.originalName} onClick={() => setSelectedName(school.name)} className={`w-full rounded-2xl border p-3 text-left text-sm transition hover:bg-white ${selected?.originalName === school.originalName ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
               <div className="font-semibold text-zinc-900">{school.name}</div>
-              <div className="mt-1 text-xs text-zinc-500">{school.history.length} imported record{school.history.length === 1 ? '' : 's'}{school.irm ? ` · IRM ${school.irm}` : ''}</div>
+              <div className="mt-1 text-xs text-zinc-500">{school.history.length} imported record{school.history.length === 1 ? '' : 's'}{school.irm ? ` · IRM ${school.irm}` : ''}{school.mergedFrom?.length ? ` · ${school.mergedFrom.length} merged` : ''}</div>
             </button>
           ))}
         </div>
       </section>
-      <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} />
+      <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={setEditingSchool} onMerge={setMergingSchool} />
+      <AnimatePresence>
+        {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
+        {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={schools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
+      </AnimatePresence>
     </div>
   );
 }
@@ -975,6 +1223,7 @@ export default function SchedulerApp() {
   const [customEvents, setCustomEvents] = useState([]);
   const [addingEvent, setAddingEvent] = useState(false);
   const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
+  const [schoolOverrides, setSchoolOverrides] = useState({});
 
   useEffect(() => {
     try {
@@ -984,6 +1233,8 @@ export default function SchedulerApp() {
       if (savedAssistants) setAssistants(JSON.parse(savedAssistants));
       const savedEvents = window.localStorage.getItem('ismile.customEvents');
       if (savedEvents) setCustomEvents(JSON.parse(savedEvents));
+      const savedSchoolOverrides = window.localStorage.getItem('ismile.schoolOverrides');
+      if (savedSchoolOverrides) setSchoolOverrides(JSON.parse(savedSchoolOverrides));
     } catch (error) {
       console.warn('Could not load saved team members', error);
     }
@@ -1000,6 +1251,10 @@ export default function SchedulerApp() {
   useEffect(() => {
     try { window.localStorage.setItem('ismile.customEvents', JSON.stringify(customEvents)); } catch {}
   }, [customEvents]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem('ismile.schoolOverrides', JSON.stringify(schoolOverrides)); } catch {}
+  }, [schoolOverrides]);
 
   const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string';
   const allEvents = useMemo(() => [...EVENTS, ...customEvents].filter(isValidEvent), [customEvents]);
@@ -1026,7 +1281,7 @@ export default function SchedulerApp() {
           {activeTab === 'Overview' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} /></>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
-          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} />}
+          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schoolOverrides={schoolOverrides} setSchoolOverrides={setSchoolOverrides} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} />}
         </section>
         <section className="grid gap-4 md:grid-cols-3">
