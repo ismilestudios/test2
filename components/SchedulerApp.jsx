@@ -153,8 +153,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-zinc-500"><CalendarDays size={16} /> Historical schedule imports wired</div>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -1012,12 +1011,15 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
     <div className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-[1.25fr_1fr]">
         <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="max-w-xl">
               <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled</h2>
-              <p className="mt-1 text-sm text-zinc-600">Click a school to schedule it for Fall 2026. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">Click a school to schedule it for Fall 2026. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
             </div>
-            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setAddingEvent(true)} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button><Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill></div>
+            <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+              <button type="button" onClick={() => setAddingEvent(true)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button>
+              <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
+            </div>
           </div>
           <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
             {filteredSchools.map(item => (
@@ -1351,12 +1353,11 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
 }
 
 
-function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelectedDate, setViewMode }) {
+function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelectedDate }) {
   const goToday = () => {
     const today = todayKey();
     setSelectedDate(today);
     setMonth(monthKey(today));
-    setViewMode('Day');
   };
   const move = (delta) => {
     if (viewMode === 'Month') {
@@ -1395,7 +1396,7 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
           ))}
         </div>
       </div>
-      <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} />
+      <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
       {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} />}
       {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} />}
       {viewMode === 'Day' && <DayView events={events} selectedDate={selectedDate} onClick={onClick} />}
