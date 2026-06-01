@@ -207,23 +207,69 @@ function MonthNavigator({ month, setMonth }) {
   );
 }
 
-function Summary({ events, allMonthEvents }) {
-  const needs = events.filter(e => e.status === 'Needs Photographers Scheduled' || e.status === 'Needs Photographers Assigned').length;
-  const schools = new Set(events.filter(e => e.canonicalSchool).map(e => e.canonicalSchool)).size;
+function TodayTomorrowList({ title, date, events }) {
+  const dayEvents = events
+    .filter(event => event && event.date === date && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
+    .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
+
   return (
-    <section className="grid gap-3 md:grid-cols-4">
-      {[
-        ['Visible Events', events.length, ClipboardList],
-        ['Schools', schools, History],
-        ['Needs Photographers Assigned', needs, UserRoundCheck],
-        ['Month Total', allMonthEvents.length, Users]
-      ].map(([label, value, Icon]) => (
-        <div key={label} className="rounded-3xl border border-zinc-200/80 bg-white/75 p-4 shadow-sm">
-          <Icon size={18} className="text-zinc-500" />
-          <div className="mt-3 text-2xl font-semibold text-zinc-950">{value}</div>
-          <div className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</div>
+    <div className="rounded-3xl border border-zinc-200/80 bg-white/75 p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</div>
+          <div className="mt-1 text-sm font-medium text-zinc-900">{formatDate(date)}</div>
         </div>
-      ))}
+        <Pill className="border-zinc-200 bg-cream text-zinc-700">{dayEvents.length}</Pill>
+      </div>
+      <div className="mt-3 space-y-2">
+        {dayEvents.length ? dayEvents.slice(0, 4).map(event => (
+          <div key={event.id} className="rounded-2xl border border-zinc-100 bg-white/80 p-3">
+            <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+              <span>{event.time || 'TBD'}</span>
+              {event.photographers?.length ? <span>Assigned: {event.photographers.join(', ')}</span> : <span>Needs photographers assigned</span>}
+            </div>
+          </div>
+        )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-400">Nothing currently scheduled.</div>}
+        {dayEvents.length > 4 ? <div className="text-xs font-medium text-zinc-500">+ {dayEvents.length - 4} more</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function CurrentWeeklyRolloutCard({ events }) {
+  const today = todayKey();
+  const { start, end } = weekBounds(today);
+  const weekEvents = events.filter(event => event && event.date >= start && event.date <= end);
+  const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+  const capacity = getCapacityTone(weeklyRollouts);
+  const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
+
+  return (
+    <div className={`rounded-3xl border p-4 shadow-sm ${capacity.className}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Weekly Rollout</div>
+          <div className="mt-1 text-sm font-medium">Current week: {shortDate(start)} – {shortDate(end)}</div>
+        </div>
+        <Pill className={`border-current bg-white/60 ${capacity.className}`}>{capacity.label}</Pill>
+      </div>
+      <div className="mt-5 text-3xl font-semibold">{weeklyRollouts} / 22</div>
+      <div className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-75">Photographer rollouts</div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/70">
+        <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function OperationalSummary({ events }) {
+  const today = todayKey();
+  return (
+    <section className="grid gap-3 lg:grid-cols-3">
+      <TodayTomorrowList title="What We're Photographing Today" date={today} events={events} />
+      <TodayTomorrowList title="What We're Photographing Tomorrow" date={addDays(today, 1)} events={events} />
+      <CurrentWeeklyRolloutCard events={events} />
     </section>
   );
 }
@@ -549,7 +595,6 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
           {school.contactEmail ? <div className="break-words">{school.contactEmail}</div> : null}
         </div>
       </div>
-      {school.additionalContactInformation ? <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600"><span className="font-semibold text-zinc-800">Additional Contact Information:</span> {school.additionalContactInformation}</div> : null}
       <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
         <span className="font-semibold text-zinc-800">Notes:</span> {school.notes || '—'}
       </div>
@@ -849,7 +894,6 @@ function EditSchoolModal({ school, onClose, onSave }) {
   const [contactPhone, setContactPhone] = useState(school?.contactPhone || '');
   const [contactEmail, setContactEmail] = useState(school?.contactEmail || '');
   const [contactTitle, setContactTitle] = useState(school?.contactTitle || '');
-  const [additionalContactInformation, setAdditionalContactInformation] = useState(school?.additionalContactInformation || '');
   const [notes, setNotes] = useState(school?.notes || '');
 
   useEffect(() => {
@@ -863,7 +907,6 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setContactPhone(school?.contactPhone || '');
     setContactEmail(school?.contactEmail || '');
     setContactTitle(school?.contactTitle || '');
-    setAdditionalContactInformation(school?.additionalContactInformation || '');
     setNotes(school?.notes || '');
   }, [school]);
 
@@ -883,7 +926,6 @@ function EditSchoolModal({ school, onClose, onSave }) {
       contactPhone,
       contactEmail,
       contactTitle,
-      additionalContactInformation,
       notes
     });
   };
@@ -931,9 +973,6 @@ function EditSchoolModal({ school, onClose, onSave }) {
             </label>
             <label className="text-sm font-medium text-zinc-700 sm:col-span-2">Contact Title
               <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
-            </label>
-            <label className="text-sm font-medium text-zinc-700 sm:col-span-2">Additional Contact Information
-              <textarea value={additionalContactInformation} onChange={(e) => setAdditionalContactInformation(e.target.value)} rows={4} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
             </label>
           </div>
           <label className="text-sm font-medium text-zinc-700">Notes
@@ -1276,7 +1315,7 @@ export default function SchedulerApp() {
     <main className="min-h-screen font-sans text-zinc-900">
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-        <Summary events={filtered} allMonthEvents={monthEvents} />
+        {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
           {activeTab === 'Overview' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} /></>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
