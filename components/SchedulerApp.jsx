@@ -1010,7 +1010,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
   return (
     <div className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.25fr)]">
-        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[680px] xl:flex-col xl:overflow-hidden">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-xl">
               <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled <span className="text-zinc-500">[Fall 2026]</span></h2>
@@ -1021,7 +1021,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
               <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:pr-1">
             {filteredSchools.map(item => (
               <button key={item.name} onClick={() => setSelectedSchool(item)} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1039,7 +1039,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         </section>
 
         <section className="space-y-3">
-          <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+          <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:max-h-[680px] xl:overflow-auto">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-zinc-950">Selected School</h2>
