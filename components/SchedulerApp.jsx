@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 
 const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members'];
@@ -477,7 +477,8 @@ function normalizeSchoolOverride(school = {}, override = {}) {
     ...override,
     name: override.name || school.name,
     irm: override.irm ?? school.irm,
-    notes: override.notes ?? school.notes
+    notes: override.notes ?? school.notes,
+    referenceImages: override.referenceImages ?? school.referenceImages ?? []
   };
 }
 
@@ -597,6 +598,19 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
       </div>
       <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
         <span className="font-semibold text-zinc-800">Notes:</span> {school.notes || '—'}
+      </div>
+      <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
+        <div className="flex items-center gap-2 font-semibold text-zinc-800"><ImageIcon size={16} /> Reference Images</div>
+        {school.referenceImages?.length ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {school.referenceImages.map((image) => (
+              <a key={image.id} href={image.src} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70 transition hover:bg-white hover:shadow-sm">
+                <img src={image.src} alt={image.caption || 'School reference'} className="h-36 w-full object-cover transition group-hover:scale-[1.02]" />
+                <div className="p-2 text-xs text-zinc-600">{image.caption || 'Reference image'}</div>
+              </a>
+            ))}
+          </div>
+        ) : <div className="mt-2 text-xs text-zinc-400">No reference images yet.</div>}
       </div>
     </section>
   );
@@ -895,6 +909,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
   const [contactEmail, setContactEmail] = useState(school?.contactEmail || '');
   const [contactTitle, setContactTitle] = useState(school?.contactTitle || '');
   const [notes, setNotes] = useState(school?.notes || '');
+  const [referenceImages, setReferenceImages] = useState(school?.referenceImages || []);
 
   useEffect(() => {
     setName(school?.name || '');
@@ -908,9 +923,38 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setContactEmail(school?.contactEmail || '');
     setContactTitle(school?.contactTitle || '');
     setNotes(school?.notes || '');
+    setReferenceImages(school?.referenceImages || []);
   }, [school]);
 
   if (!school) return null;
+
+  const handleImageUpload = (event) => {
+    const files = Array.from(event.target.files || []);
+    files.forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        setReferenceImages(prev => [
+          ...prev,
+          {
+            id: `${Date.now()}-${file.name}`,
+            src: reader.result,
+            caption: file.name.replace(/\.[^/.]+$/, '')
+          }
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+    event.target.value = '';
+  };
+
+  const updateImageCaption = (id, caption) => {
+    setReferenceImages(prev => prev.map(image => image.id === id ? { ...image, caption } : image));
+  };
+
+  const removeImage = (id) => {
+    setReferenceImages(prev => prev.filter(image => image.id !== id));
+  };
 
   const handleSave = () => {
     const cleanName = name.trim();
@@ -926,7 +970,8 @@ function EditSchoolModal({ school, onClose, onSave }) {
       contactPhone,
       contactEmail,
       contactTitle,
-      notes
+      notes,
+      referenceImages
     });
   };
 
@@ -978,6 +1023,29 @@ function EditSchoolModal({ school, onClose, onSave }) {
           <label className="text-sm font-medium text-zinc-700">Notes
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={10} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
           </label>
+          <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-zinc-800">Reference Images</div>
+                <div className="text-xs text-zinc-500">Add JPG or PNG notes like parking maps, entrances, and setup references.</div>
+              </div>
+              <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-2 text-xs font-semibold text-zinc-900 hover:bg-[#DDE8D2]">
+                Add Image
+                <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+              </label>
+            </div>
+            {referenceImages.length ? (
+              <div className="mt-3 space-y-3">
+                {referenceImages.map((image) => (
+                  <div key={image.id} className="grid gap-3 rounded-2xl border border-zinc-200 bg-cream/70 p-2 sm:grid-cols-[120px_1fr_auto] sm:items-center">
+                    <img src={image.src} alt={image.caption || 'School reference'} className="h-24 w-full rounded-xl object-cover sm:w-[120px]" />
+                    <input value={image.caption || ''} onChange={(e) => updateImageCaption(image.id, e.target.value)} placeholder="Caption, e.g. Parking entrance" className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+                    <button type="button" onClick={() => removeImage(image.id)} className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-50">Remove</button>
+                  </div>
+                ))}
+              </div>
+            ) : <div className="mt-3 text-xs text-zinc-400">No reference images yet.</div>}
+          </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">Cancel</button>
@@ -1048,12 +1116,14 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       const mergedFrom = mergedSourcesByTarget[school.name] || [];
       const mergedSourceSchools = mergedFrom.map(name => normalizeSchoolOverride(SCHOOLS.find(item => item.name === name) || { name }, schoolOverrides?.[name] || {}));
       const mergedNotes = mergedSourceSchools.map(item => item.notes).filter(Boolean);
+      const mergedImages = mergedSourceSchools.flatMap(item => item.referenceImages || []);
       const normalized = normalizeSchoolOverride(school, override);
       const notes = [normalized.notes, ...mergedNotes.map((note, index) => `Merged from ${mergedSourceSchools[index]?.name || mergedFrom[index]}:\n${note}`)].filter(Boolean).join('\n\n');
       return {
         ...normalized,
         originalName: school.name,
         notes,
+        referenceImages: [...(normalized.referenceImages || []), ...mergedImages],
         mergedFrom: mergedSourceSchools.map(item => item.name),
         history: getSchoolHistoryForNames([school.name, ...mergedFrom], events)
       };

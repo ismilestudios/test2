@@ -134,3 +134,8 @@ Added School List page controls:
   - Saves to browser localStorage as `ismile.schoolOverrides`.
 
 Build check completed successfully with `npm run build` before packaging.
+
+
+## Latest update: School reference images
+
+School List pages now include a Reference Images section underneath Notes. Use the Edit button on a school page to add JPG/PNG images, edit captions, or remove images. Images are stored in the same browser-local school override data as editable notes for now; Supabase/cloud storage can make these shared later.
