@@ -720,17 +720,24 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
   const seasons = ['Spring 2025', 'Fall 2025', 'Spring 2026', 'Fall 2026'];
   return (
     <section className={`${compact ? 'rounded-2xl p-0' : 'rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm'}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-zinc-950">{school.name}</h2>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <h2 className="text-xl font-semibold text-zinc-950">{school.name}</h2>
+            {school.irm ? <Pill className="w-fit border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800 shadow-sm">IRM {school.irm}</Pill> : <Pill className="w-fit border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
+          </div>
           <p className="mt-1 text-sm text-zinc-600">School history page: past picture days, makeups, photographers, assistants, and future scheduling status.</p>
           {school.mergedFrom?.length ? <p className="mt-1 text-xs text-zinc-500">Merged with: {school.mergedFrom.join(', ')}</p> : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
-          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50">Edit</button> : null}
-          {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/40">Merge</button> : null}
-        </div>
+        {(onEdit || onMerge) ? (
+          <div className="flex shrink-0 flex-col gap-1 rounded-2xl border border-zinc-200 bg-white/80 p-2 shadow-sm sm:min-w-[148px]">
+            <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">School actions</div>
+            <div className="flex flex-wrap gap-2 lg:flex-col">
+              {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-900 bg-zinc-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-zinc-800">Edit</button> : null}
+              {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-xl border border-[#AEBB9E] bg-[#F3F8EF] px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Merge</button> : null}
+            </div>
+          </div>
+        ) : null}
       </div>
       <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-4 grid gap-3 md:grid-cols-4'}`}>
         {seasons.map(season => {
