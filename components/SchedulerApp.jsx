@@ -355,12 +355,12 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
   const overviewColumns = [
     {
       key: 'needs-photographers',
-      title: 'Need Photographers Assigned',
+      title: 'Need Photographer(s) Assigned',
       filter: (event) => event.status === 'Needs Photographers Assigned'
     },
     {
       key: 'needs-assistant',
-      title: 'Need Assistant Assigned',
+      title: 'Need Assistant(s) Assigned',
       filter: (event) => event.status === 'Scheduled' && (!event.assistants || event.assistants.length === 0)
     },
     {
@@ -917,13 +917,13 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
       title: `${school.name} Fall Picture Day`,
       canonicalSchool: school.name,
       type: 'Fall Picture Day',
-      status: selectedPhotographers.length ? 'Need Assistant Assigned' : 'Needs Photographers Assigned',
+      status: selectedPhotographers.length ? 'Need Assistant(s) Assigned' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: selectedAssistants,
       features: [],
       irm: school.irm || null,
       time: 'TBD',
-      notes: notes || 'Need Assistant Assigned from Carrie View. Details can be refined later.',
+      notes: notes || 'Need Assistant(s) Assigned from Carrie View. Details can be refined later.',
       rainInfo: '',
       history: school.lastEvent ? `Fall 2025 reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Assigned photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
     };
@@ -1014,7 +1014,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       title: cleanTitle,
       canonicalSchool: cleanName,
       type: eventType,
-      status: selectedPhotographers.length ? 'Need Assistant Assigned' : 'Needs Photographers Assigned',
+      status: selectedPhotographers.length ? 'Need Assistant(s) Assigned' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: selectedAssistants,
       features: [],
@@ -1118,7 +1118,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[680px] xl:flex-col xl:overflow-hidden">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-xl">
-              <h2 className="text-lg font-semibold text-zinc-950">To Be Need Assistant Assigned <span className="text-zinc-500">[Fall 2026]</span></h2>
+              <h2 className="text-lg font-semibold text-zinc-950">To Be Need Assistant(s) Assigned <span className="text-zinc-500">[Fall 2026]</span></h2>
               <p className="mt-2 text-sm leading-6 text-zinc-600">Click a school to review it for Fall 2026 scheduling. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
             </div>
             <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
