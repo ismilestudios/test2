@@ -215,44 +215,113 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
   return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
 
+
+function isRolloutEvent(event) {
+  const rolloutTypes = new Set(['Fall Picture Day', 'Spring Picture Day', 'Makeup Day', 'Rain Date']);
+  return event && rolloutTypes.has(event.type);
+}
+
+function parseRolloutCountFromTitle(title = '') {
+  const text = String(title).toLowerCase();
+  const explicit = text.match(/(\d+)\s*(?:teams?|photogs?|photographers?)/);
+  if (explicit) return Math.max(1, Number(explicit[1]) || 1);
+  if (text.includes('2 teams') || text.includes('two teams')) return 2;
+  if (text.includes('3 teams') || text.includes('three teams')) return 3;
+  if (text.includes('1 team') || text.includes('1 photog') || text.includes('one team')) return 1;
+  return null;
+}
+
+function getRolloutCount(event) {
+  if (!isRolloutEvent(event)) return 0;
+  const fromTitle = parseRolloutCountFromTitle(event.title || event.sourceTitle || '');
+  if (fromTitle) return fromTitle;
+  const assigned = Array.isArray(event.photographers) ? event.photographers.length : 0;
+  return Math.max(1, assigned);
+}
+
+function getCapacityTone(rollouts) {
+  if (rollouts >= 20) return {
+    label: 'Overloaded',
+    className: 'border-rose-200 bg-rose-50 text-rose-800',
+    barClassName: 'bg-rose-500'
+  };
+  if (rollouts >= 17) return {
+    label: 'Heavy',
+    className: 'border-amber-200 bg-amber-50 text-amber-900',
+    barClassName: 'bg-amber-500'
+  };
+  return {
+    label: 'Light',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    barClassName: 'bg-emerald-500'
+  };
+}
+
 function WeekView({ events, selectedDate, onClick }) {
   const { start, end } = weekBounds(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  const weekEvents = days.flatMap(date => events.filter(e => e && e.date === date));
+  const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+  const capacity = getCapacityTone(weeklyRollouts);
+  const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
+
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
-      <h2 className="mb-4 text-sm font-semibold text-zinc-800">Week of {shortDate(start)} – {shortDate(end)}</h2>
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="text-sm font-semibold text-zinc-800">Week of {shortDate(start)} – {shortDate(end)}</h2>
+        <div className={`rounded-2xl border px-4 py-3 ${capacity.className}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Weekly Rollouts</div>
+              <div className="mt-1 text-lg font-semibold">{weeklyRollouts} / 22</div>
+            </div>
+            <Pill className={`border-current bg-white/60 ${capacity.className}`}>{capacity.label}</Pill>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+            <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      </div>
       <div className="space-y-4">
         {days.map(date => {
           const dayEvents = events.filter(e => e && e.date === date);
+          const dayRollouts = dayEvents.reduce((total, event) => total + getRolloutCount(event), 0);
           return (
             <section key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-zinc-900">{formatDate(date)}</h3>
-                <Pill className="border-zinc-200 bg-cream text-zinc-600">{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Pill>
+                <div className="flex flex-wrap gap-2">
+                  <Pill className="border-zinc-200 bg-cream text-zinc-600">{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Pill>
+                  {dayRollouts ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{dayRollouts} rollout{dayRollouts === 1 ? '' : 's'}</Pill> : null}
+                </div>
               </div>
               {dayEvents.length ? (
                 <div className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-100 bg-white">
-                  {dayEvents.map(event => (
-                    <button
-                      key={event.id}
-                      type="button"
-                      onClick={() => onClick(event)}
-                      className="flex w-full flex-col gap-2 px-4 py-3 text-left transition hover:bg-[#DDE8D2]/35 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-semibold text-zinc-900">{event.title}</div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                          <span>{event.time || 'TBD'}</span>
-                          {event.canonicalSchool ? <span>{event.canonicalSchool}</span> : null}
-                          {event.photographers?.length ? <span>Photographers Assigned: {event.photographers.join(', ')}</span> : null}
+                  {dayEvents.map(event => {
+                    const rolloutCount = getRolloutCount(event);
+                    return (
+                      <button
+                        key={event.id}
+                        type="button"
+                        onClick={() => onClick(event)}
+                        className="flex w-full flex-col gap-2 px-4 py-3 text-left transition hover:bg-[#DDE8D2]/35 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-zinc-900">{event.title}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                            <span>{event.time || 'TBD'}</span>
+                            {event.canonicalSchool ? <span>{event.canonicalSchool}</span> : null}
+                            {event.photographers?.length ? <span>Photographers Assigned: {event.photographers.join(', ')}</span> : null}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
-                        <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
-                        {event.irm ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {event.irm}</Pill> : null}
-                      </div>
-                    </button>
-                  ))}
+                        <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
+                          <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+                          {event.irm ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {event.irm}</Pill> : null}
+                          {rolloutCount ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{rolloutCount} rollout{rolloutCount === 1 ? '' : 's'}</Pill> : null}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-4 text-sm text-zinc-400">No scheduled items</div>
