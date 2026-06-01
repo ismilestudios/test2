@@ -139,3 +139,13 @@ Build check completed successfully with `npm run build` before packaging.
 ## Latest update: School reference images
 
 School List pages now include a Reference Images section underneath Notes. Use the Edit button on a school page to add JPG/PNG images, edit captions, or remove images. Images are stored in the same browser-local school override data as editable notes for now; Supabase/cloud storage can make these shared later.
+
+## v0.6 Operational Intelligence Pass
+
+Added in this build:
+
+- Assignment workflow improvements: photographer assignment picker now shows weekly rollout workload for the selected date, same-day conflicts, selected rollout count, and recent-school badges.
+- Photographer history intelligence: School List detail pages now summarize photographer history by school, including assignment count and most recent assignment.
+- Global search: the top search now surfaces cross-app results for schools, contacts, notes, photographers, assistants, and imported events. School results jump to School List; event results open the event drawer.
+
+Build check: `npm run build` passed locally after installing dependencies with `npm install --ignore-scripts`.

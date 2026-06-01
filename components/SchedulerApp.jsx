@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
+import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2 } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 
 const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members'];
@@ -353,6 +353,84 @@ function getCapacityTone(rollouts) {
   };
 }
 
+
+function getPhotographerWeekStats(events, date, photographer) {
+  const { start, end } = weekBounds(date || todayKey());
+  const weekEvents = (events || []).filter(event => event && event.date >= start && event.date <= end && (event.photographers || []).includes(photographer));
+  const rollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+  const dayEvents = weekEvents.filter(event => event.date === date);
+  return { rollouts, dayEvents, weekEvents };
+}
+
+function getRecentSchoolPhotographers(schoolName, events) {
+  const key = normalizeSchoolLookupKey(schoolName);
+  if (!key) return [];
+  const matches = (events || [])
+    .filter(event => {
+      const eventKey = normalizeSchoolLookupKey(event?.canonicalSchool || event?.title || '');
+      return eventKey && (eventKey.includes(key) || key.includes(eventKey));
+    })
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+  const seen = new Set();
+  const names = [];
+  matches.forEach(event => (event.photographers || []).forEach(name => {
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
+  }));
+  return names.slice(0, 6);
+}
+
+function getSchoolPhotographerHistory(history = []) {
+  const map = {};
+  history.forEach(event => {
+    (event.photographers || []).forEach(name => {
+      if (!name) return;
+      map[name] ||= { name, count: 0, lastDate: '', lastTitle: '' };
+      map[name].count += 1;
+      if (!map[name].lastDate || String(event.date || '').localeCompare(map[name].lastDate) > 0) {
+        map[name].lastDate = event.date || '';
+        map[name].lastTitle = event.title || '';
+      }
+    });
+  });
+  return Object.values(map).sort((a, b) => String(b.lastDate).localeCompare(String(a.lastDate)));
+}
+
+function PhotographerAssignmentPicker({ photographers, selectedPhotographers, setSelectedPhotographers, events = [], date, schoolName }) {
+  const recent = getRecentSchoolPhotographers(schoolName, events);
+  const toggle = (name) => setSelectedPhotographers(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
+  return (
+    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-900">Photographers Assigned</h3>
+          <p className="mt-1 text-xs text-zinc-500">Shows selected-date week workload and flags people who recently photographed this school.</p>
+        </div>
+        {selectedPhotographers.length ? <Pill className="border-zinc-200 bg-cream text-zinc-700">{selectedPhotographers.length} rollout{selectedPhotographers.length === 1 ? '' : 's'}</Pill> : null}
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {photographers.map(name => {
+          const stats = getPhotographerWeekStats(events, date, name);
+          const isSelected = selectedPhotographers.includes(name);
+          const isRecent = recent.includes(name);
+          return (
+            <button key={name} type="button" onClick={() => toggle(name)} className={`rounded-2xl border p-3 text-left text-sm transition hover:-translate-y-0.5 hover:shadow-sm ${isSelected ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold">{name}</span>
+                {isRecent ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isSelected ? 'bg-white/15 text-white' : 'bg-[#DDE8D2] text-zinc-800'}`}>recent</span> : null}
+              </div>
+              <div className={`mt-1 text-xs ${isSelected ? 'text-white/70' : 'text-zinc-500'}`}>{stats.rollouts} rollout{stats.rollouts === 1 ? '' : 's'} this week{stats.dayEvents.length ? ` · ${stats.dayEvents.length} same-day` : ''}</div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function WeekView({ events, selectedDate, onClick }) {
   const { start, end } = weekBounds(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
@@ -490,6 +568,58 @@ function getSeasonLabel(date) {
   return date.slice(0, 4);
 }
 
+
+const DISTRICT_DISPLAY_NAMES = {
+  'Albany': 'Albany School District',
+  'Nisky': 'Niskayuna School District',
+  'Shen': 'Shenendehowa School District',
+  'Cairo-Durham': 'Cairo-Durham School District',
+  'BKW': 'Berne-Knox-Westerlo School District',
+  'Waterford-Halfmoon': 'Waterford-Halfmoon School District',
+  'Duanesburg': 'Duanesburg School District'
+};
+
+const SCHOOL_DISPLAY_OVERRIDES = {
+  'Albany - ASH': 'Albany School of Humanities (Albany School District)',
+  'Albany - Arbor Hill': 'Arbor Hill Elementary School (Albany School District)',
+  'Albany - Eagle Point': 'Eagle Point Elementary School (Albany School District)',
+  'Albany - Hackett': 'William S. Hackett Middle School (Albany School District)',
+  'Albany - Myers': 'Stephen and Harriet Myers Middle School (Albany School District)',
+  'Nisky - Craig Elem': 'Craig Elementary School (Niskayuna School District)',
+  'Nisky - Glencliff Elem': 'Glencliff Elementary School (Niskayuna School District)',
+  'Nisky - Rosendale Elem': 'Rosendale Elementary School (Niskayuna School District)',
+  'Shen - Arongen': 'Arongen Elementary School (Shenendehowa School District)',
+  'Shen - Karigon': 'Karigon Elementary School (Shenendehowa School District)',
+  'Shen - Okte': 'Okte Elementary School (Shenendehowa School District)',
+  'Shen - Orenda': 'Orenda Elementary School (Shenendehowa School District)',
+  'Shen - Shatekon': 'Shatekon Elementary School (Shenendehowa School District)',
+  'Shen - Skano': 'Skano Elementary School (Shenendehowa School District)',
+  'Shen - Tesago': 'Tesago Elementary School (Shenendehowa School District)'
+};
+
+function getCarrieSchoolDisplayName(schoolName = '') {
+  if (SCHOOL_DISPLAY_OVERRIDES[schoolName]) return SCHOOL_DISPLAY_OVERRIDES[schoolName];
+  const parts = String(schoolName).split(' - ');
+  if (parts.length >= 2) {
+    const prefix = parts[0].trim();
+    const base = parts.slice(1).join(' - ').trim();
+    const district = DISTRICT_DISPLAY_NAMES[prefix];
+    if (district) return `${base} (${district})`;
+  }
+  return schoolName;
+}
+
+function chooseCarrieReferenceEvent(history = []) {
+  const fall2025 = history.filter(event => event && event.date >= '2025-09-01' && event.date <= '2025-11-30');
+  const fallPictureDays = fall2025.filter(event => event.type === 'Fall Picture Day');
+  if (fallPictureDays.length) return fallPictureDays[0];
+  return fall2025[0] || history[history.length - 1] || null;
+}
+
+function getUniqueNamesFromEvents(events = [], key = 'photographers') {
+  return [...new Set(events.flatMap(event => event?.[key] || []).filter(Boolean))];
+}
+
 function getFall2026ScheduledSchools(events = EVENTS) {
   return new Set(
     events.filter(event => event && event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
@@ -504,12 +634,16 @@ function getSchoolsToSchedule(events = EVENTS) {
     .map(school => {
       const history = getSchoolHistory(school.name, events);
       const fall2025 = history.filter(event => event && event.date >= '2025-09-01' && event.date <= '2025-11-30');
-      const mostRecent = fall2025[fall2025.length - 1] || history[history.length - 1];
+      const fallPictureDayEvents = fall2025.filter(event => event.type === 'Fall Picture Day');
+      const referenceEvent = chooseCarrieReferenceEvent(history);
       return {
         ...school,
+        displayName: getCarrieSchoolDisplayName(school.name),
         history,
         fall2025,
-        lastEvent: mostRecent,
+        fallPictureDayEvents,
+        lastEvent: referenceEvent,
+        referencePhotographers: getUniqueNamesFromEvents(fallPictureDayEvents.length ? fallPictureDayEvents : referenceEvent ? [referenceEvent] : [], 'photographers'),
         status: 'Needs Fall 2026 Scheduling'
       };
     })
@@ -583,6 +717,18 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
           );
         })}
       </div>
+      <div className="mt-4 rounded-2xl border border-zinc-200 bg-white/70 p-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800"><History size={16} /> Photographer History</div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {getSchoolPhotographerHistory(school.history).length ? getSchoolPhotographerHistory(school.history).map(item => (
+            <div key={item.name} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3 text-sm">
+              <div className="font-semibold text-zinc-900">{item.name}</div>
+              <div className="mt-1 text-xs text-zinc-500">{item.count} historical assignment{item.count === 1 ? '' : 's'}</div>
+              {item.lastDate ? <div className="mt-2 text-xs text-zinc-600">Last: {shortDate(item.lastDate)} · {item.lastTitle}</div> : null}
+            </div>
+          )) : <div className="text-xs text-zinc-400">No photographer history imported yet.</div>}
+        </div>
+      </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
           <div className="font-semibold text-zinc-800">Address</div>
@@ -617,7 +763,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
 }
 
 
-function SchedulingModal({ school, photographers, assistants, onClose, onSave }) {
+function SchedulingModal({ school, photographers, assistants, events = [], onClose, onSave }) {
   const [date, setDate] = useState('2026-09-01');
   const [selectedPhotographers, setSelectedPhotographers] = useState([]);
   const [selectedAssistants, setSelectedAssistants] = useState([]);
@@ -678,14 +824,7 @@ function SchedulingModal({ school, photographers, assistants, onClose, onSave })
               </div>
             </div>
 
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Photographers</h3>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {photographers.map(name => (
-                  <button key={name} type="button" onClick={() => toggleName(name, setSelectedPhotographers)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedPhotographers.includes(name) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>
-                ))}
-              </div>
-            </section>
+            <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={school.name} />
 
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
@@ -713,7 +852,7 @@ function SchedulingModal({ school, photographers, assistants, onClose, onSave })
 }
 
 
-function AddEventModal({ photographers, assistants, onClose, onSave, defaultDate = '2026-09-01', sourceLabel = 'prototype' }) {
+function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = '2026-09-01', sourceLabel = 'prototype' }) {
   const [date, setDate] = useState(defaultDate);
   const [title, setTitle] = useState('');
   const [schoolName, setSchoolName] = useState('');
@@ -803,10 +942,7 @@ function AddEventModal({ photographers, assistants, onClose, onSave, defaultDate
                 {matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Photographers Assigned</h3>
-              <div className="mt-3 flex flex-wrap gap-2">{photographers.map(name => <button key={name} type="button" onClick={() => toggleName(name, setSelectedPhotographers)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedPhotographers.includes(name) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}</div>
-            </section>
+            <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
               <div className="mt-3 flex flex-wrap gap-2">{assistants.map(name => <button key={name} type="button" onClick={() => toggleName(name, setSelectedAssistants)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}</div>
@@ -838,7 +974,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
 
   const q = query.trim().toLowerCase();
   const filteredSchools = q
-    ? schools.filter(item => [item.name, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
+    ? schools.filter(item => [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
     : schools;
 
   return (
@@ -857,13 +993,13 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
               <button key={item.name} onClick={() => { setSelectedSchool(item); setSchedulingSchool(item); }} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <div className="text-sm font-semibold text-zinc-950">{item.name}</div>
+                    <div className="text-sm font-semibold text-zinc-950">{item.displayName || item.name}</div>
                     <div className="mt-1 text-xs text-zinc-500">{item.lastEvent ? `2025 reference: ${formatDate(item.lastEvent.date)}` : 'No imported Fall 2025 event matched yet'}</div>
                   </div>
                   {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
                 </div>
                 <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
-                {item.lastEvent ? <div className="mt-2 text-xs text-zinc-500">2025 assigned: {item.lastEvent.photographers?.length ? item.lastEvent.photographers.join(', ') : '—'}</div> : null}
+                {item.lastEvent ? <div className="mt-2 text-xs text-zinc-500">2025 Fall assigned: {item.referencePhotographers?.length ? item.referencePhotographers.join(', ') : '—'}</div> : null}
               </button>
             ))}
           </div>
@@ -891,8 +1027,8 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         </section>
       </div>
       <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
-      <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
-      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
+      <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
+      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
     </div>
   );
 }
@@ -1320,6 +1456,50 @@ function Info({ icon: Icon, title, value, large = false }) {
   return <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Icon size={14} />{title}</div><div className={`mt-2 whitespace-pre-wrap text-zinc-800 ${large ? 'text-sm leading-6' : 'text-sm font-medium'}`}>{value}</div></div>;
 }
 
+
+function GlobalSearchResults({ query, events, onSelectEvent, onSelectSchool }) {
+  const q = query.trim().toLowerCase();
+  if (!q) return null;
+  const schoolMatches = SCHOOLS.filter(school => [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0, 6);
+  const eventMatches = (events || []).filter(event => [event.title, event.canonicalSchool, event.type, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0, 8);
+  if (!schoolMatches.length && !eventMatches.length) return null;
+  return (
+    <section className="rounded-[2rem] border border-[#AEBB9E] bg-[#DDE8D2]/45 p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-950">Global Search Results</h2>
+          <p className="mt-1 text-xs text-zinc-600">Searching schools, contacts, notes, photographers, assistants, and imported events.</p>
+        </div>
+        <Pill className="border-zinc-200 bg-white/80 text-zinc-700">{schoolMatches.length + eventMatches.length} shown</Pill>
+      </div>
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-3xl border border-zinc-200 bg-white/75 p-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Schools</div>
+          <div className="space-y-2">
+            {schoolMatches.length ? schoolMatches.map(school => (
+              <button key={school.name} onClick={() => onSelectSchool(school.name)} className="w-full rounded-2xl border border-zinc-100 bg-cream/70 p-3 text-left transition hover:bg-white hover:shadow-sm">
+                <div className="text-sm font-semibold text-zinc-900">{school.name}</div>
+                <div className="mt-1 text-xs text-zinc-500">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || school.city || 'School List match'}{school.irm ? ` · IRM ${school.irm}` : ''}</div>
+              </button>
+            )) : <div className="text-xs text-zinc-400">No school matches.</div>}
+          </div>
+        </div>
+        <div className="rounded-3xl border border-zinc-200 bg-white/75 p-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Events + Assignments</div>
+          <div className="space-y-2">
+            {eventMatches.length ? eventMatches.map(event => (
+              <button key={event.id} onClick={() => onSelectEvent(event)} className="w-full rounded-2xl border border-zinc-100 bg-cream/70 p-3 text-left transition hover:bg-white hover:shadow-sm">
+                <div className="text-sm font-semibold text-zinc-900">{event.title}</div>
+                <div className="mt-1 text-xs text-zinc-500">{shortDate(event.date)} · {event.type} · {displayPhotographerAssignment(event)}</div>
+              </button>
+            )) : <div className="text-xs text-zinc-400">No event matches.</div>}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function SchedulerApp() {
   const [activeTab, setActiveTab] = useState('Calendar View');
   const [calendarMode, setCalendarMode] = useState('Month');
@@ -1386,6 +1566,7 @@ export default function SchedulerApp() {
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
+        <GlobalSearchResults query={query} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
           {activeTab === 'Overview' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} /></>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
@@ -1399,7 +1580,7 @@ export default function SchedulerApp() {
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Rule</h3><p className="mt-2 text-sm text-zinc-600">Humans make scheduling decisions. This app supports reference, visibility, and notes — not automation.</p></div>
         </section>
       </div>
-      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={selectedDate} sourceLabel="Overview" />}
+      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={selectedDate} sourceLabel="Overview" />}
       <Drawer event={selected} onClose={() => setSelected(null)} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
     </main>
   );
