@@ -728,8 +728,8 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
-          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50">Edit</button> : null}
-          {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-xs font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Merge</button> : null}
+          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50">Edit</button> : null}
+          {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/40">Merge</button> : null}
         </div>
       </div>
       <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-4 grid gap-3 md:grid-cols-4'}`}>
@@ -784,8 +784,13 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
       </div>
       {school.address ? <div className="mt-3 sm:hidden"><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer" className="block rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-3 text-center text-sm font-semibold text-zinc-900">Open Address in Maps</a></div> : null}
       <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
-        <div className="font-semibold text-zinc-800">Notes on School</div>
-        <div className="mt-1 whitespace-pre-wrap">{school.notes || '—'}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="font-semibold text-zinc-800">Notes on School</div>
+          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50">Edit Notes</button> : null}
+        </div>
+        <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-2 w-full rounded-xl p-2 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
+          <div className="whitespace-pre-wrap">{school.notes || '—'}</div>
+        </button>
       </div>
       <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
         <div className="flex items-center gap-2 font-semibold text-zinc-800"><Pencil size={16} /> Picture Day Info History</div>
@@ -1301,7 +1306,7 @@ function MergeSchoolModal({ sourceSchool, schools, onClose, onMerge }) {
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">Cancel</button>
-          <button disabled={!targetName} onClick={() => onMerge(sourceSchool.originalName, targetName)} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-40">Merge</button>
+          <button disabled={!targetName} onClick={() => onMerge(sourceSchool.originalName, targetName)} className="rounded-xl bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-40">Merge</button>
         </div>
       </motion.div>
     </motion.div>
