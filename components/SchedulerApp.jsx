@@ -691,7 +691,7 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
   return dates;
 }
 
-function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
+function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = false }) {
   if (!school) {
     return (
       <div className="rounded-3xl border border-dashed border-zinc-200 bg-white/60 p-6 text-sm text-zinc-500">
@@ -708,7 +708,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
   }, {});
   const seasons = ['Spring 2025', 'Fall 2025', 'Spring 2026', 'Fall 2026'];
   return (
-    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+    <section className={`${compact ? 'rounded-2xl p-0' : 'rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm'}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-zinc-950">{school.name}</h2>
@@ -721,7 +721,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
           {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-xs font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Merge</button> : null}
         </div>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-4 grid gap-3 md:grid-cols-4'}`}>
         {seasons.map(season => {
           const events = grouped[season] || [];
           return (
@@ -744,7 +744,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
       </div>
       <div className="mt-4 rounded-2xl border border-zinc-200 bg-white/70 p-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800"><History size={16} /> Photographer History</div>
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <div className={`${compact ? 'mt-3 grid gap-2 sm:grid-cols-2' : 'mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3'}`}>
           {getSchoolPhotographerHistory(school.history).length ? getSchoolPhotographerHistory(school.history).map(item => (
             <div key={item.name} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3 text-sm">
               <div className="font-semibold text-zinc-900">{item.name}</div>
@@ -754,7 +754,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
           )) : <div className="text-xs text-zinc-400">No photographer history imported yet.</div>}
         </div>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className={`${compact ? 'mt-4 grid gap-3' : 'mt-4 grid gap-3 md:grid-cols-2'}`}>
         <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
           <div className="font-semibold text-zinc-800">Address</div>
           <div className="mt-1 whitespace-pre-wrap">{[school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n') || '—'}</div>
@@ -1009,7 +1009,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.25fr)]">
         <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-xl">
@@ -1021,7 +1021,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
               <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
             </div>
           </div>
-          <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
+          <div className="space-y-2">
             {filteredSchools.map(item => (
               <button key={item.name} onClick={() => setSelectedSchool(item)} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1047,7 +1047,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
               </div>
               {selectedSchool ? <button type="button" onClick={() => setSchedulingSchool(selectedSchool)} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Schedule for Fall 2026</button> : null}
             </div>
-            <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
+            <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} compact />
           </div>
         </section>
       </div>
