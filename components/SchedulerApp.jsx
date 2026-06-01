@@ -556,12 +556,21 @@ function WeekView({ events, selectedDate, onClick }) {
   const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const capacity = getCapacityTone(weeklyRollouts);
   const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
+  const photographerSummary = Array.from(
+    weekEvents.reduce((counts, event) => {
+      if (!isRolloutEvent(event)) return counts;
+      (event.photographers || []).filter(Boolean).forEach(name => {
+        counts.set(name, (counts.get(name) || 0) + 1);
+      });
+      return counts;
+    }, new Map())
+  ).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-sm font-semibold text-zinc-800">Week of {shortDate(start)} – {shortDate(end)}</h2>
-        <div className={`rounded-2xl border px-4 py-3 ${capacity.className}`}>
+        <div tabIndex={0} className={`group relative rounded-2xl border px-4 py-3 outline-none ${capacity.className}`}>
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Weekly Rollouts</div>
@@ -571,6 +580,21 @@ function WeekView({ events, selectedDate, onClick }) {
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
             <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
+          </div>
+
+          <div className="pointer-events-none absolute right-0 top-full z-30 mt-3 w-72 translate-y-1 rounded-3xl border border-zinc-200 bg-white p-4 text-zinc-900 opacity-0 shadow-2xl transition group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100">
+            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">This week's photographer load</div>
+            <div className="mt-1 text-sm font-semibold text-zinc-900">{shortDate(start)} – {shortDate(end)}</div>
+            <div className="mt-3 space-y-2">
+              {photographerSummary.length ? photographerSummary.map(([name, count]) => (
+                <div key={name} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-100 bg-cream/70 px-3 py-2 text-sm">
+                  <span className="truncate font-medium">{name}</span>
+                  <span className="shrink-0 text-xs font-semibold text-zinc-500">{count} school{count === 1 ? '' : 's'}</span>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-500">No photographers assigned this week yet.</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
