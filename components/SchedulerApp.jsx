@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 
-const tabs = ['Planning Board', 'Calendar View', 'Carrie View', 'School Pages', 'Team Members'];
+const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members'];
 
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
@@ -34,6 +34,39 @@ function formatDate(date) {
   return new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+function shortDate(date) {
+  return new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function addDays(date, delta) {
+  const d = new Date(date + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function weekBounds(date) {
+  const d = new Date(date + 'T12:00:00');
+  const start = new Date(d);
+  start.setDate(d.getDate() - d.getDay());
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const toKey = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  return { start: toKey(start), end: toKey(end) };
+}
+
+function displayStatus(status) {
+  return status === 'Needs Photographers Scheduled' ? 'Needs Photographers Assigned' : status;
+}
+
+function displayPhotographerAssignment(event) {
+  return event.photographers?.length ? event.photographers.join(', ') : 'Needs Photographers Assigned';
+}
+
 function EventCard({ event, onClick, compact = false }) {
   return (
     <motion.button
@@ -46,15 +79,17 @@ function EventCard({ event, onClick, compact = false }) {
           <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
             <span>{event.time}</span>
-            {event.irm ? <span>IRM {event.irm}</span> : null}
             {event.canonicalSchool ? <span className="truncate">{event.canonicalSchool}</span> : null}
           </div>
         </div>
-        <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+          {event.irm ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {event.irm}</Pill> : null}
+        </div>
       </div>
       {!compact && (
         <div className="mt-3 space-y-1 text-xs text-zinc-600">
-          <div>Photographers: {event.photographers.length ? event.photographers.join(', ') : 'Needs Photographers Scheduled'}</div>
+          <div>Photographers Assigned: {displayPhotographerAssignment(event)}</div>
           <div>Assistants: {event.assistants.length ? event.assistants.join(', ') : '—'}</div>
         </div>
       )}
@@ -129,14 +164,14 @@ function MonthNavigator({ month, setMonth }) {
 }
 
 function Summary({ events, allMonthEvents }) {
-  const needs = events.filter(e => e.status === 'Needs Photographers Scheduled').length;
+  const needs = events.filter(e => e.status === 'Needs Photographers Scheduled' || e.status === 'Needs Photographers Assigned').length;
   const schools = new Set(events.filter(e => e.canonicalSchool).map(e => e.canonicalSchool)).size;
   return (
     <section className="grid gap-3 md:grid-cols-4">
       {[
         ['Visible Events', events.length, ClipboardList],
         ['Schools', schools, History],
-        ['Needs Photographers Scheduled', needs, UserRoundCheck],
+        ['Needs Photographers Assigned', needs, UserRoundCheck],
         ['Month Total', allMonthEvents.length, Users]
       ].map(([label, value, Icon]) => (
         <div key={label} className="rounded-3xl border border-zinc-200/80 bg-white/75 p-4 shadow-sm">
@@ -150,28 +185,63 @@ function Summary({ events, allMonthEvents }) {
 }
 
 function PlanningBoard({ events, onClick }) {
-  return <div className="grid gap-4 lg:grid-cols-4">{STATUSES.map(status => <div key={status} className="rounded-3xl border border-zinc-200/80 bg-white/45 p-3"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold text-zinc-800">{status}</h2><Pill className="border-zinc-200 bg-white text-zinc-600">{events.filter(e => e.status === status).length}</Pill></div><div className="space-y-3">{events.filter(e => e.status === status).map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div></div>)}</div>;
+  const overviewStatuses = STATUSES.filter(status => status !== 'Completed');
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      {overviewStatuses.map(status => {
+        const columnEvents = events.filter(e => e.status === status || (status === 'Needs Photographers Scheduled' && e.status === 'Needs Photographers Assigned'));
+        return (
+          <div key={status} className="rounded-3xl border border-zinc-200/80 bg-white/45 p-3">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-800">{displayStatus(status)}</h2>
+              <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
+            </div>
+            <div className="space-y-3">{columnEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
-function MonthView({ events, month, onClick }) {
+function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className="min-h-[132px] rounded-2xl border border-zinc-200 bg-cream/80 p-2"><div className="mb-2 text-xs font-semibold text-zinc-500">{day}</div><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
+  return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
 
-function WeekView({ events, month, onClick }) {
-  const totalDays = daysInMonth(month);
-  const weeks = [];
-  for (let day = 1; day <= totalDays; day += 7) weeks.push(Array.from({ length: Math.min(7, totalDays - day + 1) }, (_, i) => day + i));
-  return <div className="space-y-4">{weeks.map((week, idx) => <div key={idx} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">Week of {monthLabel(month).split(' ')[0]} {week[0]}, {month.split('-')[0]}</h2><div className="grid gap-3 md:grid-cols-7">{week.map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-3"><div className="mb-2 text-xs font-semibold text-zinc-500">{monthLabel(month).slice(0,3)} {day}</div><div className="space-y-2">{dayEvents.length ? dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} compact />) : <div className="text-xs text-zinc-400">No scheduled items</div>}</div></div>})}</div></div>)}</div>;
+function WeekView({ events, selectedDate, onClick }) {
+  const { start, end } = weekBounds(selectedDate);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  return (
+    <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
+      <h2 className="mb-3 text-sm font-semibold text-zinc-800">Week of {shortDate(start)} – {shortDate(end)}</h2>
+      <div className="grid gap-3 md:grid-cols-7">
+        {days.map(date => {
+          const dayEvents = events.filter(e => e && e.date === date);
+          return (
+            <div key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-3">
+              <div className="mb-2 text-xs font-semibold text-zinc-500">{new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+              <div className="space-y-2">{dayEvents.length ? dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} compact />) : <div className="text-xs text-zinc-400">No scheduled items</div>}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
-function DayView({ events, onClick, month }) {
-  const grouped = events.filter(event => event && event.date).reduce((acc, event) => { acc[event.date] ||= []; acc[event.date].push(event); return acc; }, {});
-  const entries = Object.entries(grouped);
-  if (!entries.length) return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">No events scheduled for {monthLabel(month)} yet.</div>;
-  return <div className="space-y-4">{entries.map(([date, dayEvents]) => <div key={date} className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><h2 className="mb-3 text-sm font-semibold text-zinc-800">{formatDate(date)}</h2><div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div></div>)}</div>;
+function DayView({ events, onClick, selectedDate }) {
+  const dayEvents = events.filter(event => event && event.date === selectedDate);
+  if (!dayEvents.length) return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">No events scheduled for {formatDate(selectedDate)} yet.</div>;
+  return (
+    <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
+      <h2 className="mb-3 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</h2>
+      <div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div>
+    </div>
+  );
 }
+
 
 
 
@@ -282,7 +352,7 @@ function SchoolHistoryPanel({ school, onClickEvent }) {
                     <button key={event.id} onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-white/80 p-2 text-left text-xs transition hover:bg-white hover:shadow-sm">
                       <div className="font-semibold text-zinc-900">{formatDate(event.date)}</div>
                       <div className="mt-1 text-zinc-600">{event.title}</div>
-                      <div className="mt-1 text-zinc-500">Photogs: {event.photographers?.length ? event.photographers.join(', ') : '—'}</div>
+                      <div className="mt-1 text-zinc-500">Assigned: {event.photographers?.length ? event.photographers.join(', ') : '—'}</div>
                     </button>
                   ))}
                 </div>
@@ -318,7 +388,7 @@ function SchedulingModal({ school, photographers, assistants, onClose, onSave })
       title: `${school.name} Fall Picture Day`,
       canonicalSchool: school.name,
       type: 'Fall Picture Day',
-      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Scheduled',
+      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: selectedAssistants,
       features: [],
@@ -326,7 +396,7 @@ function SchedulingModal({ school, photographers, assistants, onClose, onSave })
       time: 'TBD',
       notes: notes || 'Scheduled from Carrie View. Details can be refined later.',
       rainInfo: '',
-      history: school.lastEvent ? `Fall 2025 reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
+      history: school.lastEvent ? `Fall 2025 reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Assigned photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
     };
     onSave(event);
     onClose();
@@ -356,7 +426,7 @@ function SchedulingModal({ school, photographers, assistants, onClose, onSave })
               <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">2025 Reference</div>
                 <div className="mt-2 text-sm text-zinc-800">{school.lastEvent ? `${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}` : 'No matched Fall 2025 reference yet.'}</div>
-                <div className="mt-1 text-xs text-zinc-500">Photogs: {school.lastEvent?.photographers?.length ? school.lastEvent.photographers.join(', ') : '—'}</div>
+                <div className="mt-1 text-xs text-zinc-500">Assigned: {school.lastEvent?.photographers?.length ? school.lastEvent.photographers.join(', ') : '—'}</div>
               </div>
             </div>
 
@@ -394,11 +464,105 @@ function SchedulingModal({ school, photographers, assistants, onClose, onSave })
   );
 }
 
+
+function AddEventModal({ photographers, assistants, onClose, onSave }) {
+  const [date, setDate] = useState('2026-09-01');
+  const [title, setTitle] = useState('');
+  const [schoolName, setSchoolName] = useState('');
+  const [eventType, setEventType] = useState('Fall Picture Day');
+  const [selectedPhotographers, setSelectedPhotographers] = useState([]);
+  const [selectedAssistants, setSelectedAssistants] = useState([]);
+  const [notes, setNotes] = useState('');
+
+  const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
+  const save = () => {
+    const cleanTitle = title.trim() || (schoolName.trim() ? `${schoolName.trim()} ${eventType}` : 'New Event');
+    const event = {
+      id: `custom-${Date.now()}`,
+      date,
+      title: cleanTitle,
+      canonicalSchool: schoolName.trim() || null,
+      type: eventType,
+      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      photographers: selectedPhotographers,
+      assistants: selectedAssistants,
+      features: [],
+      irm: null,
+      time: 'TBD',
+      notes: notes || 'Added from Carrie View.',
+      rainInfo: '',
+      history: 'Created from Add School or Event.'
+    };
+    onSave(event);
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-8 max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl">
+          <div className="border-b border-zinc-200 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Add School or Event</Pill>
+                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">Create a scheduled item</h2>
+                <p className="mt-1 text-sm text-zinc-600">Use this for a new school, meeting, special event, rain date, or placeholder.</p>
+              </div>
+              <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
+            </div>
+          </div>
+          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Date</div>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Event Type</div>
+                <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4">
+                  {Object.keys(TYPE_COLORS).map(type => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">School / Account Name</div>
+                <input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} placeholder="Optional" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills if blank" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+            </div>
+            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <h3 className="text-sm font-semibold text-zinc-900">Photographers Assigned</h3>
+              <div className="mt-3 flex flex-wrap gap-2">{photographers.map(name => <button key={name} type="button" onClick={() => toggleName(name, setSelectedPhotographers)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedPhotographers.includes(name) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}</div>
+            </section>
+            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
+              <div className="mt-3 flex flex-wrap gap-2">{assistants.map(name => <button key={name} type="button" onClick={() => toggleName(name, setSelectedAssistants)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}</div>
+            </section>
+            <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Notes</div>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Optional notes..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+            </label>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
+            <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
+            <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save Event</button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule }) {
   const schools = useMemo(() => getSchoolsToSchedule(events), [events]);
   const availability = useMemo(() => getFall2026Availability(events, photographers), [events, photographers]);
   const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
   const [schedulingSchool, setSchedulingSchool] = useState(null);
+  const [addingEvent, setAddingEvent] = useState(false);
   useEffect(() => {
     if (!selectedSchool && schools.length) setSelectedSchool(schools[0]);
   }, [schools, selectedSchool]);
@@ -414,10 +578,10 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-zinc-950">Carrie View</h2>
+              <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled</h2>
               <p className="mt-1 text-sm text-zinc-600">Click a school to schedule it for Fall 2026. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
             </div>
-            <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setAddingEvent(true)} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button><Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill></div>
           </div>
           <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
             {filteredSchools.map(item => (
@@ -430,7 +594,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
                   {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
                 </div>
                 <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
-                {item.lastEvent ? <div className="mt-2 text-xs text-zinc-500">2025 photogs: {item.lastEvent.photographers?.length ? item.lastEvent.photographers.join(', ') : '—'}</div> : null}
+                {item.lastEvent ? <div className="mt-2 text-xs text-zinc-500">2025 assigned: {item.lastEvent.photographers?.length ? item.lastEvent.photographers.join(', ') : '—'}</div> : null}
               </button>
             ))}
           </div>
@@ -449,7 +613,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
                     <div className="text-sm font-semibold text-zinc-900">{formatDate(day.date)}</div>
                     <div className="mt-1 text-xs text-zinc-500">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
                   </div>
-                  <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photogs open</Pill>
+                  <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photographers open</Pill>
                 </div>
                 <div className="mt-2 text-xs text-zinc-600">Available: {day.availablePhotographers.join(', ') || '—'}</div>
               </div>
@@ -459,12 +623,12 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
       </div>
       <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
       <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
+      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} onClose={() => setAddingEvent(false)} onSave={onSchedule} />}
     </div>
   );
 }
 
-function SchoolPages({ query, onClickEvent, events }) {
-  const [selectedName, setSelectedName] = useState(SCHOOLS[0]?.name || '');
+function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName }) {
   const q = query.trim().toLowerCase();
   const schools = useMemo(() => SCHOOLS.map(school => ({ ...school, history: getSchoolHistory(school.name, events) })).sort((a, b) => a.name.localeCompare(b.name)), [events]);
   const filtered = q ? schools.filter(school => [school.name, school.notes, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : schools;
@@ -472,7 +636,7 @@ function SchoolPages({ query, onClickEvent, events }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
       <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-zinc-950">School Pages</h2>
+        <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
         <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history.</p>
         <div className="mt-4 max-h-[760px] space-y-2 overflow-auto pr-1">
           {filtered.map(school => (
@@ -489,7 +653,37 @@ function SchoolPages({ query, onClickEvent, events }) {
 }
 
 
-function CalendarView({ viewMode, setViewMode, events, monthEvents, month, setMonth, onClick }) {
+function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelectedDate, setViewMode }) {
+  const goToday = () => {
+    const today = todayKey();
+    setSelectedDate(today);
+    setMonth(monthKey(today));
+    setViewMode('Day');
+  };
+  const move = (delta) => {
+    if (viewMode === 'Month') {
+      const nextMonth = addMonths(month, delta);
+      setMonth(nextMonth);
+      setSelectedDate(`${nextMonth}-01`);
+      return;
+    }
+    const nextDate = addDays(selectedDate, viewMode === 'Week' ? delta * 7 : delta);
+    setSelectedDate(nextDate);
+    setMonth(monthKey(nextDate));
+  };
+  const { start, end } = weekBounds(selectedDate);
+  const label = viewMode === 'Month' ? monthLabel(month) : viewMode === 'Week' ? `${shortDate(start)} – ${shortDate(end)}` : formatDate(selectedDate);
+  return (
+    <div className="mb-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
+      <button type="button" onClick={() => move(-1)} className="rounded-full border border-zinc-200 bg-white/85 p-2 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft" aria-label="Previous"><ChevronLeft size={20} /></button>
+      <div className="min-w-[280px] rounded-full border border-zinc-200 bg-white/90 px-6 py-2 text-center text-base font-semibold text-zinc-900 shadow-sm">{label}</div>
+      <button type="button" onClick={() => move(1)} className="rounded-full border border-zinc-200 bg-white/85 p-2 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft" aria-label="Next"><ChevronRight size={20} /></button>
+      <button type="button" onClick={goToday} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Today</button>
+    </div>
+  );
+}
+
+function CalendarView({ viewMode, setViewMode, events, month, setMonth, selectedDate, setSelectedDate, onClick }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -499,24 +693,18 @@ function CalendarView({ viewMode, setViewMode, events, monthEvents, month, setMo
         </div>
         <div className="inline-flex rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm">
           {['Month', 'Week', 'Day'].map(mode => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setViewMode(mode)}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}
-            >
-              {mode}
-            </button>
+            <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}>{mode}</button>
           ))}
         </div>
       </div>
-      <MonthNavigator month={month} setMonth={setMonth} />
-      {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} />}
-      {viewMode === 'Week' && <WeekView events={events} month={month} onClick={onClick} />}
-      {viewMode === 'Day' && <DayView events={events} month={month} onClick={onClick} />}
+      <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} />
+      {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} />}
+      {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} />}
+      {viewMode === 'Day' && <DayView events={events} selectedDate={selectedDate} onClick={onClick} />}
     </div>
   );
 }
+
 
 function normalizeMemberName(value) {
   return value.trim().replace(/\s+/g, ' ');
@@ -593,8 +781,8 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
   );
 }
 
-function Drawer({ event, onClose }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5"><Info icon={UserRoundCheck} title="Photographers" value={event.photographers.length ? event.photographers.join(', ') : 'Needs Photographers Scheduled'} /><Info icon={Users} title="Assistants" value={event.assistants.length ? event.assistants.join(', ') : '—'} /><Info icon={ClipboardList} title="Status" value={event.status} /><Info icon={Clock} title="IRM" value={event.irm ? `${event.irm} — informational only` : '—'} /><Info icon={Pencil} title="Notes" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">This is still a frontend-only prototype. Update this data file in GitHub for now; add Supabase later for live editing and persistence.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
+function Drawer({ event, onClose, onViewSchool }) {
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{event.irm ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {event.irm}</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<Info icon={UserRoundCheck} title="Photographers Assigned" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={event.assistants.length ? event.assistants.join(', ') : '—'} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={Clock} title="IRM" value={event.irm ? `${event.irm} — informational only` : '—'} /><Info icon={Pencil} title="Notes" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">This is still a frontend-only prototype. Update this data file in GitHub for now; add Supabase later for live editing and persistence.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -605,11 +793,13 @@ export default function SchedulerApp() {
   const [activeTab, setActiveTab] = useState('Calendar View');
   const [calendarMode, setCalendarMode] = useState('Month');
   const [month, setMonth] = useState('2025-09');
+  const [selectedDate, setSelectedDate] = useState('2025-09-01');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
   const [photographers, setPhotographers] = useState(PHOTOGRAPHERS);
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [customEvents, setCustomEvents] = useState([]);
+  const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
 
   useEffect(() => {
     try {
@@ -641,6 +831,7 @@ export default function SchedulerApp() {
   const handleScheduleEvent = (event) => {
     setCustomEvents(prev => [...prev.filter(item => item.id !== event.id), event]);
     setMonth(monthKey(event.date));
+    setSelectedDate(event.date);
     setActiveTab('Calendar View');
   };
 
@@ -657,10 +848,10 @@ export default function SchedulerApp() {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         <Summary events={filtered} allMonthEvents={monthEvents} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
-          {activeTab === 'Planning Board' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} /></>}
-          {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} monthEvents={monthEvents} month={month} setMonth={setMonth} onClick={setSelected} />}
+          {activeTab === 'Overview' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} /></>}
+          {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
-          {activeTab === 'School Pages' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} />}
+          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} />}
         </section>
         <section className="grid gap-4 md:grid-cols-3">
@@ -669,7 +860,7 @@ export default function SchedulerApp() {
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Rule</h3><p className="mt-2 text-sm text-zinc-600">Humans make scheduling decisions. This app supports reference, visibility, and notes — not automation.</p></div>
         </section>
       </div>
-      <Drawer event={selected} onClose={() => setSelected(null)} />
+      <Drawer event={selected} onClose={() => setSelected(null)} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
     </main>
   );
 }
