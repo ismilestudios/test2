@@ -11,6 +11,32 @@ function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
 }
 
+function CalendarColorKey() {
+  const items = [
+    ['Fall Picture Day', TYPE_COLORS['Fall Picture Day']],
+    ['Spring Picture Day', TYPE_COLORS['Spring Picture Day']],
+    ['Makeup Day', TYPE_COLORS['Makeup Day']],
+    ['Sports', TYPE_COLORS.Sports],
+    ['Special Event', TYPE_COLORS['Special Event']],
+    ['Rain Date', TYPE_COLORS['Rain Date']],
+    ['Seniors', TYPE_COLORS.Seniors],
+    ['Call or Meeting', TYPE_COLORS['Call or Meeting']],
+    ['Edit Day', TYPE_COLORS['Edit Day']]
+  ];
+
+  return (
+    <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white/75 px-3 py-2 shadow-sm">
+      <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Key</span>
+      {items.map(([label, className]) => (
+        <span key={label} className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-zinc-700">
+          <span className={`h-3 w-3 rounded-full border ${className}`} />
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function monthKey(date) {
   return typeof date === 'string' && date.length >= 7 ? date.slice(0, 7) : '';
 }
@@ -60,7 +86,7 @@ function weekBounds(date) {
 }
 
 function displayStatus(status) {
-  return status === 'Needs Photographers Scheduled' ? 'Needs Photographers Assigned' : status;
+  return status === 'Needs Photographers Need Assistant Assigned' ? 'Needs Photographers Assigned' : status;
 }
 
 function displayPhotographerAssignment(event) {
@@ -299,6 +325,32 @@ function OperationalSummary({ events }) {
   );
 }
 
+function OverviewControls({ viewMode, setViewMode, month, setMonth, selectedDate, setSelectedDate }) {
+  return (
+    <div className="mb-4 space-y-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">Overview</h2>
+          <p className="mt-1 text-sm text-zinc-600">Review open scheduling needs by month, week, or day.</p>
+        </div>
+        <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:inline-flex sm:w-auto">
+          {['Month', 'Week', 'Day'].map(mode => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+      </div>
+      <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+    </div>
+  );
+}
+
 function PlanningBoard({ events, onClick, onAddEvent }) {
   const overviewStatuses = STATUSES.filter(status => status !== 'Completed');
   return (
@@ -308,7 +360,7 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
       {overviewStatuses.map(status => {
-        const columnEvents = events.filter(e => e.status === status || (status === 'Needs Photographers Scheduled' && e.status === 'Needs Photographers Assigned'));
+        const columnEvents = events.filter(e => e.status === status || (status === 'Needs Photographers Need Assistant Assigned' && e.status === 'Needs Photographers Assigned'));
         return (
           <div key={status} className="rounded-3xl border border-zinc-200/80 bg-white/45 p-3">
             <div className="mb-3 flex items-center justify-between">
@@ -656,7 +708,7 @@ function getPictureDayInfoHistory(history = []) {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
-function getFall2026ScheduledSchools(events = EVENTS) {
+function getFall2026Need Assistant AssignedSchools(events = EVENTS) {
   return new Set(
     events.filter(event => event && event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
       .map(event => schoolKey(event.canonicalSchool))
@@ -664,7 +716,7 @@ function getFall2026ScheduledSchools(events = EVENTS) {
 }
 
 function getSchoolsToSchedule(events = EVENTS) {
-  const scheduled2026 = getFall2026ScheduledSchools(events);
+  const scheduled2026 = getFall2026Need Assistant AssignedSchools(events);
   return SCHOOLS
     .filter(school => !scheduled2026.has(schoolKey(school.name)))
     .map(school => {
@@ -720,24 +772,17 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
   const seasons = ['Spring 2025', 'Fall 2025', 'Spring 2026', 'Fall 2026'];
   return (
     <section className={`${compact ? 'rounded-2xl p-0' : 'rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm'}`}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <h2 className="text-xl font-semibold text-zinc-950">{school.name}</h2>
-            {school.irm ? <Pill className="w-fit border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800 shadow-sm">IRM {school.irm}</Pill> : <Pill className="w-fit border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-zinc-950">{school.name}</h2>
           <p className="mt-1 text-sm text-zinc-600">School history page: past picture days, makeups, photographers, assistants, and future scheduling status.</p>
           {school.mergedFrom?.length ? <p className="mt-1 text-xs text-zinc-500">Merged with: {school.mergedFrom.join(', ')}</p> : null}
         </div>
-        {(onEdit || onMerge) ? (
-          <div className="flex shrink-0 flex-col gap-1 rounded-2xl border border-zinc-200 bg-white/80 p-2 shadow-sm sm:min-w-[148px]">
-            <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">School actions</div>
-            <div className="flex flex-wrap gap-2 lg:flex-col">
-              {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-900 bg-zinc-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-zinc-800">Edit</button> : null}
-              {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-xl border border-[#AEBB9E] bg-[#F3F8EF] px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Merge</button> : null}
-            </div>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
+          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50">Edit</button> : null}
+          {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/40">Merge</button> : null}
+        </div>
       </div>
       <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-4 grid gap-3 md:grid-cols-4'}`}>
         {seasons.map(season => {
@@ -855,13 +900,13 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
       title: `${school.name} Fall Picture Day`,
       canonicalSchool: school.name,
       type: 'Fall Picture Day',
-      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      status: selectedPhotographers.length ? 'Need Assistant Assigned' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: selectedAssistants,
       features: [],
       irm: school.irm || null,
       time: 'TBD',
-      notes: notes || 'Scheduled from Carrie View. Details can be refined later.',
+      notes: notes || 'Need Assistant Assigned from Carrie View. Details can be refined later.',
       rainInfo: '',
       history: school.lastEvent ? `Fall 2025 reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Assigned photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
     };
@@ -952,7 +997,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       title: cleanTitle,
       canonicalSchool: cleanName,
       type: eventType,
-      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      status: selectedPhotographers.length ? 'Need Assistant Assigned' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: selectedAssistants,
       features: [],
@@ -1056,7 +1101,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[680px] xl:flex-col xl:overflow-hidden">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-xl">
-              <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled <span className="text-zinc-500">[Fall 2026]</span></h2>
+              <h2 className="text-lg font-semibold text-zinc-950">To Be Need Assistant Assigned <span className="text-zinc-500">[Fall 2026]</span></h2>
               <p className="mt-2 text-sm leading-6 text-zinc-600">Click a school to review it for Fall 2026 scheduling. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
             </div>
             <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
@@ -1408,7 +1453,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
 }
 
 
-function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelectedDate }) {
+function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelectedDate, showKey = false }) {
   const goToday = () => {
     const today = todayKey();
     setSelectedDate(today);
@@ -1428,11 +1473,14 @@ function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelecte
   const { start, end } = weekBounds(selectedDate);
   const label = viewMode === 'Month' ? monthLabel(month) : viewMode === 'Week' ? `${shortDate(start)} – ${shortDate(end)}` : formatDate(selectedDate);
   return (
-    <div className="mb-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
-      <button type="button" onClick={() => move(-1)} className="rounded-full border border-zinc-200 bg-white/85 p-2 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft" aria-label="Previous"><ChevronLeft size={20} /></button>
-      <div className="min-w-[280px] rounded-full border border-zinc-200 bg-white/90 px-6 py-2 text-center text-base font-semibold text-zinc-900 shadow-sm">{label}</div>
-      <button type="button" onClick={() => move(1)} className="rounded-full border border-zinc-200 bg-white/85 p-2 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft" aria-label="Next"><ChevronRight size={20} /></button>
-      <button type="button" onClick={goToday} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Today</button>
+    <div className="mb-4 flex flex-col items-center justify-center gap-3">
+      <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <button type="button" onClick={() => move(-1)} className="rounded-full border border-zinc-200 bg-white/85 p-2 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft" aria-label="Previous"><ChevronLeft size={20} /></button>
+        <div className="min-w-[280px] rounded-full border border-zinc-200 bg-white/90 px-6 py-2 text-center text-base font-semibold text-zinc-900 shadow-sm">{label}</div>
+        <button type="button" onClick={() => move(1)} className="rounded-full border border-zinc-200 bg-white/85 p-2 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft" aria-label="Next"><ChevronRight size={20} /></button>
+        <button type="button" onClick={goToday} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Today</button>
+      </div>
+      {showKey ? <CalendarColorKey /> : null}
     </div>
   );
 }
@@ -1451,7 +1499,7 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
           ))}
         </div>
       </div>
-      <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+      <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} showKey />
       {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} />}
       {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} />}
       {viewMode === 'Day' && <DayView events={events} selectedDate={selectedDate} onClick={onClick} />}
@@ -1590,6 +1638,7 @@ function GlobalSearchResults({ query, events, onSelectEvent, onSelectSchool }) {
 export default function SchedulerApp() {
   const [activeTab, setActiveTab] = useState('Calendar View');
   const [calendarMode, setCalendarMode] = useState('Month');
+  const [overviewMode, setOverviewMode] = useState('Month');
   const [month, setMonth] = useState('2025-09');
   const [selectedDate, setSelectedDate] = useState('2025-09-01');
   const [query, setQuery] = useState('');
@@ -1641,12 +1690,20 @@ export default function SchedulerApp() {
     setActiveTab('Calendar View');
   };
 
-  const monthEvents = useMemo(() => allEvents.filter(event => event && monthKey(event.date) === month), [allEvents, month]);
-  const filtered = useMemo(() => {
+  const queryFilteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return monthEvents;
-    return monthEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q));
-  }, [query, monthEvents]);
+    if (!q) return allEvents;
+    return allEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q));
+  }, [query, allEvents]);
+
+  const overviewPeriodEvents = useMemo(() => {
+    if (overviewMode === 'Month') return queryFilteredEvents.filter(event => event && monthKey(event.date) === month);
+    if (overviewMode === 'Week') {
+      const { start, end } = weekBounds(selectedDate);
+      return queryFilteredEvents.filter(event => event && event.date >= start && event.date <= end);
+    }
+    return queryFilteredEvents.filter(event => event && event.date === selectedDate);
+  }, [queryFilteredEvents, overviewMode, month, selectedDate]);
 
   return (
     <main className="min-h-screen font-sans text-zinc-900">
@@ -1655,8 +1712,11 @@ export default function SchedulerApp() {
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
         <GlobalSearchResults query={query} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
-          {activeTab === 'Overview' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} /></>}
-          {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
+          {activeTab === 'Overview' && <>
+            <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+            <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />
+          </>}
+          {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schoolOverrides={schoolOverrides} setSchoolOverrides={setSchoolOverrides} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} />}
