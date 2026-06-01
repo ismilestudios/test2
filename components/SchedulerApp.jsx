@@ -67,6 +67,50 @@ function displayPhotographerAssignment(event) {
   return event.photographers?.length ? event.photographers.join(', ') : 'Needs Photographers Assigned';
 }
 
+function normalizeSchoolLookupKey(value = '') {
+  return String(value)
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+const SCHOOL_IRM_LOOKUP = new Map(
+  SCHOOLS.map((school) => [normalizeSchoolLookupKey(school.name), school.irm]).filter(([, irm]) => irm !== undefined && irm !== null && irm !== '')
+);
+
+function getSchoolListIrmForEvent(event) {
+  const candidates = [event?.canonicalSchool, event?.title].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const directKey = normalizeSchoolLookupKey(candidate);
+    if (SCHOOL_IRM_LOOKUP.has(directKey)) return SCHOOL_IRM_LOOKUP.get(directKey);
+  }
+
+  for (const candidate of candidates) {
+    const eventKey = normalizeSchoolLookupKey(candidate);
+    if (!eventKey) continue;
+
+    for (const [schoolKey, irm] of SCHOOL_IRM_LOOKUP.entries()) {
+      if (schoolKey && (eventKey.includes(schoolKey) || schoolKey.includes(eventKey))) return irm;
+    }
+  }
+
+  return null;
+}
+
+function getEventIrm(event) {
+  if (event?.irm !== undefined && event?.irm !== null && event?.irm !== '') return event.irm;
+
+  // Makeup Days and Rain Dates often do not include IRM in the imported calendar title.
+  // For those operational follow-up dates, pull the IRM from the matched School List account.
+  if (event?.type === 'Makeup Day' || event?.type === 'Rain Date') {
+    return getSchoolListIrmForEvent(event);
+  }
+
+  return null;
+}
+
 function EventCard({ event, onClick, compact = false }) {
   return (
     <motion.button
@@ -84,7 +128,7 @@ function EventCard({ event, onClick, compact = false }) {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
-          {event.irm ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {event.irm}</Pill> : null}
+          {getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
         </div>
       </div>
       {!compact && (
@@ -322,7 +366,7 @@ function WeekView({ events, selectedDate, onClick }) {
                         </div>
                         <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
                           <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
-                          {event.irm ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {event.irm}</Pill> : null}
+                          {getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
                           {rolloutCount ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{rolloutCount} rollout{rolloutCount === 1 ? '' : 's'}</Pill> : null}
                         </div>
                       </button>
@@ -912,7 +956,7 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
 }
 
 function Drawer({ event, onClose, onViewSchool }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{event.irm ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {event.irm}</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<Info icon={UserRoundCheck} title="Photographers Assigned" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={event.assistants.length ? event.assistants.join(', ') : '—'} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={Clock} title="IRM" value={event.irm ? `${event.irm} — informational only` : '—'} /><Info icon={Pencil} title="Notes" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">This is still a frontend-only prototype. Update this data file in GitHub for now; add Supabase later for live editing and persistence.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<Info icon={UserRoundCheck} title="Photographers Assigned" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={event.assistants.length ? event.assistants.join(', ') : '—'} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={Clock} title="IRM" value={getEventIrm(event) ? `${getEventIrm(event)} — informational only` : '—'} /><Info icon={Pencil} title="Notes" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">This is still a frontend-only prototype. Update this data file in GitHub for now; add Supabase later for live editing and persistence.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
