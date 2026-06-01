@@ -1013,8 +1013,8 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-xl">
-              <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-600">Click a school to schedule it for Fall 2026. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
+              <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled <span className="text-zinc-500">[Fall 2026]</span></h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">Click a school to review it for Fall 2026 scheduling. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
             </div>
             <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
               <button type="button" onClick={() => setAddingEvent(true)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button>
@@ -1023,7 +1023,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
           </div>
           <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
             {filteredSchools.map(item => (
-              <button key={item.name} onClick={() => { setSelectedSchool(item); setSchedulingSchool(item); }} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+              <button key={item.name} onClick={() => setSelectedSchool(item)} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-sm font-semibold text-zinc-950">{item.displayName || item.name}</div>
@@ -1038,28 +1038,40 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
           </div>
         </section>
 
-        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
-            <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Empty means nothing has been scheduled yet.</p>
-          </div>
-          <div className="max-h-[680px] space-y-2 overflow-auto pr-1">
-            {availability.map(day => (
-              <div key={day.date} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-900">{formatDate(day.date)}</div>
-                    <div className="mt-1 text-xs text-zinc-500">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
-                  </div>
-                  <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photographers open</Pill>
-                </div>
-                <div className="mt-2 text-xs text-zinc-600">Available: {day.availablePhotographers.join(', ') || '—'}</div>
+        <section className="space-y-3">
+          <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-zinc-950">Selected School</h2>
+                <p className="mt-1 text-sm text-zinc-600">Review history, contacts, notes, and prior assignments before scheduling.</p>
               </div>
-            ))}
+              {selectedSchool ? <button type="button" onClick={() => setSchedulingSchool(selectedSchool)} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Schedule for Fall 2026</button> : null}
+            </div>
+            <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
           </div>
         </section>
       </div>
-      <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
+
+      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
+          <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Empty means nothing has been scheduled yet.</p>
+        </div>
+        <div className="grid max-h-[520px] gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+          {availability.map(day => (
+            <div key={day.date} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-zinc-900">{formatDate(day.date)}</div>
+                  <div className="mt-1 text-xs text-zinc-500">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
+                </div>
+                <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photographers open</Pill>
+              </div>
+              <div className="mt-2 text-xs text-zinc-600">Available: {day.availablePhotographers.join(', ') || '—'}</div>
+            </div>
+          ))}
+        </div>
+      </section>
       <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
     </div>
