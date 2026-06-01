@@ -108,3 +108,11 @@ Validated with:
 ```bash
 npm run build
 ```
+
+
+## Latest Update — School Log Notes
+
+- Correlated notes from `School Log.pdf` into the School List data.
+- Notes are appended to each matched school in this format: `From School Log: ...`.
+- Included operational/logistical notes for schools such as Albany ASH, Shen Arongen, Cairo-Durham, Central Park, Childhood Friends Rotterdam, Duanesburg Elementary, Eagle Point, Gardner Dickinson, Heatly, Hoosic Valley, Keane, KinderCare Niskayuna, Lincoln, Little Scholars, Malta Ave, Okte, Orenda, Schenectady JCC, Shaker Seniors, Shen United Methodist PK, TSL Troy, and Pleasant Valley.
+- Preserved prior School List notes; School Log notes were appended, not replaced.
