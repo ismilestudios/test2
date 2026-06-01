@@ -10,3 +10,24 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: radial-gradient(circle at top left, #DDE8D2 0, transparent 30%), #FFFDF8; }
 button, input, textarea, select { font: inherit; }
+
+
+@media (max-width: 640px) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    touch-action: manipulation;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

@@ -167,7 +167,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
                 className="w-full rounded-2xl border border-zinc-200 bg-white/80 py-3 pl-10 pr-4 text-sm outline-none ring-sage/30 transition focus:ring-4"
               />
             </label>
-            <nav className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-5">
               {tabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
@@ -178,6 +178,32 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
         </div>
       </div>
     </header>
+  );
+}
+
+
+function MobileBottomNav({ activeTab, setActiveTab }) {
+  const mobileTabs = [
+    { label: 'Today', tab: 'Overview' },
+    { label: 'Calendar', tab: 'Calendar View' },
+    { label: 'Carrie', tab: 'Carrie View' },
+    { label: 'Schools', tab: 'School List' }
+  ];
+  return (
+    <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[1.5rem] border border-zinc-200 bg-white/95 p-1 shadow-2xl backdrop-blur sm:hidden">
+      <div className="grid grid-cols-4 gap-1">
+        {mobileTabs.map(item => (
+          <button
+            key={item.tab}
+            type="button"
+            onClick={() => setActiveTab(item.tab)}
+            className={`rounded-2xl px-2 py-3 text-xs font-semibold transition ${activeTab === item.tab ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-cream'}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </nav>
   );
 }
 
@@ -302,7 +328,7 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
+  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
 
 
@@ -740,8 +766,13 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge }) {
           {school.contactTitle ? <div className="mt-1 text-xs text-zinc-500">{school.contactTitle}</div> : null}
           {school.contactPhone ? <div className="mt-2">{school.contactPhone}</div> : null}
           {school.contactEmail ? <div className="break-words">{school.contactEmail}</div> : null}
+          <div className="mt-3 grid gap-2 sm:hidden">
+            {school.contactPhone ? <a href={`tel:${school.contactPhone}`} className="rounded-2xl border border-zinc-200 bg-white px-3 py-3 text-center text-xs font-semibold text-zinc-800">Call Contact</a> : null}
+            {school.contactEmail ? <a href={`mailto:${school.contactEmail}`} className="rounded-2xl border border-zinc-200 bg-white px-3 py-3 text-center text-xs font-semibold text-zinc-800">Email Contact</a> : null}
+          </div>
         </div>
       </div>
+      {school.address ? <div className="mt-3 sm:hidden"><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer" className="block rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-3 text-center text-sm font-semibold text-zinc-900">Open Address in Maps</a></div> : null}
       <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
         <span className="font-semibold text-zinc-800">Notes:</span> {school.notes || '—'}
       </div>
@@ -799,7 +830,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
   return (
     <AnimatePresence>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-8 max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl">
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -896,7 +927,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   return (
     <AnimatePresence>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-8 max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl">
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -1113,7 +1144,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}>
-      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-6 max-h-[90vh] max-w-2xl overflow-auto rounded-[2rem] bg-cream p-5 shadow-2xl">
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-2xl overflow-auto rounded-[2rem] bg-cream p-4 shadow-2xl sm:mt-6 sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-zinc-950">Edit School</h2>
@@ -1206,7 +1237,7 @@ function MergeSchoolModal({ sourceSchool, schools, onClose, onMerge }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}>
-      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-10 max-w-2xl rounded-[2rem] bg-cream p-5 shadow-2xl">
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-2xl overflow-auto rounded-[2rem] bg-cream p-4 shadow-2xl sm:mt-10 sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-zinc-950">Merge School</h2>
@@ -1297,7 +1328,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+    <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
       <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
         <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history.</p>
@@ -1358,7 +1389,7 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
           <h2 className="text-lg font-semibold text-zinc-950">Calendar View</h2>
           <p className="mt-1 text-sm text-zinc-600">Switch between month, week, and day layouts while staying on one clean calendar page.</p>
         </div>
-        <div className="inline-flex rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm">
+        <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:inline-flex sm:w-auto">
           {['Month', 'Week', 'Day'].map(mode => (
             <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}>{mode}</button>
           ))}
@@ -1564,22 +1595,23 @@ export default function SchedulerApp() {
   return (
     <main className="min-h-screen font-sans text-zinc-900">
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-7xl space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
         <GlobalSearchResults query={query} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
-        <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-4 shadow-soft">
+        <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <><MonthNavigator month={month} setMonth={setMonth} /><PlanningBoard events={filtered} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} /></>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={filtered} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schoolOverrides={schoolOverrides} setSchoolOverrides={setSchoolOverrides} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} />}
         </section>
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="hidden gap-4 md:grid md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Assistants</h3><p className="mt-2 text-sm text-zinc-600">{assistants.join(', ')}</p></div>
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Rule</h3><p className="mt-2 text-sm text-zinc-600">Humans make scheduling decisions. This app supports reference, visibility, and notes — not automation.</p></div>
         </section>
       </div>
+      <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={selectedDate} sourceLabel="Overview" />}
       <Drawer event={selected} onClose={() => setSelected(null)} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
     </main>
