@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2 } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 import AuthStatus from './AuthStatus';
+import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members'];
 
@@ -1579,25 +1580,95 @@ function normalizeMemberName(value) {
   return value.trim().replace(/\s+/g, ' ');
 }
 
-function TeamMembers({ photographers, assistants, setPhotographers, setAssistants }) {
+function TeamMembers({ photographers, assistants, setPhotographers, setAssistants, reloadTeamMembers, teamMembersMessage }) {
   const [photographerInput, setPhotographerInput] = useState('');
   const [assistantInput, setAssistantInput] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const addMember = (role, value) => {
+  const saveMember = async (role, value) => {
     const name = normalizeMemberName(value);
     if (!name) return;
-    if (role === 'photographer') {
-      setPhotographers(prev => prev.some(item => item.toLowerCase() === name.toLowerCase()) ? prev : [...prev, name].sort((a, b) => a.localeCompare(b)));
-      setPhotographerInput('');
-    } else {
-      setAssistants(prev => prev.some(item => item.toLowerCase() === name.toLowerCase()) ? prev : [...prev, name].sort((a, b) => a.localeCompare(b)));
-      setAssistantInput('');
+
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected yet. Team members cannot be saved to the database.');
+      return;
     }
+
+    setSaving(true);
+    setMessage('');
+
+    const { data: existing, error: lookupError } = await supabase
+      .from('staff_members')
+      .select('id')
+      .eq('role', role)
+      .eq('name', name)
+      .limit(1);
+
+    if (lookupError) {
+      setSaving(false);
+      setMessage(`Could not check team member: ${lookupError.message}`);
+      return;
+    }
+
+    let error = null;
+
+    if (existing?.length) {
+      const result = await supabase
+        .from('staff_members')
+        .update({ active: true, updated_at: new Date().toISOString() })
+        .eq('id', existing[0].id);
+      error = result.error;
+    } else {
+      const result = await supabase
+        .from('staff_members')
+        .insert({ name, role, active: true });
+      error = result.error;
+    }
+
+    setSaving(false);
+
+    if (error) {
+      setMessage(`Could not save team member: ${error.message}`);
+      return;
+    }
+
+    if (role === 'photographer') setPhotographerInput('');
+    else setAssistantInput('');
+
+    await reloadTeamMembers?.();
+    setMessage(`${name} is active as a ${role}.`);
   };
 
-  const removeMember = (role, name) => {
+  const deactivateMember = async (role, name) => {
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected yet. Team members cannot be deactivated.');
+      return;
+    }
+
+    setSaving(true);
+    setMessage('');
+
+    const { error } = await supabase
+      .from('staff_members')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('role', role)
+      .eq('name', name);
+
+    setSaving(false);
+
+    if (error) {
+      setMessage(`Could not deactivate team member: ${error.message}`);
+      return;
+    }
+
     if (role === 'photographer') setPhotographers(prev => prev.filter(item => item !== name));
     else setAssistants(prev => prev.filter(item => item !== name));
+
+    await reloadTeamMembers?.();
+    setMessage(`${name} was deactivated, not deleted. Historical assignments can still remain intact.`);
   };
 
   const MemberEditor = ({ title, description, members, value, setValue, role }) => (
@@ -1610,7 +1681,7 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          addMember(role, value);
+          saveMember(role, value);
         }}
       >
         <input
@@ -1619,7 +1690,7 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
           placeholder={`Add ${role === 'photographer' ? 'photographer' : 'assistant'}...`}
           className="min-w-0 flex-1 rounded-2xl border border-zinc-200 bg-white/85 px-4 py-3 text-sm outline-none ring-sage/30 transition focus:ring-4"
         />
-        <button type="submit" className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">
+        <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-zinc-400">
           <Plus size={16} /> Add
         </button>
       </form>
@@ -1627,11 +1698,14 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
         {members.map(name => (
           <div key={name} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-cream/80 px-3 py-2">
             <span className="text-sm font-medium text-zinc-900">{name}</span>
-            <button type="button" onClick={() => removeMember(role, name)} className="rounded-full p-2 text-zinc-400 transition hover:bg-white hover:text-rose-600" aria-label={`Remove ${name}`}>
+            <button type="button" disabled={saving} onClick={() => deactivateMember(role, name)} className="rounded-full p-2 text-zinc-400 transition hover:bg-white hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50" aria-label={`Deactivate ${name}`} title="Deactivate, do not delete">
               <Trash2 size={16} />
             </button>
           </div>
         ))}
+        {!members.length ? (
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-3 text-sm text-zinc-500">No active {role === 'photographer' ? 'photographers' : 'assistants'} yet.</div>
+        ) : null}
       </div>
     </section>
   );
@@ -1640,11 +1714,13 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
     <div className="space-y-4">
       <section className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/60 p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-950">Team Members</h2>
-        <p className="mt-1 text-sm text-zinc-700">Add or remove the photographers and assistants available for future scheduling. These changes save in this browser for now; a database can make them shared for everyone later.</p>
+        <p className="mt-1 text-sm text-zinc-700">Team Members now save to Supabase. Use the trash icon to deactivate someone instead of deleting them, so historical staffing remains usable later.</p>
+        {teamMembersMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{teamMembersMessage}</p> : null}
+        {message ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{message}</p> : null}
       </section>
       <div className="grid gap-4 lg:grid-cols-2">
-        <MemberEditor title="Photographers" description="Used by Carrie View availability and future assignment lists." members={photographers} value={photographerInput} setValue={setPhotographerInput} role="photographer" />
-        <MemberEditor title="Assistants" description="Used as the active assistant roster for scheduling reference." members={assistants} value={assistantInput} setValue={setAssistantInput} role="assistant" />
+        <MemberEditor title="Photographers" description="Active photographers available for future scheduling." members={photographers} value={photographerInput} setValue={setPhotographerInput} role="photographer" />
+        <MemberEditor title="Assistants" description="Active assistants available for future scheduling." members={assistants} value={assistantInput} setValue={setAssistantInput} role="assistant" />
       </div>
     </div>
   );
@@ -1712,33 +1788,83 @@ export default function SchedulerApp() {
   const [selected, setSelected] = useState(null);
   const [photographers, setPhotographers] = useState(PHOTOGRAPHERS);
   const [assistants, setAssistants] = useState(ASSISTANTS);
+  const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
   const [customEvents, setCustomEvents] = useState([]);
   const [addingEvent, setAddingEvent] = useState(false);
   const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
   const [schoolOverrides, setSchoolOverrides] = useState({});
 
+  const loadTeamMembersFromSupabase = async () => {
+    if (!hasSupabaseEnv()) {
+      setTeamMembersMessage('Supabase is not connected yet. Using the built-in team member list.');
+      return;
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      setTeamMembersMessage('Supabase client was not available. Using the built-in team member list.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('staff_members')
+      .select('name, role, active')
+      .in('role', ['photographer', 'assistant'])
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.warn('Could not load team members from Supabase', error);
+      setTeamMembersMessage(`Could not load team members from Supabase: ${error.message}. Using the built-in list for now.`);
+      return;
+    }
+
+    if (!data?.length) {
+      const seedRows = [
+        ...PHOTOGRAPHERS.map(name => ({ name, role: 'photographer', active: true })),
+        ...ASSISTANTS.map(name => ({ name, role: 'assistant', active: true }))
+      ];
+
+      const { error: seedError } = await supabase.from('staff_members').insert(seedRows);
+
+      if (seedError) {
+        console.warn('Could not seed team members into Supabase', seedError);
+        setTeamMembersMessage(`Supabase team member table is empty, but seeding failed: ${seedError.message}. Check staff_members permissions.`);
+        return;
+      }
+
+      setPhotographers([...PHOTOGRAPHERS].sort((a, b) => a.localeCompare(b)));
+      setAssistants([...ASSISTANTS].sort((a, b) => a.localeCompare(b)));
+      setTeamMembersMessage('Seeded the starter photographers and assistants into Supabase.');
+      return;
+    }
+
+    const activePhotographers = data
+      .filter(member => member.active && member.role === 'photographer')
+      .map(member => member.name)
+      .sort((a, b) => a.localeCompare(b));
+
+    const activeAssistants = data
+      .filter(member => member.active && member.role === 'assistant')
+      .map(member => member.name)
+      .sort((a, b) => a.localeCompare(b));
+
+    setPhotographers(activePhotographers);
+    setAssistants(activeAssistants);
+    setTeamMembersMessage('Team Members are loading from Supabase.');
+  };
+
   useEffect(() => {
     try {
-      const savedPhotographers = window.localStorage.getItem('ismile.photographers');
-      const savedAssistants = window.localStorage.getItem('ismile.assistants');
-      if (savedPhotographers) setPhotographers(JSON.parse(savedPhotographers));
-      if (savedAssistants) setAssistants(JSON.parse(savedAssistants));
       const savedEvents = window.localStorage.getItem('ismile.customEvents');
       if (savedEvents) setCustomEvents(JSON.parse(savedEvents));
       const savedSchoolOverrides = window.localStorage.getItem('ismile.schoolOverrides');
       if (savedSchoolOverrides) setSchoolOverrides(JSON.parse(savedSchoolOverrides));
     } catch (error) {
-      console.warn('Could not load saved team members', error);
+      console.warn('Could not load saved local scheduling data', error);
     }
+
+    loadTeamMembersFromSupabase();
   }, []);
-
-  useEffect(() => {
-    try { window.localStorage.setItem('ismile.photographers', JSON.stringify(photographers)); } catch {}
-  }, [photographers]);
-
-  useEffect(() => {
-    try { window.localStorage.setItem('ismile.assistants', JSON.stringify(assistants)); } catch {}
-  }, [assistants]);
 
   useEffect(() => {
     try { window.localStorage.setItem('ismile.customEvents', JSON.stringify(customEvents)); } catch {}
@@ -1786,7 +1912,7 @@ export default function SchedulerApp() {
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schoolOverrides={schoolOverrides} setSchoolOverrides={setSchoolOverrides} />}
-          {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} />}
+          {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>

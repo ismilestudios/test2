@@ -106,3 +106,18 @@ Recommended while testing:
 - Either create the first user manually in Authentication → Users, OR use "Create account" in the app.
 - If email confirmation is enabled, confirm the email before logging in.
 - If you want the quickest internal test, temporarily turn off "Confirm email" while creating your first test user, then turn it back on later if desired.
+
+
+## Team Members moved to Supabase
+
+This build reads active photographers and assistants from the existing `public.staff_members` table.
+
+Run this extra migration in Supabase SQL Editor after the original schema:
+
+`supabase/team_members_migration.sql`
+
+Important behavior:
+- Add = inserts a staff member, or reactivates an existing inactive one with the same name/role.
+- Trash icon = deactivates the staff member by setting `active = false`.
+- Historical schedules should later keep references to inactive people instead of losing them.
+- If the table is empty, the app seeds the starter photographer/assistant lists into Supabase on first load.
