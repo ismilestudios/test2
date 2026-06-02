@@ -16,8 +16,14 @@ export default function AuthStatus() {
     const supabase = createClient();
     if (!supabase) return;
 
-    supabase.auth.getSession().then(({ data }) => {
-      setUserEmail(data.session?.user?.email || null);
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session?.user?.email) {
+        setUserEmail(data.session.user.email);
+        return;
+      }
+
+      const { data: userData } = await supabase.auth.getUser();
+      setUserEmail(userData.user?.email || null);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {

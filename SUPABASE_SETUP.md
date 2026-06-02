@@ -81,3 +81,13 @@ The next code pass should move data in this order:
 6. images/storage
 
 Do not migrate everything at once. Keep one fallback version before each step.
+
+
+## Auth callback note
+
+This build supports both Supabase email callback formats:
+
+- `?code=...` via `exchangeCodeForSession`
+- `?token_hash=...&type=email` via `verifyOtp`
+
+If login redirects to the app but still shows "Login", check Vercel logs for `Supabase auth callback error`.

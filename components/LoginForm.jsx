@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 export default function LoginForm() {
@@ -8,6 +8,12 @@ export default function LoginForm() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const configured = hasSupabaseEnv();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    if (error) setMessage(`Login link problem: ${error}`);
+  }, []);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -23,7 +29,7 @@ export default function LoginForm() {
     const origin = window.location.origin;
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${origin}/auth/callback` }
+      options: { emailRedirectTo: `${origin}/auth/callback?next=/` }
     });
     setLoading(false);
 
