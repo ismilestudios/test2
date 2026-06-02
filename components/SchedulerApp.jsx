@@ -400,7 +400,7 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button type="button" onClick={onAddEvent} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button>
+        <button type="button" onClick={onAddEvent} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add Event</button>
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
       {overviewColumns.map(column => {
@@ -866,34 +866,34 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         ) : null}
       </div>
 
-      <div className={`${compact ? 'mt-4 grid gap-3' : 'mt-5 grid gap-3 md:grid-cols-2'}`}>
-        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
-          <div className="font-semibold text-zinc-800">Address</div>
-          <div className="mt-1 whitespace-pre-wrap">{addressLine || '—'}</div>
-          {school.address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-[#DDE8D2]">Open in Maps</a> : null}
+      <div className={`${compact ? 'mt-4 grid gap-3' : 'mt-5 grid gap-3 lg:grid-cols-3'}`}>
+        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
+          <div className="text-sm font-semibold text-zinc-800">Address</div>
+          <div className="mt-1 whitespace-pre-wrap leading-5">{addressLine || '—'}</div>
+          {school.address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-[#DDE8D2]">Maps</a> : null}
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
-          <div className="font-semibold text-zinc-800">Primary Contact</div>
-          <div className="mt-1">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || '—'}</div>
-          {school.contactTitle ? <div className="mt-1 text-xs text-zinc-500">{school.contactTitle}</div> : null}
-          {school.contactPhone ? <div className="mt-2">{school.contactPhone}</div> : null}
+        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
+          <div className="text-sm font-semibold text-zinc-800">Primary Contact</div>
+          <div className="mt-1 text-sm font-medium text-zinc-700">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || '—'}</div>
+          {school.contactTitle ? <div className="mt-0.5 text-xs text-zinc-500">{school.contactTitle}</div> : null}
+          {school.contactPhone ? <div className="mt-1">{school.contactPhone}</div> : null}
           {school.contactEmail ? <div className="break-words">{school.contactEmail}</div> : null}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {school.contactPhone ? <a href={`tel:${school.contactPhone}`} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800">Call</a> : null}
-            {school.contactEmail ? <a href={`mailto:${school.contactEmail}`} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800">Email</a> : null}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {school.contactPhone ? <a href={`tel:${school.contactPhone}`} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800">Call</a> : null}
+            {school.contactEmail ? <a href={`mailto:${school.contactEmail}`} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800">Email</a> : null}
           </div>
         </div>
-      </div>
 
-      <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-zinc-800">Notes on School</div>
-          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Edit Notes</button> : null}
+        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-semibold text-zinc-800">Notes on School</div>
+            {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Edit</button> : null}
+          </div>
+          <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-1.5 w-full rounded-xl p-1.5 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
+            <div className="line-clamp-5 whitespace-pre-wrap leading-5">{school.notes || '—'}</div>
+          </button>
         </div>
-        <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-2 w-full rounded-xl p-2 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
-          <div className="whitespace-pre-wrap">{school.notes || '—'}</div>
-        </button>
       </div>
 
       <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-5 grid gap-3 md:grid-cols-4'}`}>
@@ -1074,7 +1074,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   const save = () => {
     const cleanName = schoolName.trim();
     if (!cleanName) {
-      setError('Please choose an existing school/account or type a new name.');
+      setError('Please choose or type the school/account this event belongs to.');
       return;
     }
     const cleanTitle = title.trim() || `${cleanName} ${eventType}`;
@@ -1092,7 +1092,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       time: 'TBD',
       notes: notes || '',
       rainInfo: '',
-      history: matchedSchool ? 'Created from Add School or Event using an existing school/account.' : 'Created from Add School or Event using a new school/account name.'
+      history: matchedSchool ? 'Created from Add Event using an existing school/account.' : 'Created from Add Event using a new school/account name.'
     };
     onSave(event);
     onClose();
@@ -1105,9 +1105,9 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Add School or Event</Pill>
-                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">Create a scheduled item</h2>
-                <p className="mt-1 text-sm text-zinc-600">Choose from the school list or type a new school/account name. The name is required.</p>
+                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Add Event</Pill>
+                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">Create an event</h2>
+                <p className="mt-1 text-sm text-zinc-600">Choose an existing school or type a school/account name to associate this event with.</p>
               </div>
               <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
             </div>
@@ -1128,18 +1128,18 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">School / Event Name <span className="text-rose-600">*</span></div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account <span className="text-rose-600">*</span></div>
                 <input
                   list="school-account-options"
                   value={schoolName}
                   onChange={(e) => { setSchoolName(e.target.value); setError(''); }}
-                  placeholder="Select from list or type a new name"
+                  placeholder="Select or type school/account name"
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4"
                 />
                 <datalist id="school-account-options">
                   {schoolOptions.map(name => <option key={name} value={name} />)}
                 </datalist>
-                <div className="mt-2 text-xs text-zinc-500">Existing schools auto-fill IRM when available. New names are allowed.</div>
+                <div className="mt-2 text-xs text-zinc-500">This associates the event with a school/account name. It does not create a School List record.</div>
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
@@ -1167,12 +1167,137 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   );
 }
 
-function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule }) {
+
+function AddSchoolModal({ onClose, onSave }) {
+  const [name, setName] = useState('');
+  const [irm, setIrm] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [stateZip, setStateZip] = useState('');
+  const [contactFirst, setContactFirst] = useState('');
+  const [contactLast, setContactLast] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactTitle, setContactTitle] = useState('');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+
+  const save = () => {
+    const cleanName = name.trim();
+    if (!cleanName) {
+      setError('Please enter a school/account name.');
+      return;
+    }
+
+    onSave({
+      name: cleanName,
+      originalName: cleanName,
+      irm,
+      address,
+      city,
+      stateZip,
+      contactFirst,
+      contactLast,
+      contactPhone,
+      contactEmail,
+      contactTitle,
+      notes,
+      referenceImages: [],
+      active: true
+    });
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
+          <div className="border-b border-zinc-200 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Add School</Pill>
+                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">Create a School List record</h2>
+                <p className="mt-1 text-sm text-zinc-600">This adds a school/account to the School List database only. It does not create a calendar event.</p>
+              </div>
+              <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
+            </div>
+          </div>
+
+          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
+            {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4 md:col-span-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">School / Account Name <span className="text-rose-600">*</span></div>
+                <input value={name} onChange={(e) => { setName(e.target.value); setError(''); }} placeholder="Example: New School Name (District)" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">IRM</div>
+                <input value={irm} onChange={(e) => setIrm(e.target.value)} placeholder="Optional" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Address</div>
+                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">City</div>
+                <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">State / Zip</div>
+                <input value={stateZip} onChange={(e) => setStateZip(e.target.value)} placeholder="NY 12345" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact First Name</div>
+                <input value={contactFirst} onChange={(e) => setContactFirst(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact Last Name</div>
+                <input value={contactLast} onChange={(e) => setContactLast(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact Phone</div>
+                <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact Email</div>
+                <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4 md:col-span-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact Title</div>
+                <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+            </div>
+
+            <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Notes on School</div>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Persistent notes about this school/account..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
+            <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
+            <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save School</button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule, schoolsList, setSchools, onSchoolAdded }) {
   const schools = useMemo(() => getSchoolsToSchedule(events), [events]);
   const availability = useMemo(() => getFall2026Availability(events, photographers), [events, photographers]);
   const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
   const [schedulingSchool, setSchedulingSchool] = useState(null);
   const [addingEvent, setAddingEvent] = useState(false);
+  const [addingSchool, setAddingSchool] = useState(false);
   useEffect(() => {
     if (!selectedSchool && schools.length) setSelectedSchool(schools[0]);
   }, [schools, selectedSchool]);
@@ -1181,6 +1306,34 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
   const filteredSchools = q
     ? schools.filter(item => [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
     : schools;
+
+  const saveSchool = async (schoolValues) => {
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      alert('Supabase is not connected, so this school cannot be saved yet.');
+      return;
+    }
+
+    const row = schoolToSupabaseRow(schoolValues);
+    const { data, error } = await supabase
+      .from('schools')
+      .upsert(row, { onConflict: 'original_name' })
+      .select()
+      .single();
+
+    if (error) {
+      alert(`Could not save school: ${error.message}`);
+      return;
+    }
+
+    const savedSchool = supabaseRowToSchool(data);
+    setSchools?.(prev => {
+      const without = (prev || []).filter(school => (school.originalName || school.name) !== (savedSchool.originalName || savedSchool.name));
+      return [...without, savedSchool].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    onSchoolAdded?.(savedSchool.name);
+    setAddingSchool(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -1192,7 +1345,10 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
               <p className="mt-2 text-sm leading-6 text-zinc-600">Click a school to review it for Fall 2026 scheduling. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
             </div>
             <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-              <button type="button" onClick={() => setAddingEvent(true)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <button type="button" onClick={() => setAddingEvent(true)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add Event</button>
+                <button type="button" onClick={() => setAddingSchool(true)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-5 py-3 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]"><Plus size={16} /> Add School</button>
+              </div>
               <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
             </div>
           </div>
@@ -1249,6 +1405,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
       </section>
       <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
+      {addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={saveSchool} />}
     </div>
   );
 }
@@ -2098,7 +2255,7 @@ export default function SchedulerApp() {
             <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />
           </>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
-          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
+          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
         </section>
