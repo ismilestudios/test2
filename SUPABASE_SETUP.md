@@ -136,3 +136,18 @@ Important behavior:
 - Edit School saves changes with `upsert` using `original_name` as the stable key.
 - Merge School saves the source school's `merged_into` value instead of using browser-only localStorage.
 - Current event/calendar data is still frontend/local data for now; only School List records moved in this step.
+
+
+## Events moved to Supabase
+
+This build saves new/custom events into the existing `public.events` table.
+
+Run this extra migration in Supabase SQL Editor after the original schema:
+
+`supabase/events_migration.sql`
+
+Important behavior:
+- Built-in imported/historical events remain in the app as the read-only baseline.
+- New events from Overview, Calendar View, and Carrie View save to Supabase.
+- Calendar, Overview, and Carrie View read those Supabase events together with the built-in historical events.
+- Full historical event import can happen later after this create/read flow is stable.

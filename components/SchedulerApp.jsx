@@ -1680,6 +1680,51 @@ function supabaseRowToSchool(row = {}) {
   };
 }
 
+
+function eventToSupabaseRow(event = {}) {
+  return {
+    client_event_id: event.id || `event-${Date.now()}`,
+    title: event.title || 'Untitled Event',
+    date: event.date,
+    time: event.time || null,
+    event_type: event.type || event.eventType || 'Special Event',
+    status: event.status || 'Scheduled',
+    season: event.season || getSeasonLabel(event.date || ''),
+    picture_day_info: event.notes || null,
+    canonical_school: event.canonicalSchool || null,
+    photographers: event.photographers || [],
+    assistants: event.assistants || [],
+    irm: event.irm === '' || event.irm === undefined || event.irm === null ? null : Number(event.irm),
+    rain_info: event.rainInfo || null,
+    history: event.history || null,
+    source: event.source || 'app',
+    active: event.active !== false,
+    updated_at: new Date().toISOString()
+  };
+}
+
+function supabaseRowToEvent(row = {}) {
+  return {
+    id: row.client_event_id || row.id,
+    supabaseId: row.id,
+    date: row.date,
+    title: row.title,
+    canonicalSchool: row.canonical_school || '',
+    type: row.event_type || 'Special Event',
+    status: row.status || 'Scheduled',
+    photographers: row.photographers || [],
+    assistants: row.assistants || [],
+    features: [],
+    irm: row.irm ?? null,
+    time: row.time || 'TBD',
+    notes: row.picture_day_info || '',
+    rainInfo: row.rain_info || '',
+    history: row.history || '',
+    source: row.source || 'supabase',
+    active: row.active !== false
+  };
+}
+
 function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schools, setSchools, reloadSchools, schoolsMessage }) {
   const [schoolListQuery, setSchoolListQuery] = useState('');
   const q = (schoolListQuery || query).trim().toLowerCase();
@@ -2099,11 +2144,40 @@ export default function SchedulerApp() {
   const [photographers, setPhotographers] = useState(PHOTOGRAPHERS);
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
-  const [customEvents, setCustomEvents] = useState([]);
+  const [supabaseEvents, setSupabaseEvents] = useState([]);
+  const [eventsMessage, setEventsMessage] = useState('Loading events from Supabase...');
   const [addingEvent, setAddingEvent] = useState(false);
   const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
   const [schools, setSchools] = useState(SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
   const [schoolsMessage, setSchoolsMessage] = useState('Loading schools from Supabase...');
+
+  const loadEventsFromSupabase = async () => {
+    if (!hasSupabaseEnv()) {
+      setEventsMessage('Supabase is not connected yet. New events will not be shared.');
+      return;
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      setEventsMessage('Supabase client was not available. New events will not be shared.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('active', true)
+      .order('date', { ascending: true });
+
+    if (error) {
+      console.warn('Could not load events from Supabase', error);
+      setEventsMessage(`Could not load Supabase events: ${error.message}. Run supabase/events_migration.sql and refresh.`);
+      return;
+    }
+
+    setSupabaseEvents((data || []).map(supabaseRowToEvent).filter(event => event.active !== false));
+    setEventsMessage(data?.length ? 'New/custom events are loading from Supabase.' : 'Supabase events table is ready. No custom events saved yet.');
+  };
 
   const loadSchoolsFromSupabase = async () => {
     if (!hasSupabaseEnv()) {
@@ -2213,27 +2287,46 @@ export default function SchedulerApp() {
 
   useEffect(() => {
     try {
-      const savedEvents = window.localStorage.getItem('ismile.customEvents');
-      if (savedEvents) setCustomEvents(JSON.parse(savedEvents));
-      // School List now loads from Supabase instead of localStorage.
+      // Events and School List now load from Supabase instead of localStorage.
     } catch (error) {
       console.warn('Could not load saved local scheduling data', error);
     }
 
     loadTeamMembersFromSupabase();
     loadSchoolsFromSupabase();
+    loadEventsFromSupabase();
   }, []);
 
-  useEffect(() => {
-    try { window.localStorage.setItem('ismile.customEvents', JSON.stringify(customEvents)); } catch {}
-  }, [customEvents]);
+  const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false;
+  const allEvents = useMemo(() => [...EVENTS, ...supabaseEvents].filter(isValidEvent), [supabaseEvents]);
+  const handleScheduleEvent = async (event) => {
+    const eventWithId = { ...event, id: event.id || `custom-${Date.now()}` };
 
-  const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string';
-  const allEvents = useMemo(() => [...EVENTS, ...customEvents].filter(isValidEvent), [customEvents]);
-  const handleScheduleEvent = (event) => {
-    setCustomEvents(prev => [...prev.filter(item => item.id !== event.id), event]);
-    setMonth(monthKey(event.date));
-    setSelectedDate(event.date);
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setEventsMessage('Supabase is not connected, so this event could not be saved.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .upsert(eventToSupabaseRow(eventWithId), { onConflict: 'client_event_id' })
+      .select()
+      .single();
+
+    if (error) {
+      setEventsMessage(`Could not save event to Supabase: ${error.message}. Run supabase/events_migration.sql if needed.`);
+      return;
+    }
+
+    const savedEvent = supabaseRowToEvent(data);
+    setSupabaseEvents(prev => {
+      const without = (prev || []).filter(item => item.id !== savedEvent.id);
+      return [...without, savedEvent].sort((a, b) => a.date.localeCompare(b.date));
+    });
+    setEventsMessage('Event saved to Supabase.');
+    setMonth(monthKey(savedEvent.date));
+    setSelectedDate(savedEvent.date);
     setActiveTab('Calendar View');
   };
 
@@ -2257,6 +2350,7 @@ export default function SchedulerApp() {
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="mx-auto max-w-7xl space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
+        {eventsMessage && activeTab === 'Calendar View' ? <div className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm">{eventsMessage}</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>
