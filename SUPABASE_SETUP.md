@@ -91,3 +91,18 @@ This build supports both Supabase email callback formats:
 - `?token_hash=...&type=email` via `verifyOtp`
 
 If login redirects to the app but still shows "Login", check Vercel logs for `Supabase auth callback error`.
+
+
+## Password login test flow
+
+This build uses email/password login instead of magic links.
+
+For the smoothest first test, in Supabase go to:
+
+Authentication → Providers → Email
+
+Recommended while testing:
+- Keep Email provider enabled.
+- Either create the first user manually in Authentication → Users, OR use "Create account" in the app.
+- If email confirmation is enabled, confirm the email before logging in.
+- If you want the quickest internal test, temporarily turn off "Confirm email" while creating your first test user, then turn it back on later if desired.
