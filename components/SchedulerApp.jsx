@@ -2310,7 +2310,7 @@ export default function SchedulerApp() {
 
     const { data, error } = await supabase
       .from('events')
-      .upsert(eventToSupabaseRow(eventWithId), { onConflict: 'client_event_id' })
+      .insert(eventToSupabaseRow(eventWithId))
       .select()
       .single();
 

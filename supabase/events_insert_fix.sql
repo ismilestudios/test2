@@ -1,6 +1,8 @@
--- iSmile Scheduler Events migration
--- Run this in Supabase SQL Editor after the original schema.
--- This makes new/custom events persist in Supabase.
+-- iSmile Scheduler Events insert fix
+-- Run only if you previously hit:
+-- "there is no unique or exclusion constraint matching the ON CONFLICT specification"
+
+drop index if exists events_client_event_id_unique_idx;
 
 alter table public.events
   add column if not exists client_event_id text,
@@ -13,10 +15,8 @@ alter table public.events
   add column if not exists active boolean not null default true,
   add column if not exists updated_at timestamptz not null default now();
 
-drop index if exists events_client_event_id_unique_idx;
-
 create index if not exists events_client_event_id_idx
-  on public.events (client_event_id);
+on public.events (client_event_id);
 
 alter table public.events enable row level security;
 
