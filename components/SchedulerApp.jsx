@@ -830,6 +830,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
       </div>
     );
   }
+
   const grouped = school.history.reduce((acc, event) => {
     if (!event || !event.date) return acc;
     const season = getSeasonLabel(event.date);
@@ -838,21 +839,64 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
     return acc;
   }, {});
   const seasons = ['Spring 2025', 'Fall 2025', 'Spring 2026', 'Fall 2026'];
+
+  const addressLine = [school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n');
+
   return (
     <section className={`${compact ? 'rounded-2xl p-0' : 'rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm'}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-zinc-950">{school.name}</h2>
-          <p className="mt-1 text-sm text-zinc-600">School history page: past picture days, makeups, photographers, assistants, and future scheduling status.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
+            {school.mergedFrom?.length ? <Pill className="border-zinc-200 bg-white text-zinc-600">{school.mergedFrom.length} merged</Pill> : null}
+          </div>
+          <h2 className="mt-3 text-xl font-semibold text-zinc-950">{school.name}</h2>
+          <p className="mt-1 text-sm text-zinc-600">School history page: address, primary contact, school notes, picture day history, photographers, and future scheduling status.</p>
           {school.mergedFrom?.length ? <p className="mt-1 text-xs text-zinc-500">Merged with: {school.mergedFrom.join(', ')}</p> : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
-          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50">Edit</button> : null}
-          {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/40">Merge</button> : null}
+
+        {(onEdit || onMerge) ? (
+          <div className="rounded-3xl border border-zinc-200 bg-white/80 p-3 shadow-sm lg:min-w-[190px]">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">School Actions</div>
+            <div className="grid gap-2">
+              {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit School</button> : null}
+              {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2.5 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Merge School</button> : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className={`${compact ? 'mt-4 grid gap-3' : 'mt-5 grid gap-3 md:grid-cols-2'}`}>
+        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
+          <div className="font-semibold text-zinc-800">Address</div>
+          <div className="mt-1 whitespace-pre-wrap">{addressLine || '—'}</div>
+          {school.address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-[#DDE8D2]">Open in Maps</a> : null}
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
+          <div className="font-semibold text-zinc-800">Primary Contact</div>
+          <div className="mt-1">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || '—'}</div>
+          {school.contactTitle ? <div className="mt-1 text-xs text-zinc-500">{school.contactTitle}</div> : null}
+          {school.contactPhone ? <div className="mt-2">{school.contactPhone}</div> : null}
+          {school.contactEmail ? <div className="break-words">{school.contactEmail}</div> : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {school.contactPhone ? <a href={`tel:${school.contactPhone}`} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800">Call</a> : null}
+            {school.contactEmail ? <a href={`mailto:${school.contactEmail}`} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800">Email</a> : null}
+          </div>
         </div>
       </div>
-      <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-4 grid gap-3 md:grid-cols-4'}`}>
+
+      <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="font-semibold text-zinc-800">Notes on School</div>
+          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Edit Notes</button> : null}
+        </div>
+        <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-2 w-full rounded-xl p-2 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
+          <div className="whitespace-pre-wrap">{school.notes || '—'}</div>
+        </button>
+      </div>
+
+      <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-5 grid gap-3 md:grid-cols-4'}`}>
         {seasons.map(season => {
           const events = grouped[season] || [];
           return (
@@ -873,6 +917,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
           );
         })}
       </div>
+
       <div className="mt-4 rounded-2xl border border-zinc-200 bg-white/70 p-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800"><History size={16} /> Photographer History</div>
         <div className={`${compact ? 'mt-3 grid gap-2 sm:grid-cols-2' : 'mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3'}`}>
@@ -885,33 +930,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
           )) : <div className="text-xs text-zinc-400">No photographer history imported yet.</div>}
         </div>
       </div>
-      <div className={`${compact ? 'mt-4 grid gap-3' : 'mt-4 grid gap-3 md:grid-cols-2'}`}>
-        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
-          <div className="font-semibold text-zinc-800">Address</div>
-          <div className="mt-1 whitespace-pre-wrap">{[school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n') || '—'}</div>
-        </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
-          <div className="font-semibold text-zinc-800">Primary Contact</div>
-          <div className="mt-1">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || '—'}</div>
-          {school.contactTitle ? <div className="mt-1 text-xs text-zinc-500">{school.contactTitle}</div> : null}
-          {school.contactPhone ? <div className="mt-2">{school.contactPhone}</div> : null}
-          {school.contactEmail ? <div className="break-words">{school.contactEmail}</div> : null}
-          <div className="mt-3 grid gap-2 sm:hidden">
-            {school.contactPhone ? <a href={`tel:${school.contactPhone}`} className="rounded-2xl border border-zinc-200 bg-white px-3 py-3 text-center text-xs font-semibold text-zinc-800">Call Contact</a> : null}
-            {school.contactEmail ? <a href={`mailto:${school.contactEmail}`} className="rounded-2xl border border-zinc-200 bg-white px-3 py-3 text-center text-xs font-semibold text-zinc-800">Email Contact</a> : null}
-          </div>
-        </div>
-      </div>
-      {school.address ? <div className="mt-3 sm:hidden"><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer" className="block rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-3 text-center text-sm font-semibold text-zinc-900">Open Address in Maps</a></div> : null}
-      <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-zinc-800">Notes on School</div>
-          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50">Edit Notes</button> : null}
-        </div>
-        <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-2 w-full rounded-xl p-2 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
-          <div className="whitespace-pre-wrap">{school.notes || '—'}</div>
-        </button>
-      </div>
+
       <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
         <div className="flex items-center gap-2 font-semibold text-zinc-800"><Pencil size={16} /> Picture Day Info History</div>
         {getPictureDayInfoHistory(school.history).length ? (
@@ -931,306 +950,21 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
           </div>
         ) : <div className="mt-2 text-xs text-zinc-400">No picture day info imported yet.</div>}
       </div>
+
       <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
         <div className="flex items-center gap-2 font-semibold text-zinc-800"><ImageIcon size={16} /> Reference Images</div>
         {school.referenceImages?.length ? (
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {school.referenceImages.map((image) => (
-              <a key={image.id} href={image.src} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70 transition hover:bg-white hover:shadow-sm">
-                <img src={image.src} alt={image.caption || 'School reference'} className="h-36 w-full object-cover transition group-hover:scale-[1.02]" />
-                <div className="p-2 text-xs text-zinc-600">{image.caption || 'Reference image'}</div>
+              <a key={image.id || image.src} href={image.src} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70 transition hover:bg-white hover:shadow-sm">
+                <img src={image.src} alt={image.caption || 'School reference'} className="h-32 w-full object-cover transition group-hover:scale-[1.02]" />
+                <div className="p-2 text-xs font-medium text-zinc-700">{image.caption || 'Reference image'}</div>
               </a>
             ))}
           </div>
-        ) : <div className="mt-2 text-xs text-zinc-400">No reference images yet.</div>}
+        ) : <div className="mt-2 text-xs text-zinc-400">No reference images added yet.</div>}
       </div>
     </section>
-  );
-}
-
-
-function SchedulingModal({ school, photographers, assistants, events = [], onClose, onSave }) {
-  const [date, setDate] = useState('2026-09-01');
-  const [selectedPhotographers, setSelectedPhotographers] = useState([]);
-  const [selectedAssistants, setSelectedAssistants] = useState([]);
-  const [notes, setNotes] = useState('');
-
-  if (!school) return null;
-
-  const toggleName = (name, setter) => {
-    setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
-  };
-
-  const saveSchedule = () => {
-    const event = {
-      id: `2026-${school.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
-      date,
-      title: `${school.name} Fall Picture Day`,
-      canonicalSchool: school.name,
-      type: 'Fall Picture Day',
-      status: selectedPhotographers.length ? 'Need Assistant(s) Assigned' : 'Needs Photographers Assigned',
-      photographers: selectedPhotographers,
-      assistants: selectedAssistants,
-      features: [],
-      irm: school.irm || null,
-      time: 'TBD',
-      notes: notes || 'Need Assistant(s) Assigned from Carrie View. Details can be refined later.',
-      rainInfo: '',
-      history: school.lastEvent ? `Fall 2025 reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Assigned photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
-    };
-    onSave(event);
-    onClose();
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
-          <div className="border-b border-zinc-200 p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Schedule Fall 2026</Pill>
-                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">{school.name}</h2>
-                <p className="mt-1 text-sm text-zinc-600">Pick a date and assign the team. This saves locally in the prototype for now.</p>
-              </div>
-              <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
-            </div>
-          </div>
-
-          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Fall 2026 Date</div>
-                <input type="date" min="2026-09-01" max="2026-11-30" value={date} onChange={(e) => setDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-              </label>
-              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">2025 Reference</div>
-                <div className="mt-2 text-sm text-zinc-800">{school.lastEvent ? `${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}` : 'No matched Fall 2025 reference yet.'}</div>
-                <div className="mt-1 text-xs text-zinc-500">Assigned: {school.lastEvent?.photographers?.length ? school.lastEvent.photographers.join(', ') : '—'}</div>
-              </div>
-            </div>
-
-            <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={school.name} />
-
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {assistants.map(name => (
-                  <button key={name} type="button" onClick={() => toggleName(name, setSelectedAssistants)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>
-                ))}
-              </div>
-            </section>
-
-            <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Info</div>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Optional info for this specific picture day/shoot..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-            </label>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
-            <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
-            <button type="button" onClick={saveSchedule} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save Schedule</button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
-
-function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = '2026-09-01', sourceLabel = 'prototype' }) {
-  const [date, setDate] = useState(defaultDate);
-  const [title, setTitle] = useState('');
-  const [schoolName, setSchoolName] = useState('');
-  const [eventType, setEventType] = useState('Fall Picture Day');
-  const [selectedPhotographers, setSelectedPhotographers] = useState([]);
-  const [selectedAssistants, setSelectedAssistants] = useState([]);
-  const [notes, setNotes] = useState('');
-  const [error, setError] = useState('');
-
-  const schoolOptions = useMemo(() => SCHOOLS.map(school => school.name).sort((a, b) => a.localeCompare(b)), []);
-  const matchedSchool = useMemo(() => SCHOOLS.find(school => school.name.toLowerCase() === schoolName.trim().toLowerCase()), [schoolName]);
-
-  const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
-  const save = () => {
-    const cleanName = schoolName.trim();
-    if (!cleanName) {
-      setError('Please choose an existing school/account or type a new name.');
-      return;
-    }
-    const cleanTitle = title.trim() || `${cleanName} ${eventType}`;
-    const event = {
-      id: `custom-${Date.now()}`,
-      date,
-      title: cleanTitle,
-      canonicalSchool: cleanName,
-      type: eventType,
-      status: selectedPhotographers.length ? 'Need Assistant(s) Assigned' : 'Needs Photographers Assigned',
-      photographers: selectedPhotographers,
-      assistants: selectedAssistants,
-      features: [],
-      irm: matchedSchool?.irm || null,
-      time: 'TBD',
-      notes: notes || '',
-      rainInfo: '',
-      history: matchedSchool ? 'Created from Add School or Event using an existing school/account.' : 'Created from Add School or Event using a new school/account name.'
-    };
-    onSave(event);
-    onClose();
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
-          <div className="border-b border-zinc-200 p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Add School or Event</Pill>
-                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">Create a scheduled item</h2>
-                <p className="mt-1 text-sm text-zinc-600">Choose from the school list or type a new school/account name. The name is required.</p>
-              </div>
-              <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
-            </div>
-          </div>
-          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
-            {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Date</div>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-              </label>
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Event Type</div>
-                <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4">
-                  {Object.keys(TYPE_COLORS).map(type => <option key={type} value={type}>{type}</option>)}
-                </select>
-              </label>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">School / Event Name <span className="text-rose-600">*</span></div>
-                <input
-                  list="school-account-options"
-                  value={schoolName}
-                  onChange={(e) => { setSchoolName(e.target.value); setError(''); }}
-                  placeholder="Select from list or type a new name"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4"
-                />
-                <datalist id="school-account-options">
-                  {schoolOptions.map(name => <option key={name} value={name} />)}
-                </datalist>
-                <div className="mt-2 text-xs text-zinc-500">Existing schools auto-fill IRM when available. New names are allowed.</div>
-              </label>
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills from name/type" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                {matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
-              </label>
-            </div>
-            <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
-              <div className="mt-3 flex flex-wrap gap-2">{assistants.map(name => <button key={name} type="button" onClick={() => toggleName(name, setSelectedAssistants)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}</div>
-            </section>
-            <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Info</div>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Optional info for this specific event/shoot..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-            </label>
-          </div>
-          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
-            <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
-            <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save Event</button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
-function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule }) {
-  const schools = useMemo(() => getSchoolsToSchedule(events), [events]);
-  const availability = useMemo(() => getFall2026Availability(events, photographers), [events, photographers]);
-  const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
-  const [schedulingSchool, setSchedulingSchool] = useState(null);
-  const [addingEvent, setAddingEvent] = useState(false);
-  useEffect(() => {
-    if (!selectedSchool && schools.length) setSelectedSchool(schools[0]);
-  }, [schools, selectedSchool]);
-
-  const q = query.trim().toLowerCase();
-  const filteredSchools = q
-    ? schools.filter(item => [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
-    : schools;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.25fr)]">
-        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[680px] xl:flex-col xl:overflow-hidden">
-          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="max-w-xl">
-              <h2 className="text-lg font-semibold text-zinc-950">To Be Need Assistant(s) Assigned <span className="text-zinc-500">[Fall 2026]</span></h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-600">Click a school to review it for Fall 2026 scheduling. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
-            </div>
-            <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-              <button type="button" onClick={() => setAddingEvent(true)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add School or Event</button>
-              <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
-            </div>
-          </div>
-          <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:pr-1">
-            {filteredSchools.map(item => (
-              <button key={item.name} onClick={() => setSelectedSchool(item)} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-950">{item.displayName || item.name}</div>
-                    <div className="mt-1 text-xs text-zinc-500">{item.lastEvent ? `2025 reference: ${formatDate(item.lastEvent.date)}` : 'No imported Fall 2025 event matched yet'}</div>
-                  </div>
-                  {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
-                </div>
-                <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
-                {item.lastEvent ? <div className="mt-2 text-xs text-zinc-500">2025 Fall assigned: {item.referencePhotographers?.length ? item.referencePhotographers.join(', ') : '—'}</div> : null}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:max-h-[680px] xl:overflow-auto">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-zinc-950">Selected School</h2>
-                <p className="mt-1 text-sm text-zinc-600">Review history, contacts, notes, and prior assignments before scheduling.</p>
-              </div>
-              {selectedSchool ? <button type="button" onClick={() => setSchedulingSchool(selectedSchool)} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Schedule for Fall 2026</button> : null}
-            </div>
-            <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} compact />
-          </div>
-        </section>
-      </div>
-
-      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
-          <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Empty means nothing has been scheduled yet.</p>
-        </div>
-        <div className="grid max-h-[520px] gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
-          {availability.map(day => (
-            <div key={day.date} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-zinc-900">{formatDate(day.date)}</div>
-                  <div className="mt-1 text-xs text-zinc-500">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
-                </div>
-                <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photographers open</Pill>
-              </div>
-              <div className="mt-2 text-xs text-zinc-600">Available: {day.availablePhotographers.join(', ') || '—'}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-      <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
-      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
-    </div>
   );
 }
 
@@ -1613,7 +1347,17 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
           <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history. Edits now save to Supabase.</p>
-          <div className="mt-4 max-h-[760px] space-y-2 overflow-auto pr-1">
+          <div className="mt-4">
+            <input
+              type="text"
+              value={query}
+              readOnly
+              placeholder="Search schools, contacts, notes, photographers..."
+              className="w-full rounded-2xl border border-zinc-200 bg-white/90 px-4 py-3 text-sm text-zinc-700 shadow-sm outline-none ring-sage/30 placeholder:text-zinc-400 focus:ring-4"
+            />
+          </div>
+
+          <div className="mt-3 max-h-[760px] space-y-2 overflow-auto pr-1">
             {filtered.map(school => (
               <button key={school.originalName || school.name} onClick={() => setSelectedName(school.name)} className={`w-full rounded-2xl border p-3 text-left text-sm transition hover:bg-white ${selected?.originalName === school.originalName ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="font-semibold text-zinc-900">{school.name}</div>
