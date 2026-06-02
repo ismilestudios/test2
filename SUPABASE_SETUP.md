@@ -121,3 +121,18 @@ Important behavior:
 - Trash icon = deactivates the staff member by setting `active = false`.
 - Historical schedules should later keep references to inactive people instead of losing them.
 - If the table is empty, the app seeds the starter photographer/assistant lists into Supabase on first load.
+
+
+## School List moved to Supabase
+
+This build reads and writes School List records through the `public.schools` table.
+
+Run this extra migration in Supabase SQL Editor after the original schema:
+
+`supabase/schools_migration.sql`
+
+Important behavior:
+- If the schools table is empty, the app seeds the current built-in `SCHOOLS` list into Supabase.
+- Edit School saves changes with `upsert` using `original_name` as the stable key.
+- Merge School saves the source school's `merged_into` value instead of using browser-only localStorage.
+- Current event/calendar data is still frontend/local data for now; only School List records moved in this step.

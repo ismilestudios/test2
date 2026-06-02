@@ -1433,93 +1433,204 @@ function MergeSchoolModal({ sourceSchool, schools, onClose, onMerge }) {
   );
 }
 
-function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schoolOverrides, setSchoolOverrides }) {
+
+function splitStateZip(value = '') {
+  const trimmed = String(value || '').trim();
+  const parts = trimmed.split(/\s+/);
+  if (parts.length >= 2 && /^[A-Z]{2}$/i.test(parts[0])) {
+    return { state: parts[0].toUpperCase(), zip: parts.slice(1).join(' ') };
+  }
+  return { state: '', zip: trimmed };
+}
+
+function joinStateZip(state, zip, fallback = '') {
+  const joined = [state, zip].filter(Boolean).join(' ').trim();
+  return joined || fallback || '';
+}
+
+function schoolToSupabaseRow(school = {}) {
+  const stateZipParts = splitStateZip(school.stateZip || joinStateZip(school.state, school.zip));
+  return {
+    original_name: school.originalName || school.original_name || school.name,
+    name: school.name || school.originalName || school.original_name,
+    district: school.district || null,
+    irm: school.irm === '' || school.irm === undefined || school.irm === null ? null : Number(school.irm),
+    address: school.address || null,
+    city: school.city || null,
+    state: school.state || stateZipParts.state || null,
+    zip: school.zip || stateZipParts.zip || null,
+    state_zip: school.stateZip || joinStateZip(school.state, school.zip) || null,
+    notes: school.notes || null,
+    contact_first: school.contactFirst || null,
+    contact_last: school.contactLast || null,
+    contact_phone: school.contactPhone || null,
+    contact_email: school.contactEmail || null,
+    contact_title: school.contactTitle || null,
+    reference_images: school.referenceImages || [],
+    merged_into: school.mergedInto || null,
+    active: school.active !== false,
+    updated_at: new Date().toISOString()
+  };
+}
+
+function supabaseRowToSchool(row = {}) {
+  return {
+    id: row.id,
+    originalName: row.original_name || row.name,
+    name: row.name,
+    district: row.district || '',
+    irm: row.irm ?? '',
+    address: row.address || '',
+    city: row.city || '',
+    state: row.state || '',
+    zip: row.zip || '',
+    stateZip: row.state_zip || joinStateZip(row.state, row.zip),
+    notes: row.notes || '',
+    contactFirst: row.contact_first || '',
+    contactLast: row.contact_last || '',
+    contactPhone: row.contact_phone || '',
+    contactEmail: row.contact_email || '',
+    contactTitle: row.contact_title || '',
+    referenceImages: row.reference_images || [],
+    mergedInto: row.merged_into || null,
+    active: row.active !== false
+  };
+}
+
+function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schools, setSchools, reloadSchools, schoolsMessage }) {
   const q = query.trim().toLowerCase();
+  const [editingSchool, setEditingSchool] = useState(null);
+  const [mergingSchool, setMergingSchool] = useState(null);
+  const [message, setMessage] = useState('');
+
   const mergedSourcesByTarget = useMemo(() => {
     const map = {};
-    Object.entries(schoolOverrides || {}).forEach(([sourceName, override]) => {
-      if (override?.mergedInto) {
-        map[override.mergedInto] ||= [];
-        map[override.mergedInto].push(sourceName);
+    (schools || []).forEach((school) => {
+      if (school?.mergedInto) {
+        map[school.mergedInto] ||= [];
+        map[school.mergedInto].push(school.originalName || school.name);
       }
     });
     return map;
-  }, [schoolOverrides]);
+  }, [schools]);
 
-  const schools = useMemo(() => SCHOOLS
-    .filter(school => !schoolOverrides?.[school.name]?.mergedInto)
+  const activeSchools = useMemo(() => (schools || [])
+    .filter(school => school.active !== false && !school.mergedInto)
     .map(school => {
-      const override = schoolOverrides?.[school.name] || {};
-      const mergedFrom = mergedSourcesByTarget[school.name] || [];
-      const mergedSourceSchools = mergedFrom.map(name => normalizeSchoolOverride(SCHOOLS.find(item => item.name === name) || { name }, schoolOverrides?.[name] || {}));
+      const mergedFrom = mergedSourcesByTarget[school.originalName || school.name] || [];
+      const mergedSourceSchools = mergedFrom.map(name => (schools || []).find(item => (item.originalName || item.name) === name)).filter(Boolean);
       const mergedNotes = mergedSourceSchools.map(item => item.notes).filter(Boolean);
       const mergedImages = mergedSourceSchools.flatMap(item => item.referenceImages || []);
-      const normalized = normalizeSchoolOverride(school, override);
-      const notes = [normalized.notes, ...mergedNotes.map((note, index) => `Merged from ${mergedSourceSchools[index]?.name || mergedFrom[index]}:\n${note}`)].filter(Boolean).join('\n\n');
+      const notes = [school.notes, ...mergedNotes.map((note, index) => `Merged from ${mergedSourceSchools[index]?.name || mergedFrom[index]}:\n${note}`)].filter(Boolean).join('\n\n');
+
       return {
-        ...normalized,
-        originalName: school.name,
+        ...school,
         notes,
-        referenceImages: [...(normalized.referenceImages || []), ...mergedImages],
+        referenceImages: [...(school.referenceImages || []), ...mergedImages],
         mergedFrom: mergedSourceSchools.map(item => item.name),
-        history: getSchoolHistoryForNames([school.name, ...mergedFrom], events)
+        history: getSchoolHistoryForNames([school.name, school.originalName, ...mergedFrom].filter(Boolean), events)
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name)), [events, schoolOverrides, mergedSourcesByTarget]);
+    .sort((a, b) => a.name.localeCompare(b.name)), [events, schools, mergedSourcesByTarget]);
 
-  const filtered = q ? schools.filter(school => [school.name, school.notes, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : schools;
-  const selected = schools.find(school => school.name === selectedName || school.originalName === selectedName) || filtered[0] || null;
-  const [editingSchool, setEditingSchool] = useState(null);
-  const [mergingSchool, setMergingSchool] = useState(null);
+  const filtered = q ? activeSchools.filter(school => [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : activeSchools;
+  const selected = activeSchools.find(school => school.name === selectedName || school.originalName === selectedName) || filtered[0] || null;
 
-  const saveSchool = (originalName, values) => {
-    setSchoolOverrides(prev => ({
-      ...prev,
-      [originalName]: {
-        ...(prev?.[originalName] || {}),
-        ...values
-      }
-    }));
-    setSelectedName(values.name || originalName);
+  const saveSchool = async (originalName, values) => {
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected yet. School edits cannot be saved.');
+      return;
+    }
+
+    const previous = (schools || []).find(school => (school.originalName || school.name) === originalName) || {};
+    const nextSchool = { ...previous, ...values, originalName };
+    const row = schoolToSupabaseRow(nextSchool);
+
+    const { data, error } = await supabase
+      .from('schools')
+      .upsert(row, { onConflict: 'original_name' })
+      .select()
+      .single();
+
+    if (error) {
+      setMessage(`Could not save school: ${error.message}`);
+      return;
+    }
+
+    const savedSchool = supabaseRowToSchool(data);
+    setSchools(prev => {
+      const without = (prev || []).filter(school => (school.originalName || school.name) !== originalName);
+      return [...without, savedSchool].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    setSelectedName(savedSchool.name || originalName);
     setEditingSchool(null);
+    setMessage('School changes saved to Supabase.');
   };
 
-  const mergeSchool = (sourceOriginalName, targetOriginalName) => {
-    setSchoolOverrides(prev => ({
-      ...prev,
-      [sourceOriginalName]: {
-        ...(prev?.[sourceOriginalName] || {}),
-        mergedInto: targetOriginalName
-      }
-    }));
-    const target = schools.find(school => school.originalName === targetOriginalName);
+  const mergeSchool = async (sourceOriginalName, targetOriginalName) => {
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected yet. School merges cannot be saved.');
+      return;
+    }
+
+    const source = (schools || []).find(school => (school.originalName || school.name) === sourceOriginalName);
+    if (!source) {
+      setMessage('Could not find the source school to merge.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('schools')
+      .update({ merged_into: targetOriginalName, updated_at: new Date().toISOString() })
+      .eq('original_name', sourceOriginalName)
+      .select()
+      .single();
+
+    if (error) {
+      setMessage(`Could not merge school: ${error.message}`);
+      return;
+    }
+
+    const savedSource = supabaseRowToSchool(data);
+    setSchools(prev => (prev || []).map(school => (school.originalName || school.name) === sourceOriginalName ? savedSource : school));
+    const target = activeSchools.find(school => (school.originalName || school.name) === targetOriginalName);
     setSelectedName(target?.name || targetOriginalName);
     setMergingSchool(null);
+    setMessage(`${source.name} merged into ${target?.name || targetOriginalName}.`);
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
-      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
-        <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history.</p>
-        <div className="mt-4 max-h-[760px] space-y-2 overflow-auto pr-1">
-          {filtered.map(school => (
-            <button key={school.originalName} onClick={() => setSelectedName(school.name)} className={`w-full rounded-2xl border p-3 text-left text-sm transition hover:bg-white ${selected?.originalName === school.originalName ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
-              <div className="font-semibold text-zinc-900">{school.name}</div>
-              <div className="mt-1 text-xs text-zinc-500">{school.history.length} imported record{school.history.length === 1 ? '' : 's'}{school.irm ? ` · IRM ${school.irm}` : ''}{school.mergedFrom?.length ? ` · ${school.mergedFrom.length} merged` : ''}</div>
-            </button>
-          ))}
+    <div className="space-y-3">
+      {(schoolsMessage || message) ? (
+        <div className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm">
+          {schoolsMessage ? <div>{schoolsMessage}</div> : null}
+          {message ? <div>{message}</div> : null}
         </div>
-      </section>
-      <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={setEditingSchool} onMerge={setMergingSchool} />
-      <AnimatePresence>
-        {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
-        {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={schools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
-      </AnimatePresence>
+      ) : null}
+      <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
+        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
+          <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history. Edits now save to Supabase.</p>
+          <div className="mt-4 max-h-[760px] space-y-2 overflow-auto pr-1">
+            {filtered.map(school => (
+              <button key={school.originalName || school.name} onClick={() => setSelectedName(school.name)} className={`w-full rounded-2xl border p-3 text-left text-sm transition hover:bg-white ${selected?.originalName === school.originalName ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+                <div className="font-semibold text-zinc-900">{school.name}</div>
+                <div className="mt-1 text-xs text-zinc-500">{school.history.length} imported record{school.history.length === 1 ? '' : 's'}{school.irm ? ` · IRM ${school.irm}` : ''}{school.mergedFrom?.length ? ` · ${school.mergedFrom.length} merged` : ''}</div>
+              </button>
+            ))}
+          </div>
+        </section>
+        <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={setEditingSchool} onMerge={setMergingSchool} />
+        <AnimatePresence>
+          {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
+          {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={activeSchools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
-
 
 function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelectedDate, showKey = false }) {
   const goToday = () => {
@@ -1737,10 +1848,10 @@ function Info({ icon: Icon, title, value, large = false }) {
 }
 
 
-function GlobalSearchResults({ query, events, onSelectEvent, onSelectSchool }) {
+function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, onSelectSchool }) {
   const q = query.trim().toLowerCase();
   if (!q) return null;
-  const schoolMatches = SCHOOLS.filter(school => [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0, 6);
+  const schoolMatches = (schools || []).filter(school => school.active !== false && !school.mergedInto && [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0, 6);
   const eventMatches = (events || []).filter(event => [event.title, event.canonicalSchool, event.type, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0, 8);
   if (!schoolMatches.length && !eventMatches.length) return null;
   return (
@@ -1794,7 +1905,55 @@ export default function SchedulerApp() {
   const [customEvents, setCustomEvents] = useState([]);
   const [addingEvent, setAddingEvent] = useState(false);
   const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
-  const [schoolOverrides, setSchoolOverrides] = useState({});
+  const [schools, setSchools] = useState(SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
+  const [schoolsMessage, setSchoolsMessage] = useState('Loading schools from Supabase...');
+
+  const loadSchoolsFromSupabase = async () => {
+    if (!hasSupabaseEnv()) {
+      setSchoolsMessage('Supabase is not connected yet. Using the built-in school list.');
+      return;
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      setSchoolsMessage('Supabase client was not available. Using the built-in school list.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('schools')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.warn('Could not load schools from Supabase', error);
+      setSchoolsMessage(`Could not load schools from Supabase: ${error.message}. Using the built-in list for now.`);
+      return;
+    }
+
+    if (!data?.length) {
+      const seedRows = SCHOOLS.map(school => schoolToSupabaseRow({ ...school, originalName: school.name, active: true }));
+      const { data: seeded, error: seedError } = await supabase
+        .from('schools')
+        .upsert(seedRows, { onConflict: 'original_name' })
+        .select();
+
+      if (seedError) {
+        console.warn('Could not seed schools into Supabase', seedError);
+        setSchoolsMessage(`Supabase school table is empty, but seeding failed: ${seedError.message}. Run supabase/schools_migration.sql and refresh.`);
+        return;
+      }
+
+      const seededSchools = (seeded || []).map(supabaseRowToSchool).sort((a, b) => a.name.localeCompare(b.name));
+      setSchools(seededSchools.length ? seededSchools : SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
+      setSchoolsMessage('Seeded the starter School List into Supabase.');
+      return;
+    }
+
+    const loadedSchools = data.map(supabaseRowToSchool).sort((a, b) => a.name.localeCompare(b.name));
+    setSchools(loadedSchools);
+    setSchoolsMessage('School List is loading from Supabase.');
+  };
 
   const loadTeamMembersFromSupabase = async () => {
     if (!hasSupabaseEnv()) {
@@ -1859,22 +2018,18 @@ export default function SchedulerApp() {
     try {
       const savedEvents = window.localStorage.getItem('ismile.customEvents');
       if (savedEvents) setCustomEvents(JSON.parse(savedEvents));
-      const savedSchoolOverrides = window.localStorage.getItem('ismile.schoolOverrides');
-      if (savedSchoolOverrides) setSchoolOverrides(JSON.parse(savedSchoolOverrides));
+      // School List now loads from Supabase instead of localStorage.
     } catch (error) {
       console.warn('Could not load saved local scheduling data', error);
     }
 
     loadTeamMembersFromSupabase();
+    loadSchoolsFromSupabase();
   }, []);
 
   useEffect(() => {
     try { window.localStorage.setItem('ismile.customEvents', JSON.stringify(customEvents)); } catch {}
   }, [customEvents]);
-
-  useEffect(() => {
-    try { window.localStorage.setItem('ismile.schoolOverrides', JSON.stringify(schoolOverrides)); } catch {}
-  }, [schoolOverrides]);
 
   const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string';
   const allEvents = useMemo(() => [...EVENTS, ...customEvents].filter(isValidEvent), [customEvents]);
@@ -1905,7 +2060,7 @@ export default function SchedulerApp() {
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="mx-auto max-w-7xl space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
-        <GlobalSearchResults query={query} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
+        <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>
             <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
@@ -1913,7 +2068,7 @@ export default function SchedulerApp() {
           </>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} />}
-          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schoolOverrides={schoolOverrides} setSchoolOverrides={setSchoolOverrides} />}
+          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
