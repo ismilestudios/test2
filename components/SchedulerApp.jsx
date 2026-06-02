@@ -1580,6 +1580,47 @@ function normalizeMemberName(value) {
   return value.trim().replace(/\s+/g, ' ');
 }
 
+function TeamMemberEditor({ title, description, members, value, setValue, role, saving, onSaveMember, onDeactivateMember }) {
+  return (
+    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-zinc-950">{title}</h2>
+        <p className="mt-1 text-sm text-zinc-600">{description}</p>
+      </div>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSaveMember(role, value);
+        }}
+      >
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={`Add ${role === 'photographer' ? 'photographer' : 'assistant'}...`}
+          className="min-w-0 flex-1 rounded-2xl border border-zinc-200 bg-white/85 px-4 py-3 text-sm outline-none ring-sage/30 transition focus:ring-4"
+        />
+        <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-zinc-400">
+          <Plus size={16} /> Add
+        </button>
+      </form>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {members.map(name => (
+          <div key={name} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-cream/80 px-3 py-2">
+            <span className="text-sm font-medium text-zinc-900">{name}</span>
+            <button type="button" disabled={saving} onClick={() => onDeactivateMember(role, name)} className="rounded-full p-2 text-zinc-400 transition hover:bg-white hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50" aria-label={`Deactivate ${name}`} title="Deactivate, do not delete">
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))}
+        {!members.length ? (
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-3 text-sm text-zinc-500">No active {role === 'photographer' ? 'photographers' : 'assistants'} yet.</div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function TeamMembers({ photographers, assistants, setPhotographers, setAssistants, reloadTeamMembers, teamMembersMessage }) {
   const [photographerInput, setPhotographerInput] = useState('');
   const [assistantInput, setAssistantInput] = useState('');
@@ -1671,45 +1712,6 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
     setMessage(`${name} was deactivated, not deleted. Historical assignments can still remain intact.`);
   };
 
-  const MemberEditor = ({ title, description, members, value, setValue, role }) => (
-    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-zinc-950">{title}</h2>
-        <p className="mt-1 text-sm text-zinc-600">{description}</p>
-      </div>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          saveMember(role, value);
-        }}
-      >
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={`Add ${role === 'photographer' ? 'photographer' : 'assistant'}...`}
-          className="min-w-0 flex-1 rounded-2xl border border-zinc-200 bg-white/85 px-4 py-3 text-sm outline-none ring-sage/30 transition focus:ring-4"
-        />
-        <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-zinc-400">
-          <Plus size={16} /> Add
-        </button>
-      </form>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {members.map(name => (
-          <div key={name} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-cream/80 px-3 py-2">
-            <span className="text-sm font-medium text-zinc-900">{name}</span>
-            <button type="button" disabled={saving} onClick={() => deactivateMember(role, name)} className="rounded-full p-2 text-zinc-400 transition hover:bg-white hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50" aria-label={`Deactivate ${name}`} title="Deactivate, do not delete">
-              <Trash2 size={16} />
-            </button>
-          </div>
-        ))}
-        {!members.length ? (
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-3 text-sm text-zinc-500">No active {role === 'photographer' ? 'photographers' : 'assistants'} yet.</div>
-        ) : null}
-      </div>
-    </section>
-  );
-
   return (
     <div className="space-y-4">
       <section className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/60 p-4 shadow-sm">
@@ -1719,8 +1721,8 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
         {message ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{message}</p> : null}
       </section>
       <div className="grid gap-4 lg:grid-cols-2">
-        <MemberEditor title="Photographers" description="Active photographers available for future scheduling." members={photographers} value={photographerInput} setValue={setPhotographerInput} role="photographer" />
-        <MemberEditor title="Assistants" description="Active assistants available for future scheduling." members={assistants} value={assistantInput} setValue={setAssistantInput} role="assistant" />
+        <TeamMemberEditor title="Photographers" description="Active photographers available for future scheduling." members={photographers} value={photographerInput} setValue={setPhotographerInput} role="photographer" saving={saving} onSaveMember={saveMember} onDeactivateMember={deactivateMember} />
+        <TeamMemberEditor title="Assistants" description="Active assistants available for future scheduling." members={assistants} value={assistantInput} setValue={setAssistantInput} role="assistant" saving={saving} onSaveMember={saveMember} onDeactivateMember={deactivateMember} />
       </div>
     </div>
   );
