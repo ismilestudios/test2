@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2 } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
+import AuthStatus from './AuthStatus';
 
 const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members'];
 
@@ -192,6 +193,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
                 className="w-full rounded-2xl border border-zinc-200 bg-white/80 py-3 pl-10 pr-4 text-sm outline-none ring-sage/30 transition focus:ring-4"
               />
             </label>
+            <div className="flex justify-end"><AuthStatus /></div>
             <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-5">
               {tabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
