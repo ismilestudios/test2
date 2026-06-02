@@ -95,6 +95,11 @@ function displayPhotographerAssignment(event) {
   return event.photographers?.length ? event.photographers.join(', ') : 'Needs Photographers Assigned';
 }
 
+function displayAssistants(event) {
+  if (event?.noAssistant) return 'No Assistant';
+  return event?.assistants?.length ? event.assistants.join(', ') : '—';
+}
+
 function normalizeSchoolLookupKey(value = '') {
   return String(value)
     .toLowerCase()
@@ -388,7 +393,7 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
     {
       key: 'needs-assistant',
       title: 'Need Assistant(s) Assigned',
-      filter: (event) => event.status === 'Scheduled' && (!event.assistants || event.assistants.length === 0)
+      filter: (event) => event.status === 'Scheduled' && !event.noAssistant && (!event.assistants || event.assistants.length === 0)
     },
     {
       key: 'rain-watch',
@@ -866,7 +871,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         ) : null}
       </div>
 
-      <div className={`${compact ? 'mt-4 grid gap-3' : 'mt-5 grid gap-3 lg:grid-cols-3'}`}>
+      <div className={`${compact ? 'mt-4 grid gap-3' : 'mt-5 grid gap-3 md:grid-cols-2'}`}>
         <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
           <div className="text-sm font-semibold text-zinc-800">Address</div>
           <div className="mt-1 whitespace-pre-wrap leading-5">{addressLine || '—'}</div>
@@ -884,16 +889,16 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
             {school.contactEmail ? <a href={`mailto:${school.contactEmail}`} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800">Email</a> : null}
           </div>
         </div>
+      </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm font-semibold text-zinc-800">Notes on School</div>
-            {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Edit</button> : null}
-          </div>
-          <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-1.5 w-full rounded-xl p-1.5 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
-            <div className="line-clamp-5 whitespace-pre-wrap leading-5">{school.notes || '—'}</div>
-          </button>
+      <div className="mt-3 max-w-4xl rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-zinc-800">Notes on School</div>
+          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Edit</button> : null}
         </div>
+        <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-1.5 w-full rounded-xl p-1.5 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
+          <div className="whitespace-pre-wrap leading-5">{school.notes || '—'}</div>
+        </button>
       </div>
 
       <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-5 grid gap-3 md:grid-cols-4'}`}>
@@ -972,6 +977,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
   const [date, setDate] = useState('2026-09-01');
   const [selectedPhotographers, setSelectedPhotographers] = useState([]);
   const [selectedAssistants, setSelectedAssistants] = useState([]);
+  const [noAssistant, setNoAssistant] = useState(false);
   const [notes, setNotes] = useState('');
 
   if (!school) return null;
@@ -989,7 +995,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
       type: 'Fall Picture Day',
       status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
-      assistants: selectedAssistants,
+      assistants: noAssistant ? [] : selectedAssistants,
+      noAssistant,
       features: [],
       irm: school.irm || null,
       time: 'TBD',
@@ -1034,8 +1041,9 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
               <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
                 {assistants.map(name => (
-                  <button key={name} type="button" onClick={() => toggleName(name, setSelectedAssistants)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>
+                  <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>
                 ))}
               </div>
             </section>
@@ -1057,14 +1065,16 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 }
 
 
-function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = '2026-09-01', sourceLabel = 'prototype' }) {
-  const [date, setDate] = useState(defaultDate);
-  const [title, setTitle] = useState('');
-  const [schoolName, setSchoolName] = useState('');
-  const [eventType, setEventType] = useState('Fall Picture Day');
-  const [selectedPhotographers, setSelectedPhotographers] = useState([]);
-  const [selectedAssistants, setSelectedAssistants] = useState([]);
-  const [notes, setNotes] = useState('');
+function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null }) {
+  const isEditing = Boolean(initialEvent);
+  const [date, setDate] = useState(initialEvent?.date || defaultDate);
+  const [title, setTitle] = useState(initialEvent?.title || '');
+  const [schoolName, setSchoolName] = useState(initialEvent?.canonicalSchool || '');
+  const [eventType, setEventType] = useState(initialEvent?.type || 'Fall Picture Day');
+  const [selectedPhotographers, setSelectedPhotographers] = useState(initialEvent?.photographers || []);
+  const [selectedAssistants, setSelectedAssistants] = useState(initialEvent?.assistants || []);
+  const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
+  const [notes, setNotes] = useState(initialEvent?.notes || '');
   const [error, setError] = useState('');
 
   const schoolOptions = useMemo(() => SCHOOLS.map(school => school.name).sort((a, b) => a.localeCompare(b)), []);
@@ -1079,14 +1089,16 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
     }
     const cleanTitle = title.trim() || `${cleanName} ${eventType}`;
     const event = {
-      id: `custom-${Date.now()}`,
+      id: initialEvent?.id || `custom-${Date.now()}`,
+      supabaseId: initialEvent?.supabaseId,
       date,
       title: cleanTitle,
       canonicalSchool: cleanName,
       type: eventType,
       status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
-      assistants: selectedAssistants,
+      assistants: noAssistant ? [] : selectedAssistants,
+      noAssistant,
       features: [],
       irm: matchedSchool?.irm || null,
       time: 'TBD',
@@ -1105,8 +1117,8 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Add Event</Pill>
-                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">Create an event</h2>
+                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{isEditing ? "Edit Event" : "Add Event"}</Pill>
+                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">{isEditing ? "Edit event" : "Create an event"}</h2>
                 <p className="mt-1 text-sm text-zinc-600">Choose an existing school or type a school/account name to associate this event with.</p>
               </div>
               <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
@@ -1150,7 +1162,10 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
             <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
-              <div className="mt-3 flex flex-wrap gap-2">{assistants.map(name => <button key={name} type="button" onClick={() => toggleName(name, setSelectedAssistants)} className={`rounded-full border px-3 py-2 text-sm transition ${selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
+                {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
+              </div>
             </section>
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Info</div>
@@ -1159,7 +1174,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
           </div>
           <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
-            <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save Event</button>
+            <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">{isEditing ? "Save Changes" : "Save Event"}</button>
           </div>
         </motion.div>
       </motion.div>
@@ -1694,6 +1709,7 @@ function eventToSupabaseRow(event = {}) {
     canonical_school: event.canonicalSchool || null,
     photographers: event.photographers || [],
     assistants: event.assistants || [],
+    no_assistant: Boolean(event.noAssistant),
     irm: event.irm === '' || event.irm === undefined || event.irm === null ? null : Number(event.irm),
     rain_info: event.rainInfo || null,
     history: event.history || null,
@@ -1714,6 +1730,7 @@ function supabaseRowToEvent(row = {}) {
     status: row.status || 'Scheduled',
     photographers: row.photographers || [],
     assistants: row.assistants || [],
+    noAssistant: Boolean(row.no_assistant),
     features: [],
     irm: row.irm ?? null,
     time: row.time || 'TBD',
@@ -2081,8 +2098,8 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
   );
 }
 
-function Drawer({ event, onClose, onViewSchool }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<Info icon={UserRoundCheck} title="Photographers Assigned" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={event.assistants.length ? event.assistants.join(', ') : '—'} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={Clock} title="IRM" value={getEventIrm(event) ? `${getEventIrm(event)} — informational only` : '—'} /><Info icon={Pencil} title="Picture Day Info" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">This is still a frontend-only prototype. Update this data file in GitHub for now; add Supabase later for live editing and persistence.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
+function Drawer({ event, onClose, onViewSchool, onEditEvent }) {
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Imported</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<Info icon={UserRoundCheck} title="Photographers Assigned" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={Clock} title="IRM" value={getEventIrm(event) ? `${getEventIrm(event)} — informational only` : '—'} /><Info icon={Pencil} title="Picture Day Info" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">Supabase events can be edited here. Imported historical events are currently read-only until the full historical migration.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -2137,10 +2154,11 @@ export default function SchedulerApp() {
   const [activeTab, setActiveTab] = useState('Calendar View');
   const [calendarMode, setCalendarMode] = useState('Month');
   const [overviewMode, setOverviewMode] = useState('Month');
-  const [month, setMonth] = useState('2025-09');
-  const [selectedDate, setSelectedDate] = useState('2025-09-01');
+  const [month, setMonth] = useState(monthKey(todayKey()));
+  const [selectedDate, setSelectedDate] = useState(todayKey());
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [photographers, setPhotographers] = useState(PHOTOGRAPHERS);
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
@@ -2308,11 +2326,14 @@ export default function SchedulerApp() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('events')
-      .insert(eventToSupabaseRow(eventWithId))
-      .select()
-      .single();
+    const row = eventToSupabaseRow(eventWithId);
+    const query = supabase.from('events');
+
+    const result = eventWithId.supabaseId
+      ? await query.update(row).eq('id', eventWithId.supabaseId).select().single()
+      : await query.insert(row).select().single();
+
+    const { data, error } = result;
 
     if (error) {
       setEventsMessage(`Could not save event to Supabase: ${error.message}. Run supabase/events_migration.sql if needed.`);
@@ -2321,10 +2342,12 @@ export default function SchedulerApp() {
 
     const savedEvent = supabaseRowToEvent(data);
     setSupabaseEvents(prev => {
-      const without = (prev || []).filter(item => item.id !== savedEvent.id);
+      const without = (prev || []).filter(item => item.id !== savedEvent.id && item.supabaseId !== savedEvent.supabaseId);
       return [...without, savedEvent].sort((a, b) => a.date.localeCompare(b.date));
     });
-    setEventsMessage('Event saved to Supabase.');
+    setSelected(null);
+    setEditingEvent(null);
+    setEventsMessage(eventWithId.supabaseId ? 'Event changes saved to Supabase.' : 'Event saved to Supabase.');
     setMonth(monthKey(savedEvent.date));
     setSelectedDate(savedEvent.date);
     setActiveTab('Calendar View');
@@ -2370,7 +2393,8 @@ export default function SchedulerApp() {
       </div>
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={selectedDate} sourceLabel="Overview" />}
-      <Drawer event={selected} onClose={() => setSelected(null)} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
+      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
+      {editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
     </main>
   );
 }

@@ -7,6 +7,7 @@ alter table public.events
   add column if not exists canonical_school text,
   add column if not exists photographers text[] not null default '{}'::text[],
   add column if not exists assistants text[] not null default '{}'::text[],
+  add column if not exists no_assistant boolean not null default false,
   add column if not exists irm numeric,
   add column if not exists rain_info text,
   add column if not exists history text,
