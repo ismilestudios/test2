@@ -7,7 +7,7 @@ import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOO
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
-const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members'];
+const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Removed Events', 'Team Members'];
 
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
@@ -200,7 +200,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
               />
             </label>
             <div className="flex justify-end"><AuthStatus /></div>
-            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-5">
+            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-6">
               {tabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
@@ -2098,8 +2098,39 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
   );
 }
 
-function Drawer({ event, onClose, onViewSchool, onEditEvent }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Imported</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<Info icon={UserRoundCheck} title="Photographers Assigned" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={Clock} title="IRM" value={getEventIrm(event) ? `${getEventIrm(event)} — informational only` : '—'} /><Info icon={Pencil} title="Picture Day Info" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">Supabase events can be edited here. Imported historical events are currently read-only until the full historical migration.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
+function RemovedEventsView({ events, onRestore }) {
+  return (
+    <div className="space-y-4">
+      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <h2 className="text-lg font-semibold text-zinc-950">Removed Events</h2>
+        <p className="mt-1 text-sm text-zinc-600">Events removed from the calendar are kept here so they can be restored if someone removes one by mistake.</p>
+      </section>
+      <div className="space-y-3">
+        {events.length ? events.map(event => (
+          <div key={event.supabaseId || event.id} className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex flex-wrap gap-2">
+                  <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+                  {event.noAssistant ? <Pill className="border-zinc-200 bg-white text-zinc-700">No Assistant</Pill> : null}
+                </div>
+                <h3 className="mt-2 text-base font-semibold text-zinc-950">{event.title}</h3>
+                <p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}</p>
+                {event.canonicalSchool ? <p className="mt-1 text-sm text-zinc-600">{event.canonicalSchool}</p> : null}
+              </div>
+              <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore Event</button>
+            </div>
+          </div>
+        )) : (
+          <div className="rounded-3xl border border-dashed border-zinc-200 bg-white/60 p-6 text-center text-sm text-zinc-500">No removed events.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Drawer({ event, onClose, onViewSchool, onEditEvent, onRemoveEvent }) {
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Imported</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => onRemoveEvent(event)} className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<Info icon={UserRoundCheck} title="Photographers Assigned" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={Clock} title="IRM" value={getEventIrm(event) ? `${getEventIrm(event)} — informational only` : '—'} /><Info icon={Pencil} title="Picture Day Info" value={event.notes} large /><Info icon={CloudRain} title="Rain Info" value={event.rainInfo || '—'} /><Info icon={History} title="Historical Context" value={event.history || '—'} large /><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Editing note</div><p className="mt-2 text-sm text-zinc-700">Supabase events can be edited here. Imported historical events are currently read-only until the full historical migration.</p></div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -2184,7 +2215,6 @@ export default function SchedulerApp() {
     const { data, error } = await supabase
       .from('events')
       .select('*')
-      .eq('active', true)
       .order('date', { ascending: true });
 
     if (error) {
@@ -2193,7 +2223,7 @@ export default function SchedulerApp() {
       return;
     }
 
-    setSupabaseEvents((data || []).map(supabaseRowToEvent).filter(event => event.active !== false));
+    setSupabaseEvents((data || []).map(supabaseRowToEvent));
     setEventsMessage(data?.length ? 'New/custom events are loading from Supabase.' : 'Supabase events table is ready. No custom events saved yet.');
   };
 
@@ -2316,7 +2346,8 @@ export default function SchedulerApp() {
   }, []);
 
   const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false;
-  const allEvents = useMemo(() => [...EVENTS, ...supabaseEvents].filter(isValidEvent), [supabaseEvents]);
+  const allEvents = useMemo(() => [...EVENTS, ...supabaseEvents.filter(event => event.active !== false)].filter(isValidEvent), [supabaseEvents]);
+  const removedEvents = useMemo(() => supabaseEvents.filter(event => event.active === false), [supabaseEvents]);
   const handleScheduleEvent = async (event) => {
     const eventWithId = { ...event, id: event.id || `custom-${Date.now()}` };
 
@@ -2353,6 +2384,65 @@ export default function SchedulerApp() {
     setActiveTab('Calendar View');
   };
 
+  const handleRemoveEvent = async (event) => {
+    if (!event?.supabaseId) {
+      setEventsMessage('Imported historical events are read-only right now, so they cannot be removed yet.');
+      return;
+    }
+
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setEventsMessage('Supabase is not connected, so this event could not be removed.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('id', event.supabaseId)
+      .select()
+      .single();
+
+    if (error) {
+      setEventsMessage(`Could not remove event: ${error.message}`);
+      return;
+    }
+
+    const removedEvent = supabaseRowToEvent(data);
+    setSupabaseEvents(prev => (prev || []).map(item => item.supabaseId === removedEvent.supabaseId ? removedEvent : item));
+    setSelected(null);
+    setEventsMessage('Event moved to Removed Events.');
+  };
+
+  const handleRestoreEvent = async (event) => {
+    if (!event?.supabaseId) return;
+
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setEventsMessage('Supabase is not connected, so this event could not be restored.');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .update({ active: true, updated_at: new Date().toISOString() })
+      .eq('id', event.supabaseId)
+      .select()
+      .single();
+
+    if (error) {
+      setEventsMessage(`Could not restore event: ${error.message}`);
+      return;
+    }
+
+    const restoredEvent = supabaseRowToEvent(data);
+    setSupabaseEvents(prev => (prev || []).map(item => item.supabaseId === restoredEvent.supabaseId ? restoredEvent : item));
+    setEventsMessage('Event restored to the calendar.');
+    setMonth(monthKey(restoredEvent.date));
+    setSelectedDate(restoredEvent.date);
+    setActiveTab('Calendar View');
+  };
+
   const queryFilteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allEvents;
@@ -2382,6 +2472,7 @@ export default function SchedulerApp() {
           </>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
+          {activeTab === 'Removed Events' && <RemovedEventsView events={removedEvents} onRestore={handleRestoreEvent} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
         </section>
@@ -2393,7 +2484,7 @@ export default function SchedulerApp() {
       </div>
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={selectedDate} sourceLabel="Overview" />}
-      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
+      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onRemoveEvent={handleRemoveEvent} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
       {editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
     </main>
   );
