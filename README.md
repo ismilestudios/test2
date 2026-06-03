@@ -197,3 +197,13 @@ supabase/admin_manual_backup_snapshots.sql
 ```
 
 This build keeps the usual full-project ZIP structure rather than a standalone SQL/data bundle.
+
+
+## No Fall Scheduling Patch
+
+This package adds a reversible **No Fall Scheduling** option for Carrie View's Fall 2026 list.
+
+1. Run `/supabase/no_fall_scheduling_fall_2026_migration.sql` in Supabase SQL Editor.
+2. Deploy this ZIP.
+3. In Carrie View, use the bottom-right `No Fall Scheduling` button on a school card to remove it from the Fall 2026 To Be Scheduled list.
+4. Use the toast `Undo` button for accidental clicks, or edit the school later in School List to reverse it.

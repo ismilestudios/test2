@@ -966,6 +966,7 @@ function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
 
   return allSchools
     .filter(school => school.active !== false && !school.mergedInto)
+    .filter(school => !school.noFallSchedulingFall2026)
     .filter(school => !scheduled2026.has(schoolKey(school.name)) && !scheduled2026.has(schoolKey(school.originalName || school.name)))
     .map(school => {
       const mergedFrom = mergedSourcesByTarget[school.originalName || school.name] || [];
@@ -1038,6 +1039,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
           <div className="flex flex-wrap items-center gap-2">
             {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-600">No IRM</Pill>}
             {school.mergedFrom?.length ? <Pill className="border-zinc-200 bg-white text-zinc-600">{school.mergedFrom.length} merged</Pill> : null}
+            {school.noFallSchedulingFall2026 ? <Pill className="border-slate-200 bg-slate-50 text-slate-700">No Fall Scheduling</Pill> : null}
           </div>
           <h2 className="mt-3 text-xl font-semibold text-zinc-950">{school.name}</h2>
           <p className="mt-1 text-sm text-zinc-600">School history page: address, primary contact, school notes, picture day history, photographers, and future scheduling status.</p>
@@ -1559,6 +1561,31 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
   const [addingEvent, setAddingEvent] = useState(false);
   const [addingEventDefaultDate, setAddingEventDefaultDate] = useState(todayKey());
   const [addingSchool, setAddingSchool] = useState(false);
+  const [noFallUndo, setNoFallUndo] = useState(null);
+
+  const setNoFallScheduling = async (school, value) => {
+    if (!school) return;
+    const originalName = school.originalName || school.name;
+    const nextSchool = { ...school, noFallSchedulingFall2026: value };
+
+    setSchools?.(prev => (prev || []).map(item => (item.originalName || item.name) === originalName ? { ...item, noFallSchedulingFall2026: value } : item));
+    setNoFallUndo(value ? { school: nextSchool, originalName } : null);
+
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) return;
+
+    const { error } = await supabase
+      .from('schools')
+      .update({ no_fall_scheduling_fall_2026: value, updated_at: new Date().toISOString() })
+      .eq('original_name', originalName);
+
+    if (error) {
+      setSchools?.(prev => (prev || []).map(item => (item.originalName || item.name) === originalName ? { ...item, noFallSchedulingFall2026: !value } : item));
+      setNoFallUndo(null);
+      alert(`Could not update No Fall Scheduling: ${error.message}`);
+    }
+  };
+
   useEffect(() => {
     if (!schools.length) {
       setSelectedSchool(null);
@@ -1627,7 +1654,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
           </div>
           <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:pr-1">
             {filteredSchools.map(item => (
-              <button key={item.name} onClick={() => setSelectedSchool(item)} className={`w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+              <div key={item.name} onClick={() => setSelectedSchool(item)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedSchool(item); }} className={`w-full cursor-pointer rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-sm font-semibold text-zinc-950">{item.displayName || item.name}</div>
@@ -1636,8 +1663,11 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
                   {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
                 </div>
                 <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
-                {item.lastEvent ? <div className="mt-2 text-xs text-zinc-500">2025 Fall assigned: {item.referencePhotographers?.length ? item.referencePhotographers.join(', ') : '—'}</div> : null}
-              </button>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div className="min-h-7">{item.lastEvent ? <div className="text-xs text-zinc-500">2025 Fall assigned: {item.referencePhotographers?.length ? item.referencePhotographers.join(', ') : '—'}</div> : null}</div>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); setNoFallScheduling(item, true); }} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">No Fall Scheduling</button>
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -1677,6 +1707,14 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         </div>
       </section>
       <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} />
+      {noFallUndo ? (
+        <div className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-zinc-950 px-4 py-3 text-sm text-white shadow-2xl sm:bottom-6">
+          <div className="flex items-center justify-between gap-3">
+            <div><span className="font-semibold">{noFallUndo.school?.displayName || noFallUndo.school?.name}</span> marked No Fall Scheduling.</div>
+            <button type="button" onClick={() => setNoFallScheduling(noFallUndo.school, false)} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950">Undo</button>
+          </div>
+        </div>
+      ) : null}
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
       {addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={saveSchool} />}
     </div>
@@ -1697,6 +1735,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
   const [contactTitle, setContactTitle] = useState(school?.contactTitle || '');
   const [notes, setNotes] = useState(school?.notes || '');
   const [referenceImages, setReferenceImages] = useState(school?.referenceImages || []);
+  const [noFallSchedulingFall2026, setNoFallSchedulingFall2026] = useState(Boolean(school?.noFallSchedulingFall2026));
 
   useEffect(() => {
     setName(school?.name || '');
@@ -1711,6 +1750,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setContactTitle(school?.contactTitle || '');
     setNotes(school?.notes || '');
     setReferenceImages(school?.referenceImages || []);
+    setNoFallSchedulingFall2026(Boolean(school?.noFallSchedulingFall2026));
   }, [school]);
 
   if (!school) return null;
@@ -1758,7 +1798,8 @@ function EditSchoolModal({ school, onClose, onSave }) {
       contactEmail,
       contactTitle,
       notes,
-      referenceImages
+      referenceImages,
+      noFallSchedulingFall2026
     });
   };
 
@@ -1809,6 +1850,13 @@ function EditSchoolModal({ school, onClose, onSave }) {
           </div>
           <label className="text-sm font-medium text-zinc-700">Notes on School
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={10} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
+          </label>
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-sm text-zinc-700">
+            <input type="checkbox" checked={noFallSchedulingFall2026} onChange={(e) => setNoFallSchedulingFall2026(e.target.checked)} className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900" />
+            <span>
+              <span className="font-semibold text-zinc-900">No Fall Scheduling</span>
+              <span className="mt-1 block text-xs leading-5 text-zinc-500">Hide this school from Carrie View’s Fall 2026 To Be Scheduled list. This is reversible.</span>
+            </span>
           </label>
           <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1919,6 +1967,7 @@ function schoolToSupabaseRow(school = {}) {
     reference_images: school.referenceImages || [],
     merged_into: school.mergedInto || null,
     active: school.active !== false,
+    no_fall_scheduling_fall_2026: Boolean(school.noFallSchedulingFall2026 || school.no_fall_scheduling_fall_2026),
     updated_at: new Date().toISOString()
   };
 }
@@ -1943,7 +1992,8 @@ function supabaseRowToSchool(row = {}) {
     contactTitle: row.contact_title || '',
     referenceImages: row.reference_images || [],
     mergedInto: row.merged_into || null,
-    active: row.active !== false
+    active: row.active !== false,
+    noFallSchedulingFall2026: Boolean(row.no_fall_scheduling_fall_2026)
   };
 }
 
@@ -2060,7 +2110,8 @@ function supabaseRowToEvent(row = {}) {
     source: row.source || 'supabase',
     sourceEventId: row.source_event_id || null,
     createdAt: row.created_at || null,
-    active: row.active !== false
+    active: row.active !== false,
+    noFallSchedulingFall2026: Boolean(row.no_fall_scheduling_fall_2026)
   };
 }
 
