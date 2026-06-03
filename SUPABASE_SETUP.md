@@ -167,3 +167,18 @@ Important behavior:
 - The app checks existing `source_event_id` values so the same historical events are not imported twice.
 - Once Supabase has event rows, Calendar/Overview/Carrie/School History use Supabase events instead of the hardcoded fallback.
 - The hardcoded `EVENTS` array remains only as a fallback if Supabase has no event rows or fails before import.
+
+## Spring 2025 historical schedule import
+
+This package includes a separate SQL import for February-June 2025 historical events.
+
+Run this in Supabase SQL Editor after the prior event migrations:
+
+`supabase/spring_2025_events_import.sql`
+
+Important behavior:
+- Uses `source = spring_2025_pdf_import`.
+- Uses stable `source_event_id` values and a `where not exists` guard, so the import is safe to rerun.
+- Does **not** import notes: `picture_day_info`, `rain_info`, and `history` are inserted as `NULL`.
+- `canonical_school` is filled where the event could be matched to an existing School List page.
+- Review rows are included in `supabase/spring_2025_events_review.csv`.
