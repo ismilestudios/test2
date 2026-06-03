@@ -182,3 +182,17 @@ Important behavior:
 - Does **not** import notes: `picture_day_info`, `rain_info`, and `history` are inserted as `NULL`.
 - `canonical_school` is filled where the event could be matched to an existing School List page.
 - Review rows are included in `supabase/spring_2025_events_review.csv`.
+
+
+## Fall 2024 historical events import
+
+Run:
+
+`supabase/fall_2024_events_import.sql`
+
+Notes:
+- Imports August-December 2024 history.
+- Does not import schedule notes.
+- Uses `source = fall_2024_pdf_import`.
+- Duplicate-safe by `source_event_id`.
+- Review `fall_2024_events_review.csv` and `fall_2024_excluded_review.csv` if needed.
