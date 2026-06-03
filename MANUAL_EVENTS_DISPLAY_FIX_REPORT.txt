@@ -1,0 +1,6 @@
+Manual events display fix
+- Explicitly fetches manual/app/custom events separately and merges them into the main event list.
+- Removes local backup copies from the active UI once the same event exists in Supabase.
+- Adds a Reload Supabase Events button on Calendar View.
+- Adds a short post-auth retry to handle Supabase session hydration timing.
+- Adds manual_events_display_diagnostic.sql.

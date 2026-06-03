@@ -2488,6 +2488,23 @@ export default function SchedulerApp() {
     return { importedCount: data?.length || 0, data: data || [] };
   };
 
+  const loadManualEventsFromSupabase = async (supabase) => {
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .or('source.eq.manual_app,source.eq.app,client_event_id.like.custom-%')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Could not explicitly load manual events from Supabase', error);
+      return [];
+    }
+
+    return data || [];
+  };
+
   const loadEventsFromSupabase = async () => {
     if (!hasSupabaseEnv()) {
       setEventsMessage('Supabase is not connected yet. New events will not be shared.');
@@ -2527,19 +2544,29 @@ export default function SchedulerApp() {
       return;
     }
 
-    const finalRows = importResult.importedCount
-      ? [...(data || []), ...(importResult.data || [])]
-      : (data || []);
+    const manualRows = await loadManualEventsFromSupabase(supabase);
 
-    const loadedEvents = finalRows.map(supabaseRowToEvent);
+    const rowsById = new Map();
+    [
+      ...(data || []),
+      ...(importResult.importedCount ? (importResult.data || []) : []),
+      ...manualRows
+    ].forEach(row => {
+      if (row?.id) rowsById.set(row.id, row);
+    });
+
+    const finalRows = Array.from(rowsById.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+
+    const loadedEvents = finalRows.map(row => ({ ...supabaseRowToEvent(row), localBackupOnly: false }));
     setSupabaseEvents(loadedEvents);
 
     const localBackup = loadLocalManualEvents();
-    setLocalManualEvents(localBackup);
+    const localOnlyBackup = localBackup.filter(localEvent => !loadedEvents.some(loaded => loaded.id === localEvent.id || loaded.supabaseId === localEvent.supabaseId));
+    setLocalManualEvents(localOnlyBackup);
 
-    const manualCount = finalRows.filter(row => row.source === 'manual_app' || row.client_event_id?.startsWith('custom-')).length;
-    const localOnlyCount = localBackup.filter(localEvent => !loadedEvents.some(loaded => loaded.id === localEvent.id || loaded.supabaseId === localEvent.supabaseId)).length;
-    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Events are loading from Supabase (${finalRows.length} rows, ${manualCount} manual, ${localOnlyCount} local backup).`);
+    const manualCount = finalRows.filter(row => row.source === 'manual_app' || row.source === 'app' || row.client_event_id?.startsWith('custom-')).length;
+    const localOnlyCount = localOnlyBackup.length;
+    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Loaded ${finalRows.length} Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'}${localOnlyCount ? `, plus ${localOnlyCount} browser-only backup` : ''}.`);
   };
 
   const loadSchoolsFromSupabase = async () => {
@@ -2688,6 +2715,11 @@ export default function SchedulerApp() {
         loadSchoolsFromSupabase(),
         loadEventsFromSupabase()
       ]);
+
+      // One short follow-up read catches Supabase session hydration/readback timing races.
+      window.setTimeout(() => {
+        loadEventsFromSupabase();
+      }, 750);
     };
 
     loadAfterAuth();
@@ -2877,7 +2909,12 @@ export default function SchedulerApp() {
       <div className="mx-auto max-w-7xl space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
         <LoginRequiredNotice />
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
-        {eventsMessage && activeTab === 'Calendar View' ? <div className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm">{eventsMessage}</div> : null}
+        {eventsMessage && activeTab === 'Calendar View' ? (
+          <div className="flex flex-col gap-2 rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>{eventsMessage}</div>
+            <button type="button" onClick={loadEventsFromSupabase} className="rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-white">Reload Supabase Events</button>
+          </div>
+        ) : null}
         {activeTab === 'Calendar View' && localManualEvents.some(event => event.localBackupOnly) ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
