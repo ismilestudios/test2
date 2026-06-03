@@ -7,7 +7,7 @@ import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOO
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
-const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members'];
+const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
@@ -340,7 +340,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
               />
             </label>
             <div className="flex justify-end"><AuthStatus /></div>
-            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-5">
+            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-6">
               {tabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
@@ -360,11 +360,12 @@ function MobileBottomNav({ activeTab, setActiveTab }) {
     { label: 'Today', tab: 'Overview' },
     { label: 'Calendar', tab: 'Calendar View' },
     { label: 'Carrie', tab: 'Carrie View' },
-    { label: 'Schools', tab: 'School List' }
+    { label: 'Schools', tab: 'School List' },
+    { label: 'Admin', tab: 'Admin' }
   ];
   return (
     <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[1.5rem] border border-zinc-200 bg-white/95 p-1 shadow-2xl backdrop-blur sm:hidden">
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-5 gap-1">
         {mobileTabs.map(item => (
           <button
             key={item.tab}
@@ -1962,22 +1963,23 @@ function normalizeImportedEventType(row = {}) {
   const rawType = String(row.event_type || '').trim();
   const title = String(row.title || '').toLowerCase();
   const date = String(row.date || '');
-  if (row.source !== 'google_calendar_import') return rawType || 'Special Event';
+  const isGoogleImport = row.source === 'google_calendar_import';
+  if (!isGoogleImport) return rawType || 'Special Event';
   if (title.includes('rain date') || /\brain\b/.test(title)) return 'Rain Date';
-  if (title.includes('makeup') || title.includes('make up') || title.includes('retake')) return 'Makeup Day';
-  if (title.includes('sports')) return 'Sports';
+  if (title.includes('makeup') || title.includes('make up') || title.includes('retake') || rawType === 'makeup/retake') return 'Makeup Day';
+  if (title.includes('sports') || rawType === 'sports') return 'Sports';
   if (title.includes('photo booth') || title.includes('photobooth') || rawType === 'photo booth') return 'Photo Booth';
   if (title.includes('headshot')) return 'Headshots';
   if (title.includes('senior') && !title.includes('underclass') && !title.includes('graduation') && !title.includes('pano')) return 'Seniors';
+  if (title.includes('spring') || rawType === 'spring picture day') {
+    if (!title.includes('grad') && !title.includes('graduation') && !title.includes('pano')) return 'Spring Picture Day';
+  }
+  const isFallWindow = date >= '2026-09-01' && date <= '2026-11-30';
+  const schoolish = ['school','elem','elementary','academy','preschool','pre-k','prek','ms/hs','middle','high','upk','nursery','kindercare','learning garden','consortium','christian','jcc','boces','tsl','wildwood','heatly','pooh','savior','wonderland','little','tesago','skano','okte','arongen','karigon','shatekon','chango','craig','glencliff','rosendale','duanesburg','waterford','northville','hoosic','cohoes','green tech','gordon creek','malta','milton terrace','wood road'];
   const nonShoot = ['meeting','out of town','wedding','interview','training','jury','birthday','party','townhouse','branding','quarterly','monthly','staff meeting','workshop'];
   if (nonShoot.some(term => title.includes(term))) return title.includes('meeting') || title.includes('training') || title.includes('workshop') ? 'Call or Meeting' : 'Special Event';
-  const schoolish = ['school','elem','elementary','academy','preschool','pre-k','prek','ms/hs','middle','high','upk','nursery','kindercare','learning garden','consortium','christian','jcc','boces','wildwood','heatly','pooh','savior','wonderland','little','tesago','skano','okte','arongen','karigon','shatekon','chango','craig','glencliff','rosendale','duanesburg','waterford','northville','hoosic','cohoes','green tech','gordon creek','malta','milton terrace','wood road'];
-  const explicitFall = title.includes('fall photos') || title.includes('picture day') || title.includes('first day') || title.includes('underclass') || /\(\s*\d+\s*teams?/.test(title) || /\b\d+\s*photogs?/.test(title);
-  if (date >= '2026-09-01' && date <= '2026-11-30' && schoolish.some(term => title.includes(term)) && explicitFall) return 'Fall Picture Day';
-  if ((title.includes('spring') || rawType === 'spring picture day') && !title.includes('grad') && !title.includes('graduation') && !title.includes('pano')) return 'Spring Picture Day';
+  if (isFallWindow && (rawType === 'picture day' || rawType === 'review' || rawType === 'graduation/pano' || rawType === 'senior portraits' || rawType === 'internal/non-shoot review' || schoolish.some(term => title.includes(term)) || title.includes('first day') || title.includes('fall photos'))) return 'Fall Picture Day';
   if (rawType === 'picture day') return ['01','02','03','04','05','06'].includes(date.slice(5,7)) ? 'Spring Picture Day' : 'Fall Picture Day';
-  if (rawType === 'makeup/retake') return 'Makeup Day';
-  if (rawType === 'sports') return 'Sports';
   if (rawType === 'senior portraits') return 'Seniors';
   if (rawType === 'internal/non-shoot review') return 'Call or Meeting';
   if (rawType === 'graduation/pano' || rawType === 'review') return 'Special Event';
@@ -1986,19 +1988,25 @@ function normalizeImportedEventType(row = {}) {
 
 function normalizeImportedCanonicalSchool(row = {}) {
   const current = String(row.canonical_school || '').trim();
-  if (row.source !== 'google_calendar_import') return current;
-  const lower = `${current} ${row.title || ''}`.toLowerCase();
+  if (row.source !== 'google_calendar_import' || !current) return current;
+  const clean = current
+    .replace(/^HOLD\s+/i, '')
+    .replace(/^NEW\s+/i, '')
+    .replace(/\b(Fall|Spring|Picture|Photos?|Day|Makeups?|Makeup|Rain|Date|Seniors?|Senior|Underclass|Outdoor|Indoor|FULL DAY|ALL)\b/gi, '')
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const lower = `${clean} ${row.title || ''}`.toLowerCase();
   const aliasPairs = [
-    ['gordon creek', 'Gordon Creek Elementary School (Ballston Spa School District)'], ['malta ave', 'Malta Avenue Elementary School (Ballston Spa School District)'], ['malta avenue', 'Malta Avenue Elementary School (Ballston Spa School District)'], ['milton terrace', 'Milton Terrace Elementary School (Ballston Spa School District)'], ['wood road', 'Wood Road Elementary School (Ballston Spa School District)'],
+    ['gordon creek', 'Gordon Creek Elementary School (Ballston Spa School District)'], ['malta', 'Malta Avenue Elementary School (Ballston Spa School District)'], ['milton terrace', 'Milton Terrace Elementary School (Ballston Spa School District)'], ['wood road', 'Wood Road Elementary School (Ballston Spa School District)'],
     ['rosendale', 'Rosendale Elementary School (Niskayuna School District)'], ['craig', 'Craig Elementary School (Niskayuna School District)'], ['glencliff', 'Glencliff Elementary School (Niskayuna School District)'],
     ['skano', 'Skano Elementary School (Shenendehowa School District)'], ['arongen', 'Arongen Elementary School (Shenendehowa School District)'], ['karigon', 'Karigon Elementary School (Shenendehowa School District)'], ['okte', 'Okte Elementary School (Shenendehowa School District)'], ['shatekon', 'Shatekon Elementary School (Shenendehowa School District)'], ['tesago', 'Tesago Elementary School (Shenendehowa School District)'], ['chango', 'Chango Elementary School (Shenendehowa School District)'],
-    ['jefferson', 'Jefferson Elementary School (Schalmont School District)'], ['waterford-halfmoon elementary', 'Waterford Halfmoon Elem'], ['waterford halfmoon elementary', 'Waterford Halfmoon Elem'], ['waterford-halfmoon ms', 'Waterford MS/HS'], ['waterford halfmoon ms', 'Waterford MS/HS'], ['waterford-halfmoon high', 'Waterford MS/HS'], ['waterford halfmoon high', 'Waterford MS/HS'],
-    ['duanesburg elementary', "D'burg Elementary"], ['duanesburg ms', "D'burg MS/HS"], ['duanesburg high', "D'burg MS/HS"], ['green tech', 'Green Tech MS/HS'], ['hoosic valley ms', 'Hoosic Valley MS/HS'], ['hoosic ms', 'Hoosic Valley MS/HS'], ['hudson valley consortium', 'Hudson Valley Consortium'],
-    ['albany academy', 'The Academies (AA/G)'], ['northville', 'Northville'], ['loudonville christian', 'Loudonville Christian'], ['little achiever', 'Little Achievers'], ['pooh', 'Poohs Corner'], ['heatly', 'Heatly School'], ['learning garden latham', 'Learning Garden Latham'], ['learning garden slingerlands', 'Learning Garden Slingerlands'], ['wildwood', 'Wildwood'], ['cohoes high', 'Cohoes High School']
+    ['jefferson', 'Jefferson Elementary School (Schalmont School District)'], ['waterford halfmoon elementary', 'Waterford Halfmoon Elem'], ['waterford halfmoon ms', 'Waterford MS/HS'], ['waterford halfmoon', 'Waterford MS/HS'],
+    ['duanesburg elementary', "D'burg Elementary"], ['duanesburg ms', "D'burg MS/HS"], ['green tech', 'Green Tech MS/HS'], ['hoosic valley ms', 'Hoosic Valley MS/HS'], ['hoosic ms', 'Hoosic Valley MS/HS'], ['hudson valley consortium', 'Hudson Valley Consortium'],
+    ['albany academy', 'The Academies (AA/G)'], ['academy', 'The Academies (AA/G)'], ['northville', 'Northville'], ['loudonville christian', 'Loudonville Christian'], ['little achiever', 'Little Achievers'], ['pooh', 'Poohs Corner'], ['heatly', 'Heatly School'], ['learning garden latham', 'Learning Garden Latham'], ['learning garden slingerlands', 'Learning Garden Slingerlands'], ['wildwood', 'Wildwood']
   ];
   const found = aliasPairs.find(([needle]) => lower.includes(needle));
   if (found) return found[1];
-  const clean = current.replace(/^HOLD\s+/i, '').replace(/^NEW\s+/i, '').replace(/\s+/g, ' ').trim();
   const exact = SCHOOLS.find(school => school.name.toLowerCase() === clean.toLowerCase());
   return exact?.name || current;
 }
@@ -2545,6 +2553,191 @@ function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, 
   );
 }
 
+
+function csvEscape(value) {
+  const text = value === null || value === undefined ? '' : Array.isArray(value) || typeof value === 'object' ? JSON.stringify(value) : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadTextFile(filename, content, type = 'text/plain;charset=utf-8') {
+  if (typeof window === 'undefined') return;
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function toCsv(rows = []) {
+  const allKeys = Array.from(new Set(rows.flatMap(row => Object.keys(row || {}))));
+  if (!allKeys.length) return '';
+  return [allKeys.map(csvEscape).join(','), ...rows.map(row => allKeys.map(key => csvEscape(row?.[key])).join(','))].join('\n');
+}
+
+function makeBackupFilename(label, extension) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `ismile-scheduler-${label}-${stamp}.${extension}`;
+}
+
+function AdminPage({ events, schools, photographers, assistants, eventsMessage, schoolsMessage, reloadEvents, reloadSchools }) {
+  const activeEvents = (events || []).filter(event => event.active !== false);
+  const removedEvents = (events || []).filter(event => event.active === false);
+  const googleImported = activeEvents.filter(event => event.source === 'google_calendar_import');
+  const manualEvents = activeEvents.filter(event => event.source !== 'google_calendar_import');
+  const fall2026 = activeEvents.filter(event => event.date >= '2026-09-01' && event.date <= '2026-11-30');
+  const schoolLinked = activeEvents.filter(event => event.canonicalSchool);
+  const unlinked = activeEvents.filter(event => !event.canonicalSchool);
+  const activeSchools = (schools || []).filter(school => school.active !== false);
+  const inactiveSchools = (schools || []).filter(school => school.active === false || school.mergedInto);
+
+  const exportPackage = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      app: 'iSmile Scheduler',
+      counts: {
+        activeEvents: activeEvents.length,
+        removedEvents: removedEvents.length,
+        schools: schools?.length || 0,
+        activeSchools: activeSchools.length,
+        inactiveOrMergedSchools: inactiveSchools.length
+      },
+      events: events || [],
+      schools: schools || [],
+      teamMembers: { photographers, assistants }
+    };
+    downloadTextFile(makeBackupFilename('full-backup', 'json'), JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+  };
+
+  const exportEventsCsv = () => {
+    const rows = (events || []).map(event => ({
+      id: event.id,
+      supabaseId: event.supabaseId,
+      date: event.date,
+      endDate: event.endDate || '',
+      title: event.title,
+      school: event.canonicalSchool || '',
+      type: event.type,
+      status: event.status,
+      arrivalTime: event.arrivalTime || '',
+      startTime: event.time || '',
+      photographers: (event.photographers || []).join('; '),
+      assistants: (event.assistants || []).join('; '),
+      source: event.source || '',
+      active: event.active !== false,
+      notes: event.notes || ''
+    }));
+    downloadTextFile(makeBackupFilename('events', 'csv'), toCsv(rows), 'text/csv;charset=utf-8');
+  };
+
+  const exportSchoolsCsv = () => {
+    const rows = (schools || []).map(school => ({
+      id: school.id,
+      name: school.name,
+      originalName: school.originalName || '',
+      district: school.district || '',
+      irm: school.irm || '',
+      address: school.address || '',
+      city: school.city || '',
+      stateZip: school.stateZip || '',
+      contactFirst: school.contactFirst || '',
+      contactLast: school.contactLast || '',
+      contactPhone: school.contactPhone || '',
+      contactEmail: school.contactEmail || '',
+      mergedInto: school.mergedInto || '',
+      active: school.active !== false,
+      notes: school.notes || ''
+    }));
+    downloadTextFile(makeBackupFilename('schools', 'csv'), toCsv(rows), 'text/csv;charset=utf-8');
+  };
+
+  const copyBackupSql = async () => {
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
+    const sql = `create table if not exists events_backup_${stamp} as select * from public.events;\ncreate table if not exists schools_backup_${stamp} as select * from public.schools;`;
+    try {
+      await navigator.clipboard.writeText(sql);
+      alert('Backup SQL copied. Paste it into Supabase SQL Editor before a risky update.');
+    } catch {
+      downloadTextFile(makeBackupFilename('backup-sql', 'sql'), sql, 'text/sql;charset=utf-8');
+    }
+  };
+
+  const cards = [
+    ['Active Events', activeEvents.length],
+    ['Removed Events', removedEvents.length],
+    ['Imported ICS Events', googleImported.length],
+    ['Manual/App Events', manualEvents.length],
+    ['Fall 2026 Events', fall2026.length],
+    ['School-Linked Events', `${schoolLinked.length}/${activeEvents.length}`],
+    ['Unlinked Events', unlinked.length],
+    ['Active Schools', activeSchools.length],
+    ['Merged/Hidden Schools', inactiveSchools.length]
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-950">Admin</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">Simple safety tools for backups, exports, and quick scheduler health checks. These buttons do not delete or change data.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={reloadEvents} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50">Reload Events</button>
+            <button type="button" onClick={reloadSchools} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50">Reload Schools</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <button type="button" onClick={exportPackage} className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/70 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">
+          <div className="text-sm font-bold text-zinc-950">Download Full Backup</div>
+          <div className="mt-2 text-sm leading-6 text-zinc-600">JSON package with events, schools, team members, removed events, and counts.</div>
+        </button>
+        <button type="button" onClick={exportEventsCsv} className="rounded-3xl border border-zinc-200 bg-white/70 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
+          <div className="text-sm font-bold text-zinc-950">Download Events CSV</div>
+          <div className="mt-2 text-sm leading-6 text-zinc-600">Spreadsheet-friendly export of active and removed event records.</div>
+        </button>
+        <button type="button" onClick={exportSchoolsCsv} className="rounded-3xl border border-zinc-200 bg-white/70 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
+          <div className="text-sm font-bold text-zinc-950">Download Schools CSV</div>
+          <div className="mt-2 text-sm leading-6 text-zinc-600">Spreadsheet-friendly export of school records, contacts, IRM, and merge status.</div>
+        </button>
+      </div>
+
+      <div className="rounded-[2rem] border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="font-semibold text-amber-950">Before risky SQL updates</h3>
+            <p className="mt-1 text-sm leading-6 text-amber-900">Copy a quick Supabase backup-table command for events and schools. This is useful on the free Supabase plan where automatic backups are limited.</p>
+          </div>
+          <button type="button" onClick={copyBackupSql} className="rounded-2xl bg-amber-900 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-amber-950">Copy Backup SQL</button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map(([label, value]) => (
+          <div key={label} className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</div>
+            <div className="mt-2 text-2xl font-black text-zinc-950">{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
+        <h3 className="font-semibold text-zinc-950">Current load status</h3>
+        <div className="mt-3 space-y-2 text-sm leading-6 text-zinc-600">
+          <p><strong>Events:</strong> {eventsMessage || 'No event load message yet.'}</p>
+          <p><strong>Schools:</strong> {schoolsMessage || 'No school load message yet.'}</p>
+          <p><strong>Safety note:</strong> Removed events are soft-deleted, meaning they are hidden from the main calendar but still visible in recovery/export data.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SchedulerApp() {
   const [activeTab, setActiveTab] = useState('Calendar View');
   const [calendarMode, setCalendarMode] = useState('Month');
@@ -3065,6 +3258,7 @@ export default function SchedulerApp() {
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
+          {activeTab === 'Admin' && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>

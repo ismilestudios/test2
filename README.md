@@ -177,3 +177,23 @@ This version uses PostgreSQL dollar-quoted text literals so apostrophes/quotes i
 This package includes `supabase/ics_import_visibility_repair.sql` and a frontend patch that explicitly loads `source = 'google_calendar_import'` events alongside manual events.
 
 Run this SQL once in Supabase, then deploy this ZIP. The Calendar View status banner should say it loaded Google Calendar import events.
+
+
+## Admin Page Backup Tools Update
+
+This package adds a simple **Admin** tab with practical safety tools:
+
+- Download Full Backup JSON
+- Download Events CSV
+- Download Schools CSV
+- Copy quick Supabase backup SQL
+- View simple health counts for events, imported events, removed events, linked events, and schools
+- Reload Events / Reload Schools buttons
+
+Optional manual backup SQL is included at:
+
+```text
+supabase/admin_manual_backup_snapshots.sql
+```
+
+This build keeps the usual full-project ZIP structure rather than a standalone SQL/data bundle.

@@ -1,19 +1,19 @@
 {
   "total_imported_rows_reviewed": 745,
-  "rows_with_canonical_school": 367,
+  "rows_with_canonical_school": 422,
   "fall_2026_rows": 98,
-  "fall_2026_fall_picture_day_rows": 43,
-  "manual_school_review_rows": 108,
+  "fall_2026_fall_picture_day_rows": 44,
+  "manual_school_review_rows": 117,
   "event_type_counts": {
-    "Special Event": 296,
-    "Makeup Day": 104,
-    "Fall Picture Day": 70,
-    "Seniors": 64,
-    "Spring Picture Day": 46,
+    "Special Event": 219,
+    "Fall Picture Day": 156,
+    "Makeup Day": 109,
+    "Seniors": 56,
+    "Spring Picture Day": 48,
     "Rain Date": 46,
     "Sports": 33,
     "Headshots": 33,
-    "Call or Meeting": 27,
-    "Photo Booth": 26
+    "Photo Booth": 26,
+    "Call or Meeting": 19
   }
 }

@@ -1,6 +1,6 @@
 -- iSmile Scheduler ICS one-time reconciliation
--- Normalizes imported Google Calendar rows so Fall 2026 matches Fall 2024-Spring 2026 app logic.
--- Safe to rerun; updates only source = google_calendar_import rows by client_event_id.
+-- Purpose: normalize imported Google Calendar rows so Fall 2026 matches Fall 2024-Spring 2026 app logic.
+-- Run after confirming the 745 google_calendar_import rows exist. Safe to rerun; it only updates google_calendar_import rows by client_event_id.
 BEGIN;
 
 UPDATE public.events
@@ -11,7 +11,6 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_56a0e55da
 
 UPDATE public.events
 SET   event_type = $typ$Fall Picture Day$typ$,
-  canonical_school = $sch$Little Achievers$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_76302d584805b35e$cid$;
 
@@ -27,7 +26,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_c08567b734736b9e$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Fall Picture Day$typ$,
+SET   event_type = $typ$Makeup Day$typ$,
   canonical_school = $sch$Waterford MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_5419ec24b8e081aa$cid$;
@@ -56,6 +55,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4c886e3cf
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$Shaker Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_03a9c631c6a961bf$cid$;
 
@@ -73,16 +73,17 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2c1ae0f65
 
 UPDATE public.events
 SET   event_type = $typ$Photo Booth$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_53093fd56c604461$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_91f9c7b2def83c0d$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_c26f42be528ad90f$cid$;
 
@@ -99,18 +100,18 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8a970590ffb66315$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e638379f8dc83d85$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Hoosic Seniors$sch$,
+  canonical_school = $sch$Hoosic Valley MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_db7323bd46b21e6b$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_27e202dc4b3e6fd4$cid$;
 
@@ -121,13 +122,13 @@ SET   event_type = $typ$Call or Meeting$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7b114059748dfda2$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Troy School 14$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9f42e159c8d0ba9f$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Fall Picture Day$typ$,
-  canonical_school = $sch$Little Achievers$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_faaacc08b17bddc9$cid$;
 
@@ -137,7 +138,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_a50871c9303eb334$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Walter B Howard$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_20d95b339b5d177f$cid$;
@@ -181,7 +182,7 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4395a4b0153070da$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Seniors$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Hoosic Valley MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_71ff88251e39ff8d$cid$;
@@ -197,7 +198,7 @@ SET   event_type = $typ$Rain Date$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_81e67dbd782fc601$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Call or Meeting$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_800863c57833d3c4$cid$;
@@ -250,6 +251,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_97f94ee0d
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4cab0fa0fe07a969$cid$;
 
@@ -316,11 +318,13 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_cf1325142
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$TSL Rotterdam$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3544a16e2f55e33b$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Maple Leaf - Halfmoon$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_afdfb328a371da8c$cid$;
 
@@ -371,7 +375,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3a333d6927bbfa2e$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Wildwood$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4ca49f4eb1f85567$cid$;
@@ -427,17 +431,17 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_236e92b91
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e4d3b8b48ac85e8f$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6775636b2cde597e$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Spring Picture Day$typ$,
-  canonical_school = $sch$Little Achievers$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_045910259bc36fef$cid$;
 
@@ -455,12 +459,13 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_83b614a79
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$Shaker Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_c9d9ecb1f82a6749$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
-  canonical_school = $sch$Duanesburg$sch$,
+  canonical_school = $sch$D'burg Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_14e54e845e01fe27$cid$;
 
@@ -481,12 +486,13 @@ SET   event_type = $typ$Headshots$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3b1f1540d8ea0731$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f38b48e5fd0760e8$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Seniors$typ$,
+SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$New Lebanon Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_5e727fb1bbaf7549$cid$;
 
@@ -502,12 +508,12 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_600755e0794d7d25$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Call or Meeting$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_174a141cc34935cb$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Okte Elementary School (Shenendehowa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_00efd71146a580d8$cid$;
@@ -534,7 +540,7 @@ SET   event_type = $typ$Spring Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f9af71329efc2d06$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Call or Meeting$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Stevens Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_af2ca2fd194a3840$cid$;
@@ -567,13 +573,13 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e6b6915299356202$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
-  canonical_school = $sch$Airline Drive Academy$sch$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_60f08d1d37576991$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Rosendale Elementary School (Niskayuna School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_95416b712408b89f$cid$;
@@ -584,7 +590,8 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d6eb0b7f313bb928$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Skano Elementary School (Shenendehowa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_035496c253b57b2a$cid$;
 
@@ -618,6 +625,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_5dc177253
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$Waterford MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_74e0162b1d5137e5$cid$;
 
@@ -628,7 +636,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ac5e1f1222aa995f$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Little Scholars$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f18472f018722f87$cid$;
@@ -640,8 +648,8 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e00d540ceeb108ed$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Latham Christian Academy$sch$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e7e12bd790629b48$cid$;
 
@@ -651,13 +659,14 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9a582add74e803e7$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Cohoes High School$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_0ab3b131bbf12067$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
+  canonical_school = $sch$BKW Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8633657f2a76531a$cid$;
 
@@ -685,11 +694,13 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_230ef2c43
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_df7bc33166e667fe$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Maple Leaf - Burnt Hills$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8916da1a01bd2b04$cid$;
 
@@ -749,6 +760,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_19928d741
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$Cairo-Durham Elem$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_cc79d60e34655934$cid$;
 
@@ -785,12 +797,13 @@ SET   event_type = $typ$Sports$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_54ca197597caf7c1$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e58981d098e324ee$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$Zoller Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_cbbb1e6e8dce4716$cid$;
 
@@ -800,7 +813,7 @@ SET   event_type = $typ$Headshots$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4c0f7499b48bfb89$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9e9a9d73c98e5ef6$cid$;
 
@@ -811,7 +824,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_b6d3a2b84
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
-  canonical_school = $sch$Cairo-Durham Elem$sch$,
+  canonical_school = $sch$Cairo-Durham MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d2c1a75c035eddb0$cid$;
 
@@ -822,6 +835,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_272e8a2c9
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$New Lebanon Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_db6ac5cb97da2468$cid$;
 
@@ -849,7 +863,7 @@ SET   event_type = $typ$Rain Date$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ecdbaaf3f8d2f955$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_09d0314ad57aff58$cid$;
 
@@ -872,7 +886,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4e7805094aa4e138$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ce85e583803f74fa$cid$;
 
@@ -883,7 +897,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d816e3e8439691dd$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Wonderland$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_becf54e435cc6150$cid$;
@@ -894,7 +908,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2b4e7925c9f85428$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Heatly School$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e98521cf7648f768$cid$;
@@ -929,6 +943,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9598dd61e
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_884f2af1a78c4fec$cid$;
 
@@ -945,7 +960,7 @@ SET   event_type = $typ$Rain Date$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_719e471e5aa00f2e$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Spring Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e1a9e97117e207ef$cid$;
 
@@ -961,6 +976,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_262df964e
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_c43c8c22ae07df8d$cid$;
 
@@ -976,7 +992,8 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7328bbbfb6308d40$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$TSL Troy$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_aa5b6c9df204fdfc$cid$;
 
@@ -1041,7 +1058,6 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f8f9e1637
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Columbia High School$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_14cb2ca3a706ffb9$cid$;
 
@@ -1063,7 +1079,8 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_37ff60c2fed1710b$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Saint Madeleine$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_a63b69dbd5035045$cid$;
 
@@ -1091,19 +1108,20 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_199033894e6503b2$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Call or Meeting$typ$,
-  canonical_school = $sch$Latham Christian Academy$sch$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_113c88f6832eed14$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Arongen Elementary School (Shenendehowa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_467adea7965581f9$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Cairo-Durham Elem$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3cfbb253e2b8409d$cid$;
 
@@ -1186,7 +1204,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_eb5f0cde4e4b4ebd$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Waterford Halfmoon Elem$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3552adbf32082004$cid$;
@@ -1219,7 +1237,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4cf7464e6
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
-  canonical_school = $sch$Duanesburg$sch$,
+  canonical_school = $sch$D'burg Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f9ebd120687833ca$cid$;
 
@@ -1246,7 +1264,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_32cacf80d
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
-  canonical_school = $sch$Cairo-Durham Elem$sch$,
+  canonical_school = $sch$Cairo-Durham MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_925d901edd16091c$cid$;
 
@@ -1274,11 +1292,13 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_dd7e8df77
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$New Lebanon Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_674373c01cea4012$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$Shaker Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_796ec4daf69f9b28$cid$;
 
@@ -1311,13 +1331,13 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ea71ea5813b852d2$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
-  canonical_school = $sch$Northville$sch$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Northville Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_274ad876ec819673$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9e71e26fc9f7e0e3$cid$;
 
@@ -1381,7 +1401,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_01a3bc007
 
 UPDATE public.events
 SET   event_type = $typ$Spring Picture Day$typ$,
-  canonical_school = $sch$Mother Theresa Academy$sch$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_deacb712040424c1$cid$;
 
@@ -1410,6 +1430,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_0d03b1e86
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$Shaker Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_cda749b1cea6ca2c$cid$;
 
@@ -1457,7 +1478,7 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_221409c5da512f4a$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Call or Meeting$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7768b777bbd451b7$cid$;
 
@@ -1526,13 +1547,13 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_57fcc12e491a030e$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Wood Road Elementary School (Ballston Spa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4e9cb603436604ba$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4e0796478d7e200f$cid$;
 
@@ -1560,7 +1581,7 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_dae8c94cf7b3c1a1$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Wildwood$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d5aac90e7cf143c2$cid$;
@@ -1638,6 +1659,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_81fe56b54
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$Tech Valley Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_1a9ef3c59627a78e$cid$;
 
@@ -1704,7 +1726,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4b0947167
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
-  canonical_school = $sch$Cairo-Durham Elem$sch$,
+  canonical_school = $sch$Cairo-Durham MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_bb52bfeec559bd9f$cid$;
 
@@ -1780,7 +1802,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_437139d49c60b97a$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_fbcbd1f6f89a1049$cid$;
 
@@ -1791,7 +1813,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_038938800884a785$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6b7edbdc43b52dbf$cid$;
 
@@ -1856,7 +1878,7 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_659f9af0934f05b1$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$D'burg MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_abfa6dd896775121$cid$;
@@ -1869,6 +1891,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_366b7e8d6
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$Glencliff Elementary School (Niskayuna School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_5df13e3849e1b773$cid$;
 
@@ -1929,7 +1952,7 @@ SET   event_type = $typ$Rain Date$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ec928da3e68afb7c$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_5651d9451aae46ef$cid$;
 
@@ -1962,7 +1985,7 @@ SET   event_type = $typ$Rain Date$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_a2d6dd4483110633$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d829cc6cedbcee6d$cid$;
@@ -1990,12 +2013,13 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_53a76de25
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$Shaker Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_192a54f584effd6b$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Duanesburg Seniors$sch$,
+  canonical_school = $sch$Duanesburg$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ddc7fff903375903$cid$;
 
@@ -2021,7 +2045,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3437e73c15555cae$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Little Llamas$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_1cc145d6430eadd7$cid$;
@@ -2055,22 +2079,25 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_056177f5d6da6cfd$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Christ the King$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_892f689450c1dbb6$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$Troy School 14$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_30274c7b3cb31469$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_5797791359039aaa$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$Shaker Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_a3e4c67803a0276a$cid$;
 
@@ -2098,7 +2125,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_dde043c32c112b1a$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_5ca863e397cc7237$cid$;
 
@@ -2131,13 +2158,14 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8812b64896d13bc2$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Zoller Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7fd947e1b86ecb6d$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
-  canonical_school = $sch$Mother Theresa Academy$sch$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d5be947935f41d2e$cid$;
 
@@ -2153,13 +2181,13 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_17c54046955838ab$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Call or Meeting$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9c50a46184f938e3$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Duanesburg Seniors$sch$,
+  canonical_school = $sch$D'burg Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6811e47d6cb33bde$cid$;
 
@@ -2192,11 +2220,13 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f5d365a79
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_91e5f0c38ba7da81$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ea084d59b807a831$cid$;
 
@@ -2246,13 +2276,13 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_005dcad4e4412911$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Stevens Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_59bfb5e34c35173e$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$D'burg Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f119b017db7d7b57$cid$;
@@ -2281,7 +2311,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f154e923f
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Hoosic Seniors$sch$,
+  canonical_school = $sch$Hoosic Valley MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_003cccf46f1a72a7$cid$;
 
@@ -2352,7 +2382,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_69967f997
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
-  canonical_school = $sch$Northville$sch$,
+  canonical_school = $sch$Northville Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_76ad0e9471fea105$cid$;
 
@@ -2431,7 +2461,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e80449590
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Green Tech Seniors$sch$,
+  canonical_school = $sch$Green Tech MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_df48348173f4ccbe$cid$;
 
@@ -2466,7 +2496,8 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8a22790d769ff80b$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Precious Hearts$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7d13953463b2735b$cid$;
 
@@ -2498,11 +2529,13 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4486b4017
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9153d6f2cdd6eea3$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8009aaf3f973820c$cid$;
 
@@ -2513,7 +2546,7 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_86552a01b103dc31$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_dab654a32756cdb8$cid$;
 
@@ -2525,17 +2558,19 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_582b4c85f
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$Waterford MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_0ff114bf2e569c71$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
-  canonical_school = $sch$Northville$sch$,
+  canonical_school = $sch$Northville Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6208e910c75d7c18$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d5e441f9f26f0719$cid$;
 
@@ -2546,7 +2581,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6f80fc077
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Green Tech Seniors$sch$,
+  canonical_school = $sch$Green Tech MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2ef794b3bd4733ae$cid$;
 
@@ -2568,7 +2603,7 @@ SET   event_type = $typ$Spring Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d55bd0bf4db1006e$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$TSL East Greenbush$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_08341884fc9d8141$cid$;
@@ -2586,13 +2621,14 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7df4ffe545224337$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$New Lebanon Jr/Sr$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3f16a3ad5324ceac$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_be5e70610ccca8ea$cid$;
 
@@ -2603,7 +2639,7 @@ SET   event_type = $typ$Spring Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d9c9fa72c7480518$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Gardner Dickinson$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_de4220dfbd3d2f3f$cid$;
@@ -2620,7 +2656,8 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_932ea3ff5de6c805$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2594f93a0f335beb$cid$;
 
@@ -2630,7 +2667,7 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_239ceb24b7cc5242$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_fd42ff854477be03$cid$;
 
@@ -2647,7 +2684,7 @@ SET   event_type = $typ$Rain Date$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6b4dd164dbbb1cef$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Malta Avenue Elementary School (Ballston Spa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3b94eb7225af7549$cid$;
@@ -2707,12 +2744,13 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7361821d867d2d66$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Kid's Express$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_fdaf5a85cb5bfa91$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Central Park Middle School$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_469a357c9d9dd5a3$cid$;
@@ -2745,7 +2783,7 @@ SET   event_type = $typ$Rain Date$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f99caba72e4d706c$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Chango Elementary School (Shenendehowa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_18ea7bb3d74cb5c4$cid$;
@@ -2763,8 +2801,8 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4c30b227fb471f41$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
-  canonical_school = $sch$Maywood Academy$sch$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_a995d463a45974e0$cid$;
 
@@ -2814,7 +2852,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_63e6c142f
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
-  canonical_school = $sch$Northville$sch$,
+  canonical_school = $sch$Northville Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d3d9b9afd209cef1$cid$;
 
@@ -2876,6 +2914,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7ab33257c
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$Cairo-Durham MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3b54af04b5df7aab$cid$;
 
@@ -2908,7 +2947,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_a9c862dd0096fb8e$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_001e925e98593d24$cid$;
 
@@ -2919,7 +2958,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_a1de1e8d914884fe$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Green Tech MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_cc94e37bcb6eaa32$cid$;
@@ -2937,7 +2976,7 @@ SET   event_type = $typ$Spring Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_831d9ce7c6feac8b$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Maple Leaf - Malta South$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e8f71e6b264b6f85$cid$;
@@ -2960,7 +2999,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f8ef879049f2fac7$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Jefferson Elementary School (Schalmont School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_bf0d41dfbae2a47e$cid$;
@@ -2987,12 +3026,12 @@ SET   event_type = $typ$Photo Booth$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_1732bc085f924d25$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_69f627ae744a6a1c$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Call or Meeting$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_1634e174a4203dea$cid$;
 
@@ -3030,18 +3069,19 @@ SET   event_type = $typ$Call or Meeting$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_904a50b0fd4b9a28$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Our Saviors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_04cf4b11882d3ba7$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$Two by Two Nursery$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2aa38d8efac111f1$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_4a6693700cc1c4ae$cid$;
 
@@ -3052,7 +3092,7 @@ SET   event_type = $typ$Rain Date$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d7b4f990b00425c2$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$TSL Niskayuna UPK$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9bde13e728940eb0$cid$;
@@ -3080,7 +3120,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f120d50117696ec6$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Seniors$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Hudson Valley Consortium$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f2b5ecff1e6fa1b5$cid$;
@@ -3103,7 +3143,8 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_bae0c9bda2c501fd$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Cairo-Durham MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6ae16d4fdd938496$cid$;
 
@@ -3125,7 +3166,7 @@ SET   event_type = $typ$Spring Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6508b1b10d7d5032$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_585001d0287d45c1$cid$;
 
@@ -3142,6 +3183,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_631cce252
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$Waterford MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9ecda600bfe715cc$cid$;
 
@@ -3152,7 +3194,7 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_956c3d779ee6e80f$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ef04782a0acaf724$cid$;
 
@@ -3264,17 +3306,18 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_b86ab7c04
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_9f89b967557c4a79$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Shatekon Elementary School (Shenendehowa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2d9afda3fcc5008e$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_dda1677f91666465$cid$;
 
@@ -3298,6 +3341,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_056fa3fc5
 
 UPDATE public.events
 SET   event_type = $typ$Photo Booth$typ$,
+  canonical_school = $sch$Waterford MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_04738593e49f6166$cid$;
 
@@ -3308,7 +3352,8 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_310603409a130902$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Seniors$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Tech Valley Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_654b227d5c0dbaf8$cid$;
 
@@ -3336,7 +3381,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8324e97d0
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
-  canonical_school = $sch$Northville$sch$,
+  canonical_school = $sch$Northville Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_c197c92fcec037cc$cid$;
 
@@ -3358,7 +3403,7 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d418c6947126a79b$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_49174667c735af89$cid$;
 
@@ -3379,7 +3424,7 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7d395aeadb5663d6$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Fall Picture Day$typ$,
+SET   event_type = $typ$Makeup Day$typ$,
   canonical_school = $sch$Craig Elementary School (Niskayuna School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_a52140f1a08ec317$cid$;
@@ -3396,6 +3441,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_68e1f2104
 
 UPDATE public.events
 SET   event_type = $typ$Sports$typ$,
+  canonical_school = $sch$BKW Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8fce0427c6a65240$cid$;
 
@@ -3407,6 +3453,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ca325b465
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_1c3d021ee5893393$cid$;
 
@@ -3450,6 +3497,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2a5398522
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$Tech Valley Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3ad216fec1d91e84$cid$;
 
@@ -3486,7 +3534,7 @@ SET   event_type = $typ$Special Event$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7b8f405904a1230d$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$TSL Bethlehem$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_871c6941499813ca$cid$;
@@ -3515,6 +3563,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_06277d98d
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_6402b91c390327e6$cid$;
 
@@ -3526,6 +3575,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_aac751074
 
 UPDATE public.events
 SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Glencliff Elementary School (Niskayuna School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2f546a4814cfac72$cid$;
 
@@ -3535,7 +3585,7 @@ SET   event_type = $typ$Seniors$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e612446fc43181b9$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_0e3545abbaa6e5a9$cid$;
 
@@ -3594,7 +3644,7 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_85350245eae3c9c9$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Seniors$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Hudson Valley Consortium$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ae97ab633757153b$cid$;
@@ -3673,7 +3723,8 @@ SET   event_type = $typ$Sports$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d89ff710857ce253$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Skano Elementary School (Shenendehowa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_96787ed60bb352ed$cid$;
 
@@ -3727,7 +3778,8 @@ SET   event_type = $typ$Makeup Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_5a17fceb7b472aea$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
+  canonical_school = $sch$Cairo-Durham Elem$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_fa28904acd89f5af$cid$;
 
@@ -3747,7 +3799,7 @@ SET   event_type = $typ$Call or Meeting$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_833f833896d4813f$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Call or Meeting$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_dd1ffd7f6d7f1e84$cid$;
 
@@ -3804,7 +3856,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_7d08b8dca
 
 UPDATE public.events
 SET   event_type = $typ$Fall Picture Day$typ$,
-  canonical_school = $sch$Northville$sch$,
+  canonical_school = $sch$Northville Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_043a0840ed3ccb56$cid$;
 
@@ -3815,7 +3867,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e4dddc0ed
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
-  canonical_school = $sch$Little Scholars$sch$,
+  canonical_school = $sch$Duanesburg$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_8e3e1a705e02011f$cid$;
 
@@ -3865,6 +3917,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_f29a70816
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_58c30093b5ef7e4a$cid$;
 
@@ -3891,7 +3944,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_b2822a848
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
-  canonical_school = $sch$Northville$sch$,
+  canonical_school = $sch$Northville Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_d778b2f00e853930$cid$;
 
@@ -3902,7 +3955,7 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_b8683cbd1
 
 UPDATE public.events
 SET   event_type = $typ$Rain Date$typ$,
-  canonical_school = $sch$Mother Theresa Academy$sch$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_b532401cfb77e31b$cid$;
 
@@ -3930,17 +3983,19 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_77a67f80c
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_436b4959f3812c85$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$The Academies (AA/G)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_63e0494615825c64$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Cairo-Durham Elem$sch$,
+  canonical_school = $sch$Cairo-Durham MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_3a7737f549d56544$cid$;
 
@@ -3962,24 +4017,23 @@ WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_01fd7491f
 
 UPDATE public.events
 SET   event_type = $typ$Special Event$typ$,
-  canonical_school = $sch$Little Achievers$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_e964f6d0defd1b05$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Fall Picture Day$typ$,
+SET   event_type = $typ$Spring Picture Day$typ$,
   canonical_school = $sch$Tesago Elementary School (Shenendehowa School District)$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_eca2a11a0e40a9c7$cid$;
 
 UPDATE public.events
 SET   event_type = $typ$Seniors$typ$,
-  canonical_school = $sch$Duanesburg Seniors$sch$,
+  canonical_school = $sch$D'burg Elementary$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_61eed6c69f38134d$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Seniors$typ$,
+SET   event_type = $typ$Makeup Day$typ$,
   canonical_school = $sch$Waterford MS/HS$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_29b4520768370abc$cid$;
@@ -4074,7 +4128,8 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_1b559bebae2ea89f$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Seniors$typ$,
+SET   event_type = $typ$Makeup Day$typ$,
+  canonical_school = $sch$New Lebanon Seniors$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_2ccb7c063f7730e9$cid$;
 
@@ -4090,7 +4145,7 @@ SET   event_type = $typ$Fall Picture Day$typ$,
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_ac04476f3b59fe14$cid$;
 
 UPDATE public.events
-SET   event_type = $typ$Special Event$typ$,
+SET   event_type = $typ$Fall Picture Day$typ$,
   canonical_school = $sch$Blessed Sacrament$sch$,
   updated_at = now()
 WHERE source = 'google_calendar_import' AND client_event_id = $cid$ics_050287c9adfba704$cid$;
