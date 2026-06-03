@@ -1152,17 +1152,13 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
   const save = () => {
     const cleanName = schoolName.trim();
-    if (!cleanName) {
-      setError('Please choose or type the school/account this event belongs to.');
-      return;
-    }
-    const cleanTitle = title.trim() || `${cleanName} ${eventType}`;
+    const cleanTitle = title.trim() || (cleanName ? `${cleanName} ${eventType}` : eventType);
     const event = {
       id: initialEvent?.id || `custom-${Date.now()}`,
       supabaseId: initialEvent?.supabaseId,
       date,
       title: cleanTitle,
-      canonicalSchool: cleanName,
+      canonicalSchool: cleanName || '',
       type: eventType,
       status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
@@ -1173,7 +1169,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       time: 'TBD',
       notes: notes || '',
       rainInfo: '',
-      history: matchedSchool ? 'Created from Add Event using an existing school/account.' : 'Created from Add Event using a new school/account name.'
+      history: matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
     onSave(event);
     onClose();
@@ -1188,7 +1184,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
               <div>
                 <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{isEditing ? "Edit Event" : "Add Event"}</Pill>
                 <h2 className="mt-3 text-2xl font-semibold text-zinc-950">{isEditing ? "Edit event" : "Create an event"}</h2>
-                <p className="mt-1 text-sm text-zinc-600">Choose an existing school or type a school/account name to associate this event with.</p>
+                <p className="mt-1 text-sm text-zinc-600">Optionally associate this event with a school/account, or leave it blank for internal/special events.</p>
               </div>
               <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
             </div>
@@ -1209,22 +1205,22 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account <span className="text-rose-600">*</span></div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account</div>
                 <input
                   list="school-account-options"
                   value={schoolName}
                   onChange={(e) => { setSchoolName(e.target.value); setError(''); }}
-                  placeholder="Select or type school/account name"
+                  placeholder="Optional — select or type school/account name"
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4"
                 />
                 <datalist id="school-account-options">
                   {schoolOptions.map(name => <option key={name} value={name} />)}
                 </datalist>
-                <div className="mt-2 text-xs text-zinc-500">This associates the event with a school/account name. It does not create a School List record.</div>
+                <div className="mt-2 text-xs text-zinc-500">Optional. If left blank, this event will not appear on a School List page.</div>
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills from name/type" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills if blank" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
                 {matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
