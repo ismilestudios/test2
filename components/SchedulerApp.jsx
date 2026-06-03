@@ -1774,6 +1774,16 @@ function supabaseRowToSchool(row = {}) {
 }
 
 
+function importedEventToSupabaseRow(event = {}) {
+  return eventToSupabaseRow({
+    ...event,
+    id: `imported-${event.id}`,
+    source: 'imported_code_baseline',
+    sourceEventId: event.id,
+    active: true
+  });
+}
+
 function eventToSupabaseRow(event = {}) {
   return {
     client_event_id: event.id || `event-${Date.now()}`,
@@ -1792,6 +1802,7 @@ function eventToSupabaseRow(event = {}) {
     rain_info: event.rainInfo || null,
     history: event.history || null,
     source: event.source || 'app',
+    source_event_id: event.sourceEventId || null,
     active: event.active !== false,
     updated_at: new Date().toISOString()
   };
@@ -1816,6 +1827,7 @@ function supabaseRowToEvent(row = {}) {
     rainInfo: row.rain_info || '',
     history: row.history || '',
     source: row.source || 'supabase',
+    sourceEventId: row.source_event_id || null,
     active: row.active !== false
   };
 }
@@ -2284,6 +2296,34 @@ export default function SchedulerApp() {
   const [schools, setSchools] = useState(SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
   const [schoolsMessage, setSchoolsMessage] = useState('Loading schools from Supabase...');
 
+  const importHistoricalEventsToSupabase = async (supabase, existingRows = []) => {
+    const existingImportedIds = new Set(
+      (existingRows || [])
+        .filter(row => row.source === 'imported_code_baseline' && row.source_event_id)
+        .map(row => row.source_event_id)
+    );
+
+    const rowsToImport = EVENTS
+      .filter(event => event?.id && !existingImportedIds.has(event.id))
+      .map(importedEventToSupabaseRow);
+
+    if (!rowsToImport.length) {
+      return { importedCount: 0, skipped: true };
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .insert(rowsToImport)
+      .select('*');
+
+    if (error) {
+      console.warn('Could not import historical events into Supabase', error);
+      return { importedCount: 0, error };
+    }
+
+    return { importedCount: data?.length || 0, data: data || [] };
+  };
+
   const loadEventsFromSupabase = async () => {
     if (!hasSupabaseEnv()) {
       setEventsMessage('Supabase is not connected yet. New events will not be shared.');
@@ -2307,8 +2347,20 @@ export default function SchedulerApp() {
       return;
     }
 
-    setSupabaseEvents((data || []).map(supabaseRowToEvent));
-    setEventsMessage(data?.length ? 'New/custom events are loading from Supabase.' : 'Supabase events table is ready. No custom events saved yet.');
+    const importResult = await importHistoricalEventsToSupabase(supabase, data || []);
+
+    if (importResult.error) {
+      setSupabaseEvents((data || []).map(supabaseRowToEvent));
+      setEventsMessage(`Supabase events loaded, but historical import failed: ${importResult.error.message}. Run supabase/events_historical_import_migration.sql and refresh.`);
+      return;
+    }
+
+    const finalRows = importResult.importedCount
+      ? [...(data || []), ...(importResult.data || [])]
+      : (data || []);
+
+    setSupabaseEvents(finalRows.map(supabaseRowToEvent));
+    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : 'Events are loading from Supabase.');
   };
 
   const loadSchoolsFromSupabase = async () => {
@@ -2430,7 +2482,7 @@ export default function SchedulerApp() {
   }, []);
 
   const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false;
-  const allEvents = useMemo(() => [...EVENTS, ...supabaseEvents.filter(event => event.active !== false)].filter(isValidEvent), [supabaseEvents]);
+  const allEvents = useMemo(() => (supabaseEvents.length ? supabaseEvents.filter(event => event.active !== false) : EVENTS).filter(isValidEvent), [supabaseEvents]);
   const removedEvents = useMemo(() => supabaseEvents.filter(event => event.active === false), [supabaseEvents]);
   const handleScheduleEvent = async (event) => {
     const eventWithId = { ...event, id: event.id || `custom-${Date.now()}` };

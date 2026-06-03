@@ -151,3 +151,19 @@ Important behavior:
 - New events from Overview, Calendar View, and Carrie View save to Supabase.
 - Calendar, Overview, and Carrie View read those Supabase events together with the built-in historical events.
 - Full historical event import can happen later after this create/read flow is stable.
+
+
+## Historical events imported to Supabase
+
+This build imports the built-in code-baseline `EVENTS` into Supabase automatically on first authenticated load.
+
+Run this migration first:
+
+`supabase/events_historical_import_migration.sql`
+
+Important behavior:
+- Imported events get `source = imported_code_baseline`.
+- Imported events get `source_event_id = original code event id`.
+- The app checks existing `source_event_id` values so the same historical events are not imported twice.
+- Once Supabase has event rows, Calendar/Overview/Carrie/School History use Supabase events instead of the hardcoded fallback.
+- The hardcoded `EVENTS` array remains only as a fallback if Supabase has no event rows or fails before import.
