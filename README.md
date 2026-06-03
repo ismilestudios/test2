@@ -149,3 +149,16 @@ Added in this build:
 - Global search: the top search now surfaces cross-app results for schools, contacts, notes, photographers, assistants, and imported events. School results jump to School List; event results open the event drawer.
 
 Build check: `npm run build` passed locally after installing dependencies with `npm install --ignore-scripts`.
+
+---
+
+## Latest ICS Import Update Package
+
+This ZIP includes the latest ICS comparison/import update in the same full-project format as the normal iSmile Scheduler handoff ZIPs.
+
+- Delta SQL: `supabase/ics_latest_import/ismile_calendar_import_DELTA_from_previous_ics.sql`
+- Full latest SQL: `supabase/ics_latest_import/ismile_calendar_import_FULL_latest_after_2025_05_31.sql`
+- Review workbook and CSVs: `import_reports/ics_latest/`
+- Detailed handoff: `ICS_LATEST_IMPORT_HANDOFF.md`
+
+Use the Delta SQL only if the previous ICS import was already applied. Use the Full latest SQL if no ICS import has been applied yet.

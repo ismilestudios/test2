@@ -1,0 +1,18 @@
+iSmile Scheduler — Latest ICS Import Update
+
+Package format: full deployable project ZIP, matching prior iSmile Scheduler handoff ZIP style.
+
+Latest ICS comparison result:
+- 15 added future events
+- 23 modified future events
+- 0 removed future events
+- 0 new internal duplicate events detected
+
+Use DELTA SQL if prior ICS SQL has already been run:
+supabase/ics_latest_import/ismile_calendar_import_DELTA_from_previous_ics.sql
+
+Use FULL latest SQL if no ICS import has been run yet:
+supabase/ics_latest_import/ismile_calendar_import_FULL_latest_after_2025_05_31.sql
+
+Review workbook:
+import_reports/ics_latest/ismile_ics_latest_comparison_review.xlsx

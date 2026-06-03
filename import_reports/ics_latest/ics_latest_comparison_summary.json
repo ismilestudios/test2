@@ -1,0 +1,21 @@
+{
+  "old_total_events_reported": 5329,
+  "new_total_events_parsed": 5344,
+  "old_historical_rows": 427,
+  "new_historical_rows": 427,
+  "old_future_rows": 730,
+  "new_future_rows": 745,
+  "old_needs_review_future": 294,
+  "new_needs_review_future": 293,
+  "old_duplicates_future": 0,
+  "new_duplicates_future": 0,
+  "historical_added": 0,
+  "historical_removed": 0,
+  "historical_modified": 0,
+  "future_added": 15,
+  "future_removed": 0,
+  "future_modified": 23,
+  "all_added": 15,
+  "all_removed": 0,
+  "all_modified": 23
+}
