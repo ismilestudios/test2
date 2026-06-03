@@ -1,0 +1,5 @@
+Auth-aware event load fix v2
+- Removed failing unique client_event_id index creation.
+- Manual event saves use insert again, with readback verification already in app code.
+- SQL keeps non-unique indexes and RLS policy repair.
+- This avoids failing on duplicate historical/imported client_event_id values.

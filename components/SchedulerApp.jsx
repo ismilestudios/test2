@@ -2453,6 +2453,8 @@ export default function SchedulerApp() {
   const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
   const [schools, setSchools] = useState(SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
   const [schoolsMessage, setSchoolsMessage] = useState('Loading schools from Supabase...');
+  const [authReady, setAuthReady] = useState(false);
+  const [authEmail, setAuthEmail] = useState(null);
 
   useEffect(() => {
     setLocalManualEvents(loadLocalManualEvents());
@@ -2495,6 +2497,14 @@ export default function SchedulerApp() {
     const supabase = createClient();
     if (!supabase) {
       setEventsMessage('Supabase client was not available. New events will not be shared.');
+      return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      const localBackup = loadLocalManualEvents();
+      setLocalManualEvents(localBackup);
+      setEventsMessage(`Waiting for login before loading Supabase events${localBackup.length ? ` (${localBackup.length} browser backup event${localBackup.length === 1 ? '' : 's'} visible)` : ''}.`);
       return;
     }
 
@@ -2639,15 +2649,64 @@ export default function SchedulerApp() {
   };
 
   useEffect(() => {
-    try {
-      // Events and School List now load from Supabase instead of localStorage.
-    } catch (error) {
-      console.warn('Could not load saved local scheduling data', error);
+    const localBackup = loadLocalManualEvents();
+    setLocalManualEvents(localBackup);
+
+    if (!hasSupabaseEnv()) {
+      setAuthReady(true);
+      loadTeamMembersFromSupabase();
+      loadSchoolsFromSupabase();
+      loadEventsFromSupabase();
+      return;
     }
 
-    loadTeamMembersFromSupabase();
-    loadSchoolsFromSupabase();
-    loadEventsFromSupabase();
+    const supabase = createClient();
+    if (!supabase) {
+      setAuthReady(true);
+      loadTeamMembersFromSupabase();
+      loadSchoolsFromSupabase();
+      loadEventsFromSupabase();
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAfterAuth = async (label = 'initial') => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      setAuthReady(true);
+      setAuthEmail(data.session?.user?.email || null);
+
+      if (!data.session) {
+        setEventsMessage(`Please log in to load shared Supabase events${localBackup.length ? ` (${localBackup.length} browser backup event${localBackup.length === 1 ? '' : 's'} visible)` : ''}.`);
+        return;
+      }
+
+      await Promise.all([
+        loadTeamMembersFromSupabase(),
+        loadSchoolsFromSupabase(),
+        loadEventsFromSupabase()
+      ]);
+    };
+
+    loadAfterAuth();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      setAuthReady(true);
+      setAuthEmail(session?.user?.email || null);
+      if (session && ['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event)) {
+        loadTeamMembersFromSupabase();
+        loadSchoolsFromSupabase();
+        loadEventsFromSupabase();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      listener?.subscription?.unsubscribe();
+    };
   }, []);
 
   const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false;
@@ -2697,7 +2756,9 @@ export default function SchedulerApp() {
       const confirmedEvent = readbackConfirmed ? { ...supabaseRowToEvent(readbackResult.data), localBackupOnly: false } : { ...savedEvent, localBackupOnly: true };
 
       if (readbackConfirmed) {
-        removeLocalManualEventBackup(confirmedEvent);
+        // Keep a non-warning browser backup too. Supabase is still the source of truth,
+        // but this protects the UI if a later refresh happens before auth/session readback finishes.
+        saveLocalManualEvent({ ...confirmedEvent, localBackupOnly: false });
       } else {
         saveLocalManualEvent(confirmedEvent);
         console.warn('Event save returned data, but readback verification failed', readbackResult.error);
@@ -2817,7 +2878,7 @@ export default function SchedulerApp() {
         <LoginRequiredNotice />
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
         {eventsMessage && activeTab === 'Calendar View' ? <div className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm">{eventsMessage}</div> : null}
-        {activeTab === 'Calendar View' && localManualEvents.length ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
+        {activeTab === 'Calendar View' && localManualEvents.some(event => event.localBackupOnly) ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>

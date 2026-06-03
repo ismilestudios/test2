@@ -1,0 +1,6 @@
+Auth-aware event loading fix
+- Delays shared Supabase event load until a user session exists.
+- Reloads events on SIGNED_IN / TOKEN_REFRESHED / INITIAL_SESSION.
+- Keeps a non-warning local backup even after DB readback verification, so deploy/refresh before auth does not hide confirmed manual events.
+- Uses upsert on client_event_id for manual event creation.
+- Adds manual_event_auth_load_and_upsert_fix.sql.
