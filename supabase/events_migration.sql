@@ -5,6 +5,8 @@
 alter table public.events
   add column if not exists client_event_id text,
   add column if not exists source_event_id text,
+  add column if not exists end_date date,
+  add column if not exists arrival_time text,
   add column if not exists canonical_school text,
   add column if not exists photographers text[] not null default '{}'::text[],
   add column if not exists assistants text[] not null default '{}'::text[],

@@ -196,6 +196,27 @@ function addDays(date, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function isDateInEventRange(event, date) {
+  if (!event || !date) return false;
+  const start = event.date;
+  const end = event.endDate || event.date;
+  return Boolean(start) && date >= start && date <= end;
+}
+
+function getEventDateLabel(event) {
+  if (!event?.endDate || event.endDate === event.date) return formatDate(event?.date);
+  return `${formatDate(event.date)} – ${formatDate(event.endDate)}`;
+}
+
+function getEventTimeLabel(event) {
+  const arrival = event?.arrivalTime && event.arrivalTime !== 'TBD' ? event.arrivalTime : '';
+  const start = event?.time && event.time !== 'TBD' ? event.time : '';
+  if (arrival && start) return `Arrival ${arrival} · Start ${start}`;
+  if (arrival) return `Arrival ${arrival}`;
+  if (start) return `Start ${start}`;
+  return 'Time TBD';
+}
+
 function weekBounds(date) {
   const d = new Date(date + 'T12:00:00');
   const start = new Date(d);
@@ -274,7 +295,7 @@ function EventCard({ event, onClick, compact = false }) {
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
-            <span>{event.time}</span>
+            <span>{getEventTimeLabel(event)}</span>
             {event.canonicalSchool ? <span className="truncate">{event.canonicalSchool}</span> : null}
           </div>
         </div>
@@ -387,7 +408,7 @@ function MonthNavigator({ month, setMonth }) {
 
 function TodayTomorrowList({ title, date, events }) {
   const dayEvents = events
-    .filter(event => event && event.date === date && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
+    .filter(event => isDateInEventRange(event, date) && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
     .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
   return (
@@ -547,7 +568,7 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }} title="Double-click to add an event" className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onDoubleClick={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onClick(event); }} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.localBackupOnly ? '⚠ ' : ''}{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
+  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => isDateInEventRange(e, date)); return <div key={date} onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }} title="Double-click to add an event" className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onDoubleClick={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onClick(event); }} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.localBackupOnly ? '⚠ ' : ''}{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
 
 
@@ -679,7 +700,7 @@ function PhotographerAssignmentPicker({ photographers, selectedPhotographers, se
 function WeekView({ events, selectedDate, onClick }) {
   const { start, end } = weekBounds(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const weekEvents = days.flatMap(date => events.filter(e => e && e.date === date));
+  const weekEvents = days.flatMap(date => events.filter(e => isDateInEventRange(e, date)));
   const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const capacity = getCapacityTone(weeklyRollouts);
   const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
@@ -727,7 +748,7 @@ function WeekView({ events, selectedDate, onClick }) {
       </div>
       <div className="space-y-4">
         {days.map(date => {
-          const dayEvents = events.filter(e => e && e.date === date);
+          const dayEvents = events.filter(e => isDateInEventRange(e, date));
           const dayRollouts = dayEvents.reduce((total, event) => total + getRolloutCount(event), 0);
           return (
             <section key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-4 shadow-sm">
@@ -778,7 +799,7 @@ function WeekView({ events, selectedDate, onClick }) {
 }
 
 function DayView({ events, onClick, selectedDate }) {
-  const dayEvents = events.filter(event => event && event.date === selectedDate);
+  const dayEvents = events.filter(event => isDateInEventRange(event, selectedDate));
   if (!dayEvents.length) return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">No events scheduled for {formatDate(selectedDate)} yet.</div>;
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
@@ -981,7 +1002,7 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
     const day = d.getDay();
     if (day === 0 || day === 6) continue;
     const key = d.toISOString().slice(0, 10);
-    const scheduled = events.filter(event => event && event.date === key);
+    const scheduled = events.filter(event => isDateInEventRange(event, key));
     const bookedPhotographers = new Set(scheduled.flatMap(event => event.photographers || []));
     const availablePhotographers = photographers.filter(name => !bookedPhotographers.has(name));
     dates.push({ date: key, scheduledCount: scheduled.length, availablePhotographers, scheduled });
@@ -1137,6 +1158,9 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
 
 function SchedulingModal({ school, photographers, assistants, events = [], onClose, onSave }) {
   const [date, setDate] = useState('2026-09-01');
+  const [isTwoDay, setIsTwoDay] = useState(false);
+  const [endDate, setEndDate] = useState('');
+  const [arrivalTime, setArrivalTime] = useState('');
   const [startTime, setStartTime] = useState('');
   const [selectedPhotographers, setSelectedPhotographers] = useState([]);
   const [selectedAssistants, setSelectedAssistants] = useState([]);
@@ -1153,6 +1177,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
     const event = {
       id: `2026-${school.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
       date,
+      endDate: isTwoDay ? (endDate || addDays(date, 1)) : null,
       title: `${school.name} Fall Picture Day`,
       canonicalSchool: school.name,
       type: 'Fall Picture Day',
@@ -1162,6 +1187,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
       noAssistant,
       features: [],
       irm: school.irm || null,
+      arrivalTime: arrivalTime || '',
       time: startTime || 'TBD',
       notes: notes || 'Scheduled from Carrie View. Details can be refined later.',
       rainInfo: '',
@@ -1191,8 +1217,19 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
           <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Fall 2026 Date</div>
-                <input type="date" min="2026-09-01" max="2026-11-30" value={date} onChange={(e) => setDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Fall 2026 First Date</div>
+                <input type="date" min="2026-09-01" max="2026-11-30" value={date} onChange={(e) => { setDate(e.target.value); if (isTwoDay && (!endDate || endDate < e.target.value)) setEndDate(addDays(e.target.value, 1)); }} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Second Date</div>
+                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Two-day' : 'One-day'}</button>
+                </div>
+                <input type="date" min="2026-09-01" max="2026-11-30" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
+                <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Start Time</div>
@@ -1240,6 +1277,9 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null }) {
   const isEditing = Boolean(initialEvent);
   const [date, setDate] = useState(initialEvent?.date || defaultDate);
+  const [isTwoDay, setIsTwoDay] = useState(Boolean(initialEvent?.endDate && initialEvent.endDate !== initialEvent.date));
+  const [endDate, setEndDate] = useState(initialEvent?.endDate || '');
+  const [arrivalTime, setArrivalTime] = useState(initialEvent?.arrivalTime || '');
   const [startTime, setStartTime] = useState(initialEvent?.time && initialEvent.time !== 'TBD' ? initialEvent.time : '');
   const [title, setTitle] = useState(initialEvent?.title || '');
   const [schoolName, setSchoolName] = useState(initialEvent?.canonicalSchool || '');
@@ -1262,10 +1302,17 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
 
     const cleanName = schoolName.trim();
     const cleanTitle = title.trim() || (cleanName ? `${cleanName} ${eventType}` : eventType);
+    const cleanEndDate = isTwoDay ? (endDate || addDays(date, 1)) : '';
+    if (isTwoDay && cleanEndDate < date) {
+      setError('End date must be the same as or after the first date.');
+      setSaving(false);
+      return;
+    }
     const event = {
       id: initialEvent?.id || `custom-${Date.now()}`,
       supabaseId: initialEvent?.supabaseId,
       date,
+      endDate: cleanEndDate || null,
       title: cleanTitle,
       canonicalSchool: cleanName || '',
       type: eventType,
@@ -1275,6 +1322,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       noAssistant,
       features: [],
       irm: matchedSchool?.irm || null,
+      arrivalTime: arrivalTime || '',
       time: startTime || 'TBD',
       notes: notes || '',
       rainInfo: '',
@@ -1307,12 +1355,25 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
             {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Date</div>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">First Date</div>
+                <input type="date" value={date} onChange={(e) => { setDate(e.target.value); if (isTwoDay && (!endDate || endDate < e.target.value)) setEndDate(addDays(e.target.value, 1)); }} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Second Date</div>
+                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Two-day' : 'One-day'}</button>
+                </div>
+                <input type="date" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
+                <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <div className="mt-2 text-xs text-zinc-500">When photographers arrive.</div>
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Start Time</div>
                 <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <div className="mt-2 text-xs text-zinc-500">When photographing starts.</div>
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4 md:col-span-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Event Type</div>
@@ -1901,7 +1962,9 @@ function eventToSupabaseRow(event = {}) {
     client_event_id: event.id || `event-${Date.now()}`,
     title: event.title || 'Untitled Event',
     date: event.date,
+    end_date: event.endDate || null,
     time: event.time || null,
+    arrival_time: event.arrivalTime || null,
     event_type: event.type || event.eventType || 'Special Event',
     status: event.status || 'Scheduled',
     season: event.season || getSeasonLabel(event.date || ''),
@@ -1925,6 +1988,7 @@ function supabaseRowToEvent(row = {}) {
     id: row.client_event_id || row.id,
     supabaseId: row.id,
     date: row.date,
+    endDate: row.end_date || null,
     title: row.title,
     canonicalSchool: row.canonical_school || '',
     type: row.event_type || 'Special Event',
@@ -1935,6 +1999,7 @@ function supabaseRowToEvent(row = {}) {
     features: [],
     irm: row.irm ?? null,
     time: row.time || 'TBD',
+    arrivalTime: row.arrival_time || '',
     notes: row.picture_day_info || '',
     rainInfo: row.rain_info || '',
     history: row.history || '',
@@ -2382,7 +2447,7 @@ function RemovedEventsModule({ events, onRestore }) {
 }
 
 function Drawer({ event, onClose, onViewSchool, onEditEvent, onRemoveEvent }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => onRemoveEvent(event)} className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={Clock} title="Start Time" value={event.time || 'TBD'} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => onRemoveEvent(event)} className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
               <Info icon={Pencil} title="Picture Day Info" value={event.notes || '—'} large /></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
@@ -2896,12 +2961,12 @@ export default function SchedulerApp() {
   }, [query, allEvents]);
 
   const overviewPeriodEvents = useMemo(() => {
-    if (overviewMode === 'Month') return queryFilteredEvents.filter(event => event && monthKey(event.date) === month);
+    if (overviewMode === 'Month') return queryFilteredEvents.filter(event => event && monthKey(event.date) <= month && monthKey(event.endDate || event.date) >= month);
     if (overviewMode === 'Week') {
       const { start, end } = weekBounds(selectedDate);
       return queryFilteredEvents.filter(event => event && event.date >= start && event.date <= end);
     }
-    return queryFilteredEvents.filter(event => event && event.date === selectedDate);
+    return queryFilteredEvents.filter(event => isDateInEventRange(event, selectedDate));
   }, [queryFilteredEvents, overviewMode, month, selectedDate]);
 
   return (
