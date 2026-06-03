@@ -1,0 +1,7 @@
+Delete Event confirmation + smaller Remove Event button
+
+Changes made:
+- Remove Event still opens a browser confirmation prompt before soft-deleting.
+- Remove Event is no longer full-width.
+- Remove Event is styled as a smaller secondary/destructive action beneath the primary full-width Edit Event button.
+- No SQL required.

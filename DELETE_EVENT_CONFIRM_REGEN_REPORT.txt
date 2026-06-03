@@ -1,0 +1,8 @@
+Delete Event Confirmation Regeneration
+
+Change made:
+- Event detail drawer Remove Event button now opens a confirmation prompt before calling the existing remove/soft-delete handler.
+- Cancel leaves the event untouched.
+- Confirm runs the same existing soft-delete flow, so removed events continue to appear in Removed Events/restore area.
+
+No SQL required.
