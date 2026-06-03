@@ -140,6 +140,44 @@ function todayKey() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const LOCAL_MANUAL_EVENTS_KEY = 'ismile_manual_events_backup_v1';
+
+function loadLocalManualEvents() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(LOCAL_MANUAL_EVENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(event => event && event.id && event.date && event.title) : [];
+  } catch (error) {
+    console.warn('Could not load local manual events backup', error);
+    return [];
+  }
+}
+
+function saveLocalManualEvent(event) {
+  if (typeof window === 'undefined' || !event?.id) return;
+  try {
+    const existing = loadLocalManualEvents();
+    const without = existing.filter(item => item.id !== event.id && item.supabaseId !== event.supabaseId);
+    const next = [...without, event].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    window.localStorage.setItem(LOCAL_MANUAL_EVENTS_KEY, JSON.stringify(next));
+  } catch (error) {
+    console.warn('Could not save local manual event backup', error);
+  }
+}
+
+function mergeEventsById(primary = [], backup = []) {
+  const map = new Map();
+  [...backup, ...primary].forEach(event => {
+    if (!event) return;
+    const key = event.supabaseId || event.id;
+    if (!key) return;
+    map.set(key, event);
+  });
+  return Array.from(map.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+}
+
 function addDays(date, delta) {
   const d = new Date(date + 'T12:00:00');
   d.setDate(d.getDate() + delta);
@@ -2302,11 +2340,16 @@ export default function SchedulerApp() {
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
   const [supabaseEvents, setSupabaseEvents] = useState([]);
+  const [localManualEvents, setLocalManualEvents] = useState([]);
   const [eventsMessage, setEventsMessage] = useState('Loading events from Supabase...');
   const [addingEvent, setAddingEvent] = useState(false);
   const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
   const [schools, setSchools] = useState(SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
   const [schoolsMessage, setSchoolsMessage] = useState('Loading schools from Supabase...');
+
+  useEffect(() => {
+    setLocalManualEvents(loadLocalManualEvents());
+  }, []);
 
   const importHistoricalEventsToSupabase = async (supabase, existingRows = []) => {
     const existingImportedIds = new Set(
@@ -2371,9 +2414,15 @@ export default function SchedulerApp() {
       ? [...(data || []), ...(importResult.data || [])]
       : (data || []);
 
-    setSupabaseEvents(finalRows.map(supabaseRowToEvent));
+    const loadedEvents = finalRows.map(supabaseRowToEvent);
+    setSupabaseEvents(loadedEvents);
+
+    const localBackup = loadLocalManualEvents();
+    setLocalManualEvents(localBackup);
+
     const manualCount = finalRows.filter(row => row.source === 'manual_app' || row.client_event_id?.startsWith('custom-')).length;
-    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Events are loading from Supabase (${finalRows.length} rows, ${manualCount} manual).`);
+    const localOnlyCount = localBackup.filter(localEvent => !loadedEvents.some(loaded => loaded.id === localEvent.id || loaded.supabaseId === localEvent.supabaseId)).length;
+    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Events are loading from Supabase (${finalRows.length} rows, ${manualCount} manual, ${localOnlyCount} local backup).`);
   };
 
   const loadSchoolsFromSupabase = async () => {
@@ -2495,7 +2544,10 @@ export default function SchedulerApp() {
   }, []);
 
   const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false;
-  const allEvents = useMemo(() => (supabaseEvents.length ? supabaseEvents.filter(event => event.active !== false) : EVENTS).filter(isValidEvent), [supabaseEvents]);
+  const allEvents = useMemo(() => {
+    const baseEvents = supabaseEvents.length ? supabaseEvents.filter(event => event.active !== false) : EVENTS;
+    return mergeEventsById(baseEvents, localManualEvents).filter(isValidEvent);
+  }, [supabaseEvents, localManualEvents]);
   const removedEvents = useMemo(() => supabaseEvents.filter(event => event.active === false), [supabaseEvents]);
   const handleScheduleEvent = async (event) => {
     const eventWithId = { ...event, id: event.id || `custom-${Date.now()}` };
@@ -2527,6 +2579,8 @@ export default function SchedulerApp() {
       }
 
       const savedEvent = supabaseRowToEvent(data);
+      saveLocalManualEvent(savedEvent);
+      setLocalManualEvents(loadLocalManualEvents());
       setSupabaseEvents(prev => {
         const without = (prev || []).filter(item => item.id !== savedEvent.id && item.supabaseId !== savedEvent.supabaseId);
         return [...without, savedEvent].sort((a, b) => a.date.localeCompare(b.date));

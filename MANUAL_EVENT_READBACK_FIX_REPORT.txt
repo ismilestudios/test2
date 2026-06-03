@@ -1,0 +1,6 @@
+Manual event readback fix
+- Adds localStorage safety backup for manual events after Supabase confirms save.
+- Merges local manual backups with Supabase-loaded events after refresh.
+- Keeps Supabase as the real save path.
+- Adds verify_manual_events_readback.sql.
+- Adds events_manual_readback_policy_fix.sql for possible Supabase RLS readback issue.
