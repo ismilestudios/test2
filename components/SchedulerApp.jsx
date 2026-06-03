@@ -2372,7 +2372,8 @@ export default function SchedulerApp() {
       : (data || []);
 
     setSupabaseEvents(finalRows.map(supabaseRowToEvent));
-    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Events are loading from Supabase (${finalRows.length} rows).`);
+    const manualCount = finalRows.filter(row => row.source === 'manual_app' || row.client_event_id?.startsWith('custom-')).length;
+    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Events are loading from Supabase (${finalRows.length} rows, ${manualCount} manual).`);
   };
 
   const loadSchoolsFromSupabase = async () => {
@@ -2531,16 +2532,14 @@ export default function SchedulerApp() {
         return [...without, savedEvent].sort((a, b) => a.date.localeCompare(b.date));
       });
 
-      // Re-read from Supabase after save, but do not fail the save if the reload has a temporary issue.
-      try {
-        await loadEventsFromSupabase();
-      } catch (reloadError) {
-        console.warn('Event saved, but Supabase reload failed', reloadError);
-      }
-
+      // Keep the confirmed saved row visible immediately.
+      // Do not immediately reload the full Supabase list here; a fast reload can briefly return
+      // without the new row and make the event look like it disappeared even though it saved.
       setSelected(null);
       setEditingEvent(null);
-      setEventsMessage(eventWithId.supabaseId ? 'Event changes saved to Supabase.' : 'Event saved to Supabase and confirmed.');
+      setQuery('');
+      setCalendarMode('Month');
+      setEventsMessage(eventWithId.supabaseId ? 'Event changes saved to Supabase.' : `Event saved to Supabase and shown on ${formatDate(savedEvent.date)}.`);
       setMonth(monthKey(savedEvent.date));
       setSelectedDate(savedEvent.date);
       setActiveTab('Calendar View');

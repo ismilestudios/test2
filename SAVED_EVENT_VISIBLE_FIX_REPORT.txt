@@ -1,0 +1,5 @@
+Saved event visible fix
+- Removed immediate loadEventsFromSupabase() after successful insert/update.
+- Keeps saved row in local state immediately.
+- Clears search query after save so global search filters do not hide the event.
+- Forces Calendar View / Month mode and jumps to saved event month/date.
