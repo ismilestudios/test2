@@ -664,7 +664,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign }) {
             </div>
             <div className="space-y-3">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
-              return <EventCard key={event.id} event={event} onClick={onClick} onAction={isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} actionLabel={column.key === 'needs-photographers' ? 'Assign Photographer' : column.key === 'needs-assistant' ? 'Assign Assistant' : ''} />;
+              return <EventCard key={event.id} event={event} onClick={onClick} onAction={isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
             })}</div>
           </div>
         );

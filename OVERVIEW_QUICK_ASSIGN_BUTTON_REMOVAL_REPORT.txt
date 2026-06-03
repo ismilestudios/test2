@@ -1,0 +1,11 @@
+iSmile Scheduler — Overview Quick Assign Button Removal
+
+Change implemented:
+- Removed the visible Assign Photographer / Assign Assistant button/pill from Overview page event cards.
+- Preserved click-anywhere card behavior for the Need Photographer(s) Assigned and Need Assistant(s) Assigned columns.
+- Clicking a card still opens the quick assignment modal.
+- No SQL required.
+
+Reason:
+- The dedicated action button was redundant because the full card click already performs the same quick assignment action.
+- This keeps the Overview page cleaner while preserving the faster workflow.
