@@ -1056,7 +1056,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
     setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
   };
 
-  const saveSchedule = () => {
+  const saveSchedule = async () => {
     const event = {
       id: `2026-${school.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
       date,
