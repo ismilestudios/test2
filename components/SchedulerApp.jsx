@@ -45,13 +45,38 @@ function LoginRequiredNotice() {
   if (!checked || userEmail) return null;
 
   return (
-    <section className="rounded-[2rem] border border-amber-300 bg-amber-50 p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-sm font-semibold text-amber-950">You are not logged in</div>
-          <p className="mt-1 text-sm text-amber-900">You can see the app layout, but shared Supabase data and saves require login.</p>
+    <section className="rounded-[2.25rem] border-2 border-amber-400 bg-gradient-to-br from-amber-100 via-amber-50 to-orange-100 p-6 shadow-xl">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="inline-flex rounded-full border border-amber-500 bg-white/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-900 shadow-sm">
+            Login Required
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black tracking-tight text-amber-950 sm:text-3xl">
+            You are currently NOT logged in
+          </h2>
+
+          <p className="mt-3 text-base leading-7 text-amber-950">
+            The calendar may appear normal at first glance, but shared Supabase data, saved changes, assignments, edits, and scheduling actions require login first.
+          </p>
+
+          <div className="mt-4 rounded-2xl border border-amber-300 bg-white/70 px-4 py-3 text-sm font-semibold text-amber-950 shadow-sm">
+            If you proceed without logging in, your changes may not save or sync correctly.
+          </div>
         </div>
-        <a href="/login" className="inline-flex items-center justify-center rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Login before proceeding</a>
+
+        <div className="flex shrink-0 flex-col gap-3">
+          <a
+            href="/login"
+            className="inline-flex min-h-14 items-center justify-center rounded-2xl bg-zinc-950 px-6 py-3 text-base font-bold text-white shadow-lg transition hover:-translate-y-0.5"
+          >
+            Login Now
+          </a>
+
+          <div className="text-center text-xs font-semibold uppercase tracking-wide text-amber-900">
+            Shared scheduling requires authentication
+          </div>
+        </div>
       </div>
     </section>
   );
