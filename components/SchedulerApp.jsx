@@ -251,6 +251,24 @@ function displayPhotographerAssignment(event) {
   return event.photographers?.length ? event.photographers.join(', ') : 'Needs Photographers Assigned';
 }
 
+function isNeedsPhotographerAssignment(event) {
+  const status = String(event?.status || '').trim().toLowerCase();
+  const photographers = Array.isArray(event?.photographers) ? event.photographers.filter(Boolean) : [];
+  const placeholderStatuses = new Set([
+    '',
+    'needs photographer assigned',
+    'needs photographers assigned',
+    'need photographer assigned',
+    'need photographers assigned',
+    'needs photographer(s) assigned',
+    'need photographer(s) assigned',
+    'unassigned',
+    'photographer unassigned'
+  ]);
+
+  return photographers.length === 0 || placeholderStatuses.has(status);
+}
+
 function displayAssistants(event) {
   if (event?.noAssistant) return 'No Assistant';
   return event?.assistants?.length ? event.assistants.join(', ') : '—';
@@ -616,7 +634,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign }) {
     {
       key: 'needs-photographers',
       title: 'Need Photographer(s) Assigned',
-      filter: (event) => event.status === 'Needs Photographers Assigned'
+      filter: (event) => isNeedsPhotographerAssignment(event)
     },
     {
       key: 'needs-assistant',

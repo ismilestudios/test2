@@ -1,0 +1,5 @@
+Overview Needs Photographer Filter Fix
+
+Fix: The Need Photographer(s) Assigned overview column now treats events with empty photographer arrays as needing photographer assignment, even if status was set to Scheduled by import/reconciliation. This catches imported Fall Picture Day events that display “Photographers Assigned: Needs Photographers Assigned” but previously only appeared in Need Assistant(s) Assigned.
+
+No SQL required.
