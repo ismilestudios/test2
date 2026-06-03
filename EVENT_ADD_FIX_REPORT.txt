@@ -1,0 +1,6 @@
+Event add persistence fix
+SchedulingModal contains setError: False
+SchedulingModal contains setSaving: False
+AddEventModal save awaits onSave: True
+AddEventModal has saving state: True
+handleScheduleEvent has try/catch: True

@@ -1077,9 +1077,6 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
     const result = await onSave(event);
     if (result) {
       onClose();
-    } else {
-      setError('This event did not save to Supabase. Please make sure you are logged in and try again.');
-      setSaving(false);
     }
   };
 
@@ -1190,8 +1187,13 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       rainInfo: '',
       history: matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
-    onSave(event);
-    onClose();
+    const result = await onSave(event);
+    if (result) {
+      onClose();
+    } else {
+      setError('This event did not save to Supabase. Please make sure you are logged in and try again.');
+      setSaving(false);
+    }
   };
 
   return (
@@ -2507,36 +2509,47 @@ export default function SchedulerApp() {
       ...eventWithId,
       source: eventWithId.source || 'manual_app'
     });
-    const query = supabase.from('events');
 
-    const result = eventWithId.supabaseId
-      ? await query.update(row).eq('id', eventWithId.supabaseId).select().single()
-      : await query.insert(row).select().single();
+    try {
+      const query = supabase.from('events');
 
-    const { data, error } = result;
+      const result = eventWithId.supabaseId
+        ? await query.update(row).eq('id', eventWithId.supabaseId).select().single()
+        : await query.insert(row).select().single();
 
-    if (error) {
-      console.error('Event save failed', error, row);
-      setEventsMessage(`Could not save event to Supabase: ${error.message}.`);
+      const { data, error } = result;
+
+      if (error) {
+        console.error('Event save failed', error, row);
+        setEventsMessage(`Could not save event to Supabase: ${error.message}.`);
+        return false;
+      }
+
+      const savedEvent = supabaseRowToEvent(data);
+      setSupabaseEvents(prev => {
+        const without = (prev || []).filter(item => item.id !== savedEvent.id && item.supabaseId !== savedEvent.supabaseId);
+        return [...without, savedEvent].sort((a, b) => a.date.localeCompare(b.date));
+      });
+
+      // Re-read from Supabase after save, but do not fail the save if the reload has a temporary issue.
+      try {
+        await loadEventsFromSupabase();
+      } catch (reloadError) {
+        console.warn('Event saved, but Supabase reload failed', reloadError);
+      }
+
+      setSelected(null);
+      setEditingEvent(null);
+      setEventsMessage(eventWithId.supabaseId ? 'Event changes saved to Supabase.' : 'Event saved to Supabase and confirmed.');
+      setMonth(monthKey(savedEvent.date));
+      setSelectedDate(savedEvent.date);
+      setActiveTab('Calendar View');
+      return savedEvent;
+    } catch (unexpectedError) {
+      console.error('Unexpected event save failure', unexpectedError, row);
+      setEventsMessage(`Could not save event to Supabase: ${unexpectedError?.message || 'Unexpected error'}.`);
       return false;
     }
-
-    const savedEvent = supabaseRowToEvent(data);
-    setSupabaseEvents(prev => {
-      const without = (prev || []).filter(item => item.id !== savedEvent.id && item.supabaseId !== savedEvent.supabaseId);
-      return [...without, savedEvent].sort((a, b) => a.date.localeCompare(b.date));
-    });
-
-    // Re-read from Supabase after save so refresh behavior matches the live UI.
-    await loadEventsFromSupabase();
-
-    setSelected(null);
-    setEditingEvent(null);
-    setEventsMessage(eventWithId.supabaseId ? 'Event changes saved to Supabase.' : 'Event saved to Supabase and confirmed.');
-    setMonth(monthKey(savedEvent.date));
-    setSelectedDate(savedEvent.date);
-    setActiveTab('Calendar View');
-    return savedEvent;
   };
 
   const handleRemoveEvent = async (event) => {
