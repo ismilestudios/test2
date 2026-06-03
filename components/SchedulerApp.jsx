@@ -532,10 +532,10 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
   );
 }
 
-function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode }) {
+function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
+  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }} title="Double-click to add an event" className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
 
 
@@ -906,6 +906,49 @@ function getSchoolsToSchedule(events = EVENTS) {
       const referenceEvent = chooseCarrieReferenceEvent(history);
       return {
         ...school,
+        displayName: getCarrieSchoolDisplayName(school.name),
+        history,
+        fall2025,
+        fallPictureDayEvents,
+        lastEvent: referenceEvent,
+        referencePhotographers: getUniqueNamesFromEvents(fallPictureDayEvents.length ? fallPictureDayEvents : referenceEvent ? [referenceEvent] : [], 'photographers'),
+        status: 'Needs Fall 2026 Scheduling'
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
+  const scheduled2026 = getFall2026ScheduledSchools(events);
+  const allSchools = (schoolsList && schoolsList.length ? schoolsList : SCHOOLS).filter(Boolean);
+
+  const mergedSourcesByTarget = {};
+  allSchools.forEach((school) => {
+    if (school?.mergedInto) {
+      mergedSourcesByTarget[school.mergedInto] ||= [];
+      mergedSourcesByTarget[school.mergedInto].push(school.originalName || school.name);
+    }
+  });
+
+  return allSchools
+    .filter(school => school.active !== false && !school.mergedInto)
+    .filter(school => !scheduled2026.has(schoolKey(school.name)) && !scheduled2026.has(schoolKey(school.originalName || school.name)))
+    .map(school => {
+      const mergedFrom = mergedSourcesByTarget[school.originalName || school.name] || [];
+      const mergedSourceSchools = mergedFrom.map(name => allSchools.find(item => (item.originalName || item.name) === name)).filter(Boolean);
+      const historyNames = [school.name, school.originalName, ...mergedFrom, ...mergedSourceSchools.map(item => item.name)].filter(Boolean);
+      const history = getSchoolHistoryForNames(historyNames, events);
+      const fall2025 = history.filter(event => event && event.date >= '2025-09-01' && event.date <= '2025-11-30');
+      const fallPictureDayEvents = fall2025.filter(event => event.type === 'Fall Picture Day');
+      const referenceEvent = chooseCarrieReferenceEvent(history);
+      const mergedNotes = mergedSourceSchools.map(item => item.notes).filter(Boolean);
+      const notes = [school.notes, ...mergedNotes.map((note, index) => `Merged from ${mergedSourceSchools[index]?.name || mergedFrom[index]}:\n${note}`)].filter(Boolean).join('\n\n');
+
+      return {
+        ...school,
+        notes,
+        referenceImages: [...(school.referenceImages || []), ...mergedSourceSchools.flatMap(item => item.referenceImages || [])],
+        mergedFrom: mergedSourceSchools.map(item => item.name),
         displayName: getCarrieSchoolDisplayName(school.name),
         history,
         fall2025,
@@ -1435,14 +1478,21 @@ function AddSchoolModal({ onClose, onSave }) {
 }
 
 function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule, schoolsList, setSchools, onSchoolAdded }) {
-  const schools = useMemo(() => getSchoolsToSchedule(events), [events]);
+  const schools = useMemo(() => getSchoolsToScheduleFromList(schoolsList, events), [schoolsList, events]);
   const availability = useMemo(() => getFall2026Availability(events, photographers), [events, photographers]);
   const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
   const [schedulingSchool, setSchedulingSchool] = useState(null);
   const [addingEvent, setAddingEvent] = useState(false);
+  const [addingEventDefaultDate, setAddingEventDefaultDate] = useState(todayKey());
   const [addingSchool, setAddingSchool] = useState(false);
   useEffect(() => {
-    if (!selectedSchool && schools.length) setSelectedSchool(schools[0]);
+    if (!schools.length) {
+      setSelectedSchool(null);
+      return;
+    }
+    if (!selectedSchool || !schools.some(school => school.name === selectedSchool.name)) {
+      setSelectedSchool(schools[0]);
+    }
   }, [schools, selectedSchool]);
 
   const q = query.trim().toLowerCase();
@@ -1878,6 +1928,7 @@ function supabaseRowToEvent(row = {}) {
     history: row.history || '',
     source: row.source || 'supabase',
     sourceEventId: row.source_event_id || null,
+    createdAt: row.created_at || null,
     active: row.active !== false
   };
 }
@@ -2078,7 +2129,7 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
         </div>
       </div>
       <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} showKey />
-      {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} />}
+      {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={onAddEvent} />}
       {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} />}
       {viewMode === 'Day' && <DayView events={events} selectedDate={selectedDate} onClick={onClick} />}
     </div>
@@ -2235,6 +2286,50 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
         <TeamMemberEditor title="Assistants" description="Active assistants available for future scheduling." members={assistants} value={assistantInput} setValue={setAssistantInput} role="assistant" saving={saving} onSaveMember={saveMember} onDeactivateMember={deactivateMember} />
       </div>
     </div>
+  );
+}
+
+function RecentlyAddedEventsModule({ events, onClick }) {
+  const recentEvents = useMemo(() => {
+    const cutoff = Date.now() - (72 * 60 * 60 * 1000);
+    return (events || [])
+      .filter(event => {
+        if (!event?.createdAt) return false;
+        const createdTime = new Date(event.createdAt).getTime();
+        const isRecent = Number.isFinite(createdTime) && createdTime >= cutoff;
+        const isManual = event.source === 'manual_app' || event.source === 'app' || String(event.id || '').startsWith('custom-');
+        return isRecent && isManual && event.active !== false;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 8);
+  }, [events]);
+
+  return (
+    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">Recently Added Events</h2>
+          <p className="mt-1 text-sm text-zinc-600">Manual events added to the calendar in the last 72 hours.</p>
+        </div>
+        <Pill className="border-zinc-200 bg-white text-zinc-600">{recentEvents.length} recent</Pill>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {recentEvents.length ? recentEvents.map(event => (
+          <button key={event.supabaseId || event.id} type="button" onClick={() => onClick?.(event)} className="block w-full rounded-2xl border border-zinc-200 bg-cream/75 p-3 text-left transition hover:bg-white hover:shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-zinc-950">{event.title}</div>
+                <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
+              </div>
+              <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+            </div>
+          </button>
+        )) : (
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No manual events added in the last 72 hours.</div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -2664,6 +2759,13 @@ export default function SchedulerApp() {
     setActiveTab('Calendar View');
   };
 
+  const openAddEvent = (date = selectedDate || todayKey()) => {
+    const safeDate = typeof date === 'string' && date.length >= 10 ? date : selectedDate || todayKey();
+    setAddingEventDefaultDate(safeDate);
+    setSelectedDate(safeDate);
+    setAddingEvent(true);
+  };
+
   const queryFilteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allEvents;
@@ -2690,12 +2792,15 @@ export default function SchedulerApp() {
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>
             <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
-            <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />
+            <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => openAddEvent(selectedDate)} />
             <div className="pt-6">
+              <RecentlyAddedEventsModule events={allEvents} onClick={setSelected} />
+            </div>
+            <div className="pt-3">
               <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} />
             </div>
           </>}
-          {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />}
+          {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={() => openAddEvent(selectedDate)} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
