@@ -1957,6 +1957,52 @@ function importedEventToSupabaseRow(event = {}) {
   });
 }
 
+
+function normalizeImportedEventType(row = {}) {
+  const rawType = String(row.event_type || '').trim();
+  const title = String(row.title || '').toLowerCase();
+  const date = String(row.date || '');
+  if (row.source !== 'google_calendar_import') return rawType || 'Special Event';
+  if (title.includes('rain date') || /\brain\b/.test(title)) return 'Rain Date';
+  if (title.includes('makeup') || title.includes('make up') || title.includes('retake')) return 'Makeup Day';
+  if (title.includes('sports')) return 'Sports';
+  if (title.includes('photo booth') || title.includes('photobooth') || rawType === 'photo booth') return 'Photo Booth';
+  if (title.includes('headshot')) return 'Headshots';
+  if (title.includes('senior') && !title.includes('underclass') && !title.includes('graduation') && !title.includes('pano')) return 'Seniors';
+  const nonShoot = ['meeting','out of town','wedding','interview','training','jury','birthday','party','townhouse','branding','quarterly','monthly','staff meeting','workshop'];
+  if (nonShoot.some(term => title.includes(term))) return title.includes('meeting') || title.includes('training') || title.includes('workshop') ? 'Call or Meeting' : 'Special Event';
+  const schoolish = ['school','elem','elementary','academy','preschool','pre-k','prek','ms/hs','middle','high','upk','nursery','kindercare','learning garden','consortium','christian','jcc','boces','wildwood','heatly','pooh','savior','wonderland','little','tesago','skano','okte','arongen','karigon','shatekon','chango','craig','glencliff','rosendale','duanesburg','waterford','northville','hoosic','cohoes','green tech','gordon creek','malta','milton terrace','wood road'];
+  const explicitFall = title.includes('fall photos') || title.includes('picture day') || title.includes('first day') || title.includes('underclass') || /\(\s*\d+\s*teams?/.test(title) || /\b\d+\s*photogs?/.test(title);
+  if (date >= '2026-09-01' && date <= '2026-11-30' && schoolish.some(term => title.includes(term)) && explicitFall) return 'Fall Picture Day';
+  if ((title.includes('spring') || rawType === 'spring picture day') && !title.includes('grad') && !title.includes('graduation') && !title.includes('pano')) return 'Spring Picture Day';
+  if (rawType === 'picture day') return ['01','02','03','04','05','06'].includes(date.slice(5,7)) ? 'Spring Picture Day' : 'Fall Picture Day';
+  if (rawType === 'makeup/retake') return 'Makeup Day';
+  if (rawType === 'sports') return 'Sports';
+  if (rawType === 'senior portraits') return 'Seniors';
+  if (rawType === 'internal/non-shoot review') return 'Call or Meeting';
+  if (rawType === 'graduation/pano' || rawType === 'review') return 'Special Event';
+  return rawType || 'Special Event';
+}
+
+function normalizeImportedCanonicalSchool(row = {}) {
+  const current = String(row.canonical_school || '').trim();
+  if (row.source !== 'google_calendar_import') return current;
+  const lower = `${current} ${row.title || ''}`.toLowerCase();
+  const aliasPairs = [
+    ['gordon creek', 'Gordon Creek Elementary School (Ballston Spa School District)'], ['malta ave', 'Malta Avenue Elementary School (Ballston Spa School District)'], ['malta avenue', 'Malta Avenue Elementary School (Ballston Spa School District)'], ['milton terrace', 'Milton Terrace Elementary School (Ballston Spa School District)'], ['wood road', 'Wood Road Elementary School (Ballston Spa School District)'],
+    ['rosendale', 'Rosendale Elementary School (Niskayuna School District)'], ['craig', 'Craig Elementary School (Niskayuna School District)'], ['glencliff', 'Glencliff Elementary School (Niskayuna School District)'],
+    ['skano', 'Skano Elementary School (Shenendehowa School District)'], ['arongen', 'Arongen Elementary School (Shenendehowa School District)'], ['karigon', 'Karigon Elementary School (Shenendehowa School District)'], ['okte', 'Okte Elementary School (Shenendehowa School District)'], ['shatekon', 'Shatekon Elementary School (Shenendehowa School District)'], ['tesago', 'Tesago Elementary School (Shenendehowa School District)'], ['chango', 'Chango Elementary School (Shenendehowa School District)'],
+    ['jefferson', 'Jefferson Elementary School (Schalmont School District)'], ['waterford-halfmoon elementary', 'Waterford Halfmoon Elem'], ['waterford halfmoon elementary', 'Waterford Halfmoon Elem'], ['waterford-halfmoon ms', 'Waterford MS/HS'], ['waterford halfmoon ms', 'Waterford MS/HS'], ['waterford-halfmoon high', 'Waterford MS/HS'], ['waterford halfmoon high', 'Waterford MS/HS'],
+    ['duanesburg elementary', "D'burg Elementary"], ['duanesburg ms', "D'burg MS/HS"], ['duanesburg high', "D'burg MS/HS"], ['green tech', 'Green Tech MS/HS'], ['hoosic valley ms', 'Hoosic Valley MS/HS'], ['hoosic ms', 'Hoosic Valley MS/HS'], ['hudson valley consortium', 'Hudson Valley Consortium'],
+    ['albany academy', 'The Academies (AA/G)'], ['northville', 'Northville'], ['loudonville christian', 'Loudonville Christian'], ['little achiever', 'Little Achievers'], ['pooh', 'Poohs Corner'], ['heatly', 'Heatly School'], ['learning garden latham', 'Learning Garden Latham'], ['learning garden slingerlands', 'Learning Garden Slingerlands'], ['wildwood', 'Wildwood'], ['cohoes high', 'Cohoes High School']
+  ];
+  const found = aliasPairs.find(([needle]) => lower.includes(needle));
+  if (found) return found[1];
+  const clean = current.replace(/^HOLD\s+/i, '').replace(/^NEW\s+/i, '').replace(/\s+/g, ' ').trim();
+  const exact = SCHOOLS.find(school => school.name.toLowerCase() === clean.toLowerCase());
+  return exact?.name || current;
+}
+
 function eventToSupabaseRow(event = {}) {
   return {
     client_event_id: event.id || `event-${Date.now()}`,
@@ -1990,8 +2036,8 @@ function supabaseRowToEvent(row = {}) {
     date: row.date,
     endDate: row.end_date || null,
     title: row.title,
-    canonicalSchool: row.canonical_school || '',
-    type: row.event_type || 'Special Event',
+    canonicalSchool: normalizeImportedCanonicalSchool(row),
+    type: normalizeImportedEventType(row),
     status: row.status || 'Scheduled',
     photographers: row.photographers || [],
     assistants: row.assistants || [],
