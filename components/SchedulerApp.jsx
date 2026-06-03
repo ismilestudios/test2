@@ -2763,17 +2763,55 @@ function Info({ icon: Icon, title, value, large = false }) {
 function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, onSelectSchool }) {
   const q = query.trim().toLowerCase();
   if (!q) return null;
-  const schoolMatches = (schools || []).filter(school => school.active !== false && !school.mergedInto && [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0, 6);
-  const eventMatches = (events || []).filter(event => [event.title, event.canonicalSchool, event.type, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0, 8);
-  if (!schoolMatches.length && !eventMatches.length) return null;
+
+  const normalizedQuery = normalizeSchoolLookupKey(query);
+  const allSchoolMatches = (schools || []).filter(school => school.active !== false && !school.mergedInto && [
+    school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone
+  ].filter(Boolean).join(' ').toLowerCase().includes(q));
+  const schoolMatches = allSchoolMatches.slice(0, 6);
+
+  const matchedSchoolKeys = new Set(allSchoolMatches.map(school => normalizeSchoolLookupKey(school.name)).filter(Boolean));
+  const matchesLinkedSchool = (event) => {
+    const eventSchoolKey = normalizeSchoolLookupKey(event?.canonicalSchool || '');
+    if (!eventSchoolKey) return false;
+    if (matchedSchoolKeys.has(eventSchoolKey)) return true;
+    for (const schoolKey of matchedSchoolKeys) {
+      if (schoolKey && (eventSchoolKey.includes(schoolKey) || schoolKey.includes(eventSchoolKey))) return true;
+    }
+    return false;
+  };
+
+  const today = todayKey();
+  const eventMatches = (events || [])
+    .filter(event => {
+      if (!event || event.active === false) return false;
+      const textMatch = [event.title, event.canonicalSchool, event.type, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(q);
+      const titleKey = normalizeSchoolLookupKey(event.title || '');
+      const looseTitleMatch = normalizedQuery && titleKey.includes(normalizedQuery);
+      return textMatch || looseTitleMatch || matchesLinkedSchool(event);
+    })
+    .sort((a, b) => {
+      const aFuture = String(a.date || '') >= today;
+      const bFuture = String(b.date || '') >= today;
+      if (aFuture !== bFuture) return aFuture ? -1 : 1;
+      if (aFuture && bFuture) return String(a.date || '').localeCompare(String(b.date || ''));
+      return String(b.date || '').localeCompare(String(a.date || ''));
+    });
+
+  const visibleEventMatches = eventMatches.slice(0, 24);
+  if (!schoolMatches.length && !visibleEventMatches.length) return null;
   return (
     <section className="rounded-[2rem] border border-[#AEBB9E] bg-[#DDE8D2]/45 p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-zinc-950">Global Search Results</h2>
-          <p className="mt-1 text-xs text-zinc-600">Searching schools, contacts, notes, photographers, assistants, and imported events.</p>
+          <p className="mt-1 text-xs text-zinc-600">Searching schools, contacts, notes, photographers, assistants, imported events, and school-linked events.</p>
         </div>
-        <Pill className="border-zinc-200 bg-white/80 text-zinc-700">{schoolMatches.length + eventMatches.length} shown</Pill>
+        <Pill className="border-zinc-200 bg-white/80 text-zinc-700">{schoolMatches.length + visibleEventMatches.length} shown</Pill>
       </div>
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <div className="rounded-3xl border border-zinc-200 bg-white/75 p-3">
@@ -2788,9 +2826,12 @@ function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, 
           </div>
         </div>
         <div className="rounded-3xl border border-zinc-200 bg-white/75 p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Events + Assignments</div>
-          <div className="space-y-2">
-            {eventMatches.length ? eventMatches.map(event => (
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Events + Assignments</div>
+            {eventMatches.length > visibleEventMatches.length ? <div className="text-[11px] text-zinc-400">Showing first {visibleEventMatches.length} of {eventMatches.length}</div> : null}
+          </div>
+          <div className="max-h-[34rem] space-y-2 overflow-auto pr-1">
+            {visibleEventMatches.length ? visibleEventMatches.map(event => (
               <button key={event.id} onClick={() => onSelectEvent(event)} className="w-full rounded-2xl border border-zinc-100 bg-cream/70 p-3 text-left transition hover:bg-white hover:shadow-sm">
                 <div className="text-sm font-semibold text-zinc-900">{event.title}</div>
                 <div className="mt-1 text-xs text-zinc-500">{shortDate(event.date)} · {event.type} · {displayPhotographerAssignment(event)}</div>

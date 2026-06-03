@@ -1,0 +1,12 @@
+iSmile Scheduler — Global Search School-Linked Events Fix
+
+Change made:
+- Global Search now includes events linked to a matched school via canonicalSchool, even when the event title itself does not contain the search term.
+- Example: searching "Chango" now shows events associated with Chango Elementary even if the title is phrased differently.
+- Future/upcoming events sort first, then older reference events.
+- Event results expanded from 8 to 24 visible rows and the events panel scrolls so 2027+ scheduled dates are easier to find.
+
+Why:
+- Carrie was searching for a school to confirm dates and the relevant future event was linked to the school but not visible in the limited title-based search results.
+
+No SQL required.
