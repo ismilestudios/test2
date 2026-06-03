@@ -7,7 +7,7 @@ import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOO
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
-const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Removed Events', 'Team Members'];
+const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members'];
 
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
@@ -200,7 +200,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
               />
             </label>
             <div className="flex justify-end"><AuthStatus /></div>
-            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-6">
+            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-5">
               {tabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
@@ -2098,34 +2098,39 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
   );
 }
 
-function RemovedEventsView({ events, onRestore }) {
+function RemovedEventsModule({ events, onRestore }) {
   return (
-    <div className="space-y-4">
-      <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-zinc-950">Removed Events</h2>
-        <p className="mt-1 text-sm text-zinc-600">Events removed from the calendar are kept here so they can be restored if someone removes one by mistake.</p>
-      </section>
-      <div className="space-y-3">
-        {events.length ? events.map(event => (
-          <div key={event.supabaseId || event.id} className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">Removed Events</h2>
+          <p className="mt-1 text-sm text-zinc-600">A safety net for events removed from the calendar. Restore them here if needed.</p>
+        </div>
+        <Pill className="border-zinc-200 bg-white text-zinc-600">{events.length} removed</Pill>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {events.length ? events.slice(0, 8).map(event => (
+          <div key={event.supabaseId || event.id} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
                   <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
                   {event.noAssistant ? <Pill className="border-zinc-200 bg-white text-zinc-700">No Assistant</Pill> : null}
                 </div>
-                <h3 className="mt-2 text-base font-semibold text-zinc-950">{event.title}</h3>
-                <p className="mt-1 text-sm text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}</p>
-                {event.canonicalSchool ? <p className="mt-1 text-sm text-zinc-600">{event.canonicalSchool}</p> : null}
+                <div className="mt-2 truncate text-sm font-semibold text-zinc-950">{event.title}</div>
+                <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
               </div>
-              <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore Event</button>
+              <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore</button>
             </div>
           </div>
         )) : (
-          <div className="rounded-3xl border border-dashed border-zinc-200 bg-white/60 p-6 text-center text-sm text-zinc-500">No removed events.</div>
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No removed events.</div>
         )}
       </div>
-    </div>
+
+      {events.length > 8 ? <div className="mt-3 text-xs text-zinc-500">Showing 8 most recent removed events.</div> : null}
+    </section>
   );
 }
 
@@ -2469,10 +2474,10 @@ export default function SchedulerApp() {
           {activeTab === 'Overview' && <>
             <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
             <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />
+            <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} />
           </>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
-          {activeTab === 'Removed Events' && <RemovedEventsView events={removedEvents} onRestore={handleRestoreEvent} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
         </section>
