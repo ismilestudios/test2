@@ -9,6 +9,22 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 
+const PHOTOGRAPHER_ALIASES = {
+  steph: 'Stephanie',
+  stephanie: 'Stephanie'
+};
+
+function canonicalPhotographerName(name = '') {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return '';
+  return PHOTOGRAPHER_ALIASES[trimmed.toLowerCase()] || trimmed;
+}
+
+function uniqueCanonicalPhotographers(names = []) {
+  return Array.from(new Set((names || []).map(canonicalPhotographerName).filter(Boolean)));
+}
+
+
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
 }
@@ -447,7 +463,7 @@ function CurrentWeeklyRolloutCard({ events }) {
   const photographerSummary = Array.from(
     weekEvents.reduce((counts, event) => {
       if (!isRolloutEvent(event)) return counts;
-      (event.photographers || []).filter(Boolean).forEach(name => {
+      uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
         counts.set(name, (counts.get(name) || 0) + 1);
       });
       return counts;
@@ -590,7 +606,7 @@ function isRolloutEvent(event) {
 
 function getAssignedPhotographerCount(event) {
   if (!Array.isArray(event?.photographers)) return 0;
-  return event.photographers.filter(Boolean).length;
+  return uniqueCanonicalPhotographers(event.photographers).length;
 }
 
 function getRolloutCount(event) {
@@ -623,7 +639,8 @@ function getCapacityTone(rollouts) {
 
 function getPhotographerWeekStats(events, date, photographer) {
   const { start, end } = weekBounds(date || todayKey());
-  const weekEvents = (events || []).filter(event => event && event.date >= start && event.date <= end && (event.photographers || []).includes(photographer));
+  const canonicalPhotographer = canonicalPhotographerName(photographer);
+  const weekEvents = (events || []).filter(event => event && event.date >= start && event.date <= end && uniqueCanonicalPhotographers(event.photographers || []).includes(canonicalPhotographer));
   const rollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const dayEvents = weekEvents.filter(event => event.date === date);
   return { rollouts, dayEvents, weekEvents };
@@ -641,7 +658,7 @@ function getRecentSchoolPhotographers(schoolName, events) {
 
   const seen = new Set();
   const names = [];
-  matches.forEach(event => (event.photographers || []).forEach(name => {
+  matches.forEach(event => uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
     if (name && !seen.has(name)) {
       seen.add(name);
       names.push(name);
@@ -653,7 +670,7 @@ function getRecentSchoolPhotographers(schoolName, events) {
 function getSchoolPhotographerHistory(history = []) {
   const map = {};
   history.forEach(event => {
-    (event.photographers || []).forEach(name => {
+    uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
       if (!name) return;
       map[name] ||= { name, count: 0, lastDate: '', lastTitle: '' };
       map[name].count += 1;
@@ -708,7 +725,7 @@ function WeekView({ events, selectedDate, onClick }) {
   const photographerSummary = Array.from(
     weekEvents.reduce((counts, event) => {
       if (!isRolloutEvent(event)) return counts;
-      (event.photographers || []).filter(Boolean).forEach(name => {
+      uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
         counts.set(name, (counts.get(name) || 0) + 1);
       });
       return counts;
@@ -1005,8 +1022,8 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
     if (day === 0 || day === 6) continue;
     const key = d.toISOString().slice(0, 10);
     const scheduled = events.filter(event => isDateInEventRange(event, key));
-    const bookedPhotographers = new Set(scheduled.flatMap(event => event.photographers || []));
-    const availablePhotographers = photographers.filter(name => !bookedPhotographers.has(name));
+    const bookedPhotographers = new Set(scheduled.flatMap(event => uniqueCanonicalPhotographers(event.photographers || [])));
+    const availablePhotographers = uniqueCanonicalPhotographers(photographers).filter(name => !bookedPhotographers.has(canonicalPhotographerName(name)));
     dates.push({ date: key, scheduledCount: scheduled.length, availablePhotographers, scheduled });
   }
   return dates;
@@ -2798,7 +2815,7 @@ export default function SchedulerApp() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [photographers, setPhotographers] = useState(PHOTOGRAPHERS);
+  const [photographers, setPhotographers] = useState(uniqueCanonicalPhotographers(PHOTOGRAPHERS));
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
   const [supabaseEvents, setSupabaseEvents] = useState([]);
@@ -3031,15 +3048,15 @@ export default function SchedulerApp() {
         return;
       }
 
-      setPhotographers([...PHOTOGRAPHERS].sort((a, b) => a.localeCompare(b)));
+      setPhotographers(uniqueCanonicalPhotographers(PHOTOGRAPHERS).sort((a, b) => a.localeCompare(b)));
       setAssistants([...ASSISTANTS].sort((a, b) => a.localeCompare(b)));
       setTeamMembersMessage('Seeded the starter photographers and assistants into Supabase.');
       return;
     }
 
-    const activePhotographers = data
+    const activePhotographers = uniqueCanonicalPhotographers(data
       .filter(member => member.active && member.role === 'photographer')
-      .map(member => member.name)
+      .map(member => member.name))
       .sort((a, b) => a.localeCompare(b));
 
     const activeAssistants = data
