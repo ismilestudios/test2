@@ -207,3 +207,8 @@ This package adds a reversible **No Fall Scheduling** option for Carrie View's F
 2. Deploy this ZIP.
 3. In Carrie View, use the bottom-right `No Fall Scheduling` button on a school card to remove it from the Fall 2026 To Be Scheduled list.
 4. Use the toast `Undo` button for accidental clicks, or edit the school later in School List to reverse it.
+
+
+## Removed Events Display Fix
+
+This build keeps soft-delete behavior and improves the Overview > Removed Events panel so it sorts by the latest `updated_at` timestamp. Recently deleted events should appear at the top immediately after removal instead of being hidden behind older removed events.

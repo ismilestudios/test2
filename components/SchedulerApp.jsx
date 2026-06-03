@@ -7,7 +7,7 @@ import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOO
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
-const tabs = ['Overview', 'Calendar View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
+const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 
 const PHOTOGRAPHER_ALIASES = {
   steph: 'Stephanie',
@@ -300,11 +300,11 @@ function getEventIrm(event) {
   return null;
 }
 
-function EventCard({ event, onClick, compact = false }) {
+function EventCard({ event, onClick, compact = false, actionLabel = '', onAction = null }) {
   return (
     <motion.button
       layout
-      onClick={() => onClick(event)}
+      onClick={() => (onAction ? onAction(event) : onClick(event))}
       className="w-full rounded-2xl border border-zinc-200/80 bg-white/85 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
     >
       <div className="flex items-start justify-between gap-2">
@@ -326,6 +326,11 @@ function EventCard({ event, onClick, compact = false }) {
           <div>Assistants: {event.assistants.length ? event.assistants.join(', ') : '—'}</div>
         </div>
       )}
+      {onAction && actionLabel ? (
+        <div className="mt-3 flex justify-end">
+          <span className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2] px-3 py-1.5 text-xs font-bold text-zinc-900">{actionLabel}</span>
+        </div>
+      ) : null}
     </motion.button>
   );
 }
@@ -356,7 +361,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
               />
             </label>
             <div className="flex justify-end"><AuthStatus /></div>
-            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-6">
+            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-7">
               {tabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
@@ -374,8 +379,8 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
 function MobileBottomNav({ activeTab, setActiveTab }) {
   const mobileTabs = [
     { label: 'Today', tab: 'Overview' },
+    { label: 'Mobile', tab: 'Mobile View' },
     { label: 'Calendar', tab: 'Calendar View' },
-    { label: 'Carrie', tab: 'Carrie View' },
     { label: 'Schools', tab: 'School List' },
     { label: 'Admin', tab: 'Admin' }
   ];
@@ -540,7 +545,73 @@ function OverviewControls({ viewMode, setViewMode, month, setMonth, selectedDate
   );
 }
 
-function PlanningBoard({ events, onClick, onAddEvent }) {
+
+function QuickAssignmentModal({ event, mode, photographers, assistants, onClose, onSave }) {
+  const [selectedPhotographers, setSelectedPhotographers] = useState(event?.photographers || []);
+  const [selectedAssistants, setSelectedAssistants] = useState(event?.assistants || []);
+  const [noAssistant, setNoAssistant] = useState(Boolean(event?.noAssistant));
+  if (!event) return null;
+
+  const toggle = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
+  const save = () => {
+    const nextPhotographers = selectedPhotographers.map(canonicalPhotographerName).filter(Boolean);
+    const next = {
+      ...event,
+      photographers: Array.from(new Set(nextPhotographers)),
+      assistants: noAssistant ? [] : selectedAssistants,
+      noAssistant,
+      status: nextPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned'
+    };
+    onSave(next);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/30 p-3 sm:items-center">
+      <div className="w-full max-w-xl rounded-[2rem] border border-zinc-200 bg-white p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Quick Assignment</div>
+            <h2 className="mt-1 text-xl font-black text-zinc-950">{event.title}</h2>
+            <p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-500"><X size={18} /></button>
+        </div>
+
+        {mode === 'needs-photographers' ? (
+          <section className="mt-4">
+            <h3 className="text-sm font-bold text-zinc-900">Photographer(s)</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {photographers.map(name => {
+                const canonical = canonicalPhotographerName(name);
+                const selected = selectedPhotographers.map(canonicalPhotographerName).includes(canonical);
+                return <button key={name} type="button" onClick={() => toggle(canonical, setSelectedPhotographers)} className={`rounded-full border px-3 py-2 text-sm font-semibold ${selected ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{canonical}</button>;
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="mt-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-bold text-zinc-900">Assistant(s)</h3>
+            <button type="button" onClick={() => setNoAssistant(prev => !prev)} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-600'}`}>No Assistant</button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {assistants.map(name => (
+              <button key={name} type="button" onClick={() => { setNoAssistant(false); toggle(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm font-semibold ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700'}`}>{name}</button>
+            ))}
+          </div>
+        </section>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-600">Cancel</button>
+          <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white">Save Assignment</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign }) {
   const overviewColumns = [
     {
       key: 'needs-photographers',
@@ -573,7 +644,10 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
               <h2 className="text-sm font-semibold text-zinc-800">{column.title}</h2>
               <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
             </div>
-            <div className="space-y-3">{columnEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div>
+            <div className="space-y-3">{columnEvents.map(event => {
+              const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
+              return <EventCard key={event.id} event={event} onClick={onClick} onAction={isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} actionLabel={column.key === 'needs-photographers' ? 'Assign Photographer' : column.key === 'needs-assistant' ? 'Assign Assistant' : ''} />;
+            })}</div>
           </div>
         );
       })}
@@ -2127,6 +2201,7 @@ function supabaseRowToEvent(row = {}) {
     source: row.source || 'supabase',
     sourceEventId: row.source_event_id || null,
     createdAt: row.created_at || null,
+    updatedAt: row.updated_at || row.created_at || null,
     active: row.active !== false,
     noFallSchedulingFall2026: Boolean(row.no_fall_scheduling_fall_2026)
   };
@@ -2306,6 +2381,87 @@ function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelecte
         <button type="button" onClick={goToday} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Today</button>
       </div>
       {showKey ? <CalendarColorKey /> : null}
+    </div>
+  );
+}
+
+
+function MobileView({ events, photographers, selectedDate, setSelectedDate, onClick }) {
+  const fieldPhotographers = ['Stephanie', 'Matt', 'Molly', 'Beth', 'Andrew', 'Erin'];
+  const available = Array.from(new Set([...fieldPhotographers, ...uniqueCanonicalPhotographers(photographers || [])])).filter(Boolean);
+  const [selectedPhotographer, setSelectedPhotographer] = useState('Stephanie');
+  const [viewMode, setViewMode] = useState('Day');
+
+  const today = todayKey();
+  const todayEvents = (events || [])
+    .filter(event => isDateInEventRange(event, today) && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
+    .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
+
+  const visibleEvents = useMemo(() => {
+    const canonical = canonicalPhotographerName(selectedPhotographer);
+    const assigned = (events || []).filter(event => uniqueCanonicalPhotographers(event.photographers || []).includes(canonical));
+    if (viewMode === 'Month') {
+      const key = monthKey(selectedDate);
+      return assigned.filter(event => monthKey(event.date) <= key && monthKey(event.endDate || event.date) >= key);
+    }
+    if (viewMode === 'Week') {
+      const { start, end } = weekBounds(selectedDate);
+      return assigned.filter(event => event.date <= end && (event.endDate || event.date) >= start);
+    }
+    return assigned.filter(event => isDateInEventRange(event, selectedDate));
+  }, [events, selectedPhotographer, selectedDate, viewMode]);
+
+  const move = (delta) => {
+    if (viewMode === 'Month') setSelectedDate(addDays(selectedDate, delta * 30));
+    else if (viewMode === 'Week') setSelectedDate(addDays(selectedDate, delta * 7));
+    else setSelectedDate(addDays(selectedDate, delta));
+  };
+
+  return (
+    <div className="mx-auto max-w-md space-y-4 sm:max-w-2xl">
+      <section className="rounded-[2rem] border border-[#AEBB9E] bg-[#DDE8D2]/55 p-4 shadow-sm">
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-600">What We're Photographing Today</div>
+        <div className="mt-1 text-lg font-black text-zinc-950">{formatDate(today)}</div>
+        <div className="mt-3 space-y-2">
+          {todayEvents.length ? todayEvents.map(event => (
+            <button key={event.id} type="button" onClick={() => onClick(event)} className="w-full rounded-2xl border border-white/70 bg-white/80 p-3 text-left shadow-sm">
+              <div className="font-bold text-zinc-950">{event.title}</div>
+              <div className="mt-1 text-sm text-zinc-600">{getEventTimeLabel(event)}</div>
+              <div className="mt-1 text-xs font-semibold text-zinc-500">{uniqueCanonicalPhotographers(event.photographers || []).join(', ') || 'Photographer TBD'}</div>
+            </button>
+          )) : <div className="rounded-2xl border border-dashed border-white/80 bg-white/60 p-4 text-sm text-zinc-500">Nothing scheduled for today.</div>}
+        </div>
+      </section>
+
+      <section className="rounded-[2rem] border border-zinc-200 bg-white/80 p-4 shadow-sm">
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Photographer Schedule</div>
+        <select value={selectedPhotographer} onChange={(e) => setSelectedPhotographer(e.target.value)} className="mt-3 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-base font-bold text-zinc-900 outline-none">
+          {available.map(name => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <div className="mt-3 grid grid-cols-3 rounded-2xl border border-zinc-200 bg-cream/80 p-1">
+          {['Month', 'Week', 'Day'].map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-3 py-2 text-sm font-bold ${viewMode === mode ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}>{mode}</button>)}
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => move(-1)} className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-bold">Prev</button>
+          <div className="text-center text-sm font-bold text-zinc-900">{viewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : viewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate)}</div>
+          <button type="button" onClick={() => move(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-bold">Next</button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {visibleEvents.length ? visibleEvents.sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || ''))).map(event => (
+            <button key={event.id} type="button" onClick={() => onClick(event)} className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-left shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">{getEventDateLabel(event)}</div>
+                  <div className="mt-1 font-black text-zinc-950">{event.title}</div>
+                  <div className="mt-1 text-sm text-zinc-600">{getEventTimeLabel(event)}</div>
+                  {event.assistants?.length ? <div className="mt-1 text-xs font-semibold text-zinc-500">Assistant: {event.assistants.join(', ')}</div> : null}
+                </div>
+                <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+              </div>
+            </button>
+          )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-4 text-center text-sm text-zinc-500">No {viewMode.toLowerCase()} events for {selectedPhotographer}.</div>}
+        </div>
+      </section>
     </div>
   );
 }
@@ -2533,6 +2689,14 @@ function RecentlyAddedEventsModule({ events, onClick }) {
 }
 
 function RemovedEventsModule({ events, onRestore }) {
+  const sortedRemovedEvents = useMemo(() => {
+    return [...(events || [])].sort((a, b) => {
+      const aTime = new Date(a.updatedAt || a.createdAt || a.date || 0).getTime();
+      const bTime = new Date(b.updatedAt || b.createdAt || b.date || 0).getTime();
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+    });
+  }, [events]);
+
   return (
     <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -2540,11 +2704,11 @@ function RemovedEventsModule({ events, onRestore }) {
           <h2 className="text-lg font-semibold text-zinc-950">Removed Events</h2>
           <p className="mt-1 text-sm text-zinc-600">A safety net for events removed from the calendar. Restore them here if needed.</p>
         </div>
-        <Pill className="border-zinc-200 bg-white text-zinc-600">{events.length} removed</Pill>
+        <Pill className="border-zinc-200 bg-white text-zinc-600">{sortedRemovedEvents.length} removed</Pill>
       </div>
 
       <div className="mt-4 space-y-2">
-        {events.length ? events.slice(0, 8).map(event => (
+        {sortedRemovedEvents.length ? sortedRemovedEvents.slice(0, 8).map(event => (
           <div key={event.supabaseId || event.id} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
@@ -2563,7 +2727,7 @@ function RemovedEventsModule({ events, onRestore }) {
         )}
       </div>
 
-      {events.length > 8 ? <div className="mt-3 text-xs text-zinc-500">Showing 8 most recent removed events.</div> : null}
+      {sortedRemovedEvents.length > 8 ? <div className="mt-3 text-xs text-zinc-500">Showing 8 most recently removed events.</div> : null}
     </section>
   );
 }
@@ -2815,6 +2979,7 @@ export default function SchedulerApp() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [quickAssignment, setQuickAssignment] = useState(null);
   const [photographers, setPhotographers] = useState(uniqueCanonicalPhotographers(PHOTOGRAPHERS));
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
@@ -3275,6 +3440,14 @@ export default function SchedulerApp() {
     setActiveTab('Calendar View');
   };
 
+  const handleQuickAssignmentSave = async (event) => {
+    const saved = await handleScheduleEvent(event);
+    if (saved) {
+      setQuickAssignment(null);
+      setActiveTab('Overview');
+    }
+  };
+
   const openAddEvent = (date = selectedDate || todayKey()) => {
     const safeDate = typeof date === 'string' && date.length >= 10 ? date : selectedDate || todayKey();
     setAddingEventDefaultDate(safeDate);
@@ -3314,7 +3487,7 @@ export default function SchedulerApp() {
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>
             <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
-            <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => openAddEvent(selectedDate)} />
+            <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => openAddEvent(selectedDate)} onQuickAssign={(event, mode) => setQuickAssignment({ event, mode })} />
             <div className="pt-6">
               <RecentlyAddedEventsModule events={allEvents} onClick={setSelected} />
             </div>
@@ -3323,6 +3496,7 @@ export default function SchedulerApp() {
             </div>
           </>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} />}
+          {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
@@ -3336,6 +3510,7 @@ export default function SchedulerApp() {
       </div>
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} />}
+      {quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
       <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onRemoveEvent={handleRemoveEvent} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
       {editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
     </main>
