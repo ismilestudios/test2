@@ -1074,8 +1074,13 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
       rainInfo: '',
       history: school.lastEvent ? `Fall 2025 reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Assigned photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
     };
-    onSave(event);
-    onClose();
+    const result = await onSave(event);
+    if (result) {
+      onClose();
+    } else {
+      setError('This event did not save to Supabase. Please make sure you are logged in and try again.');
+      setSaving(false);
+    }
   };
 
   return (
@@ -1154,12 +1159,17 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
   const [notes, setNotes] = useState(initialEvent?.notes || '');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const schoolOptions = useMemo(() => SCHOOLS.map(school => school.name).sort((a, b) => a.localeCompare(b)), []);
   const matchedSchool = useMemo(() => SCHOOLS.find(school => school.name.toLowerCase() === schoolName.trim().toLowerCase()), [schoolName]);
 
   const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError('');
+
     const cleanName = schoolName.trim();
     const cleanTitle = title.trim() || (cleanName ? `${cleanName} ${eventType}` : eventType);
     const event = {
@@ -1252,7 +1262,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
           </div>
           <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
-            <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">{isEditing ? "Save Changes" : "Save Event"}</button>
+            <button type="button" onClick={save} disabled={saving} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : (isEditing ? "Save Changes" : "Save Event")}</button>
           </div>
         </motion.div>
       </motion.div>
@@ -2360,7 +2370,7 @@ export default function SchedulerApp() {
       : (data || []);
 
     setSupabaseEvents(finalRows.map(supabaseRowToEvent));
-    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : 'Events are loading from Supabase.');
+    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Events are loading from Supabase (${finalRows.length} rows).`);
   };
 
   const loadSchoolsFromSupabase = async () => {
@@ -2490,10 +2500,13 @@ export default function SchedulerApp() {
     const supabase = createClient();
     if (!hasSupabaseEnv() || !supabase) {
       setEventsMessage('Supabase is not connected, so this event could not be saved.');
-      return;
+      return false;
     }
 
-    const row = eventToSupabaseRow(eventWithId);
+    const row = eventToSupabaseRow({
+      ...eventWithId,
+      source: eventWithId.source || 'manual_app'
+    });
     const query = supabase.from('events');
 
     const result = eventWithId.supabaseId
@@ -2503,8 +2516,9 @@ export default function SchedulerApp() {
     const { data, error } = result;
 
     if (error) {
-      setEventsMessage(`Could not save event to Supabase: ${error.message}. Run supabase/events_migration.sql if needed.`);
-      return;
+      console.error('Event save failed', error, row);
+      setEventsMessage(`Could not save event to Supabase: ${error.message}.`);
+      return false;
     }
 
     const savedEvent = supabaseRowToEvent(data);
@@ -2512,12 +2526,17 @@ export default function SchedulerApp() {
       const without = (prev || []).filter(item => item.id !== savedEvent.id && item.supabaseId !== savedEvent.supabaseId);
       return [...without, savedEvent].sort((a, b) => a.date.localeCompare(b.date));
     });
+
+    // Re-read from Supabase after save so refresh behavior matches the live UI.
+    await loadEventsFromSupabase();
+
     setSelected(null);
     setEditingEvent(null);
-    setEventsMessage(eventWithId.supabaseId ? 'Event changes saved to Supabase.' : 'Event saved to Supabase.');
+    setEventsMessage(eventWithId.supabaseId ? 'Event changes saved to Supabase.' : 'Event saved to Supabase and confirmed.');
     setMonth(monthKey(savedEvent.date));
     setSelectedDate(savedEvent.date);
     setActiveTab('Calendar View');
+    return savedEvent;
   };
 
   const handleRemoveEvent = async (event) => {
