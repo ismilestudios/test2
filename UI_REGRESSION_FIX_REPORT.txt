@@ -1,0 +1,5 @@
+UI regression fix
+- Restored Calendar View Add Event button by passing openAddEvent directly.
+- Restored double-click date behavior by passing clicked date into Add Event defaultDate.
+- Added missing top-level addingEventDefaultDate state.
+- Carrie View now uses the full SchoolHistoryPanel layout, matching School List Address / Primary Contact / Notes layout.
