@@ -171,3 +171,9 @@ If the earlier FULL SQL throws `ERROR: 42P01: relation "the" does not exist`, us
 `/sql/ismile_calendar_import_FULL_latest_after_2025_05_31_DOLLAR_QUOTED_SAFE.sql`
 
 This version uses PostgreSQL dollar-quoted text literals so apostrophes/quotes inside Picture Day Info cannot break the SQL parser.
+
+## ICS import visibility fix
+
+This package includes `supabase/ics_import_visibility_repair.sql` and a frontend patch that explicitly loads `source = 'google_calendar_import'` events alongside manual events.
+
+Run this SQL once in Supabase, then deploy this ZIP. The Calendar View status banner should say it loaded Google Calendar import events.

@@ -2602,7 +2602,27 @@ export default function SchedulerApp() {
       return;
     }
 
-    const importResult = await importHistoricalEventsToSupabase(supabase, data || []);
+    // ICS VISIBILITY FIX: explicitly read Google Calendar imported rows too.
+    // Some earlier builds only confirmed manual rows in the UI even when the
+    // imported rows were present in Supabase. Keeping this as a separate read
+    // makes the imported calendar rows impossible to lose during merging.
+    const { data: googleImportedRows, error: googleImportedError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('source', 'google_calendar_import')
+      .order('date', { ascending: true });
+
+    if (googleImportedError) {
+      console.warn('Could not explicitly load Google Calendar imported events', googleImportedError);
+    }
+
+    const combinedInitialRowsById = new Map();
+    [...(data || []), ...(googleImportedRows || [])].forEach(row => {
+      if (row?.id) combinedInitialRowsById.set(row.id, row);
+    });
+    const initialRows = Array.from(combinedInitialRowsById.values());
+
+    const importResult = await importHistoricalEventsToSupabase(supabase, initialRows || []);
 
     if (importResult.error) {
       setSupabaseEvents((data || []).map(supabaseRowToEvent));
@@ -2614,7 +2634,7 @@ export default function SchedulerApp() {
 
     const rowsById = new Map();
     [
-      ...(data || []),
+      ...(initialRows || []),
       ...(importResult.importedCount ? (importResult.data || []) : []),
       ...manualRows
     ].forEach(row => {
@@ -2631,8 +2651,9 @@ export default function SchedulerApp() {
     setLocalManualEvents(localOnlyBackup);
 
     const manualCount = finalRows.filter(row => row.source === 'manual_app' || row.source === 'app' || row.client_event_id?.startsWith('custom-')).length;
+    const googleImportCount = finalRows.filter(row => row.source === 'google_calendar_import').length;
     const localOnlyCount = localOnlyBackup.length;
-    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Loaded ${finalRows.length} Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'}${localOnlyCount ? `, plus ${localOnlyCount} browser-only backup` : ''}.`);
+    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Loaded ${finalRows.length} Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${localOnlyCount ? `, plus ${localOnlyCount} browser-only backup` : ''}.`);
   };
 
   const loadSchoolsFromSupabase = async () => {
