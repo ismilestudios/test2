@@ -1,0 +1,6 @@
+True Supabase confirmation fix
+- App now performs an immediate readback by Supabase row id after insert/update.
+- It only says verified when Supabase select returns the saved row.
+- If readback fails, event is shown with a warning/safety-backup marker instead of falsely claiming confirmed.
+- Added manual_event_true_persistence_diagnostic.sql.
+- Added manual_event_true_persistence_repair.sql.

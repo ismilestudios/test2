@@ -148,7 +148,7 @@ function loadLocalManualEvents() {
     const raw = window.localStorage.getItem(LOCAL_MANUAL_EVENTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(event => event && event.id && event.date && event.title) : [];
+    return Array.isArray(parsed) ? parsed.filter(event => event && event.id && event.date && event.title).map(event => ({ ...event, localBackupOnly: true })) : [];
   } catch (error) {
     console.warn('Could not load local manual events backup', error);
     return [];
@@ -160,10 +160,22 @@ function saveLocalManualEvent(event) {
   try {
     const existing = loadLocalManualEvents();
     const without = existing.filter(item => item.id !== event.id && item.supabaseId !== event.supabaseId);
-    const next = [...without, event].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    const backupEvent = { ...event, localBackupOnly: event.localBackupOnly !== false };
+    const next = [...without, backupEvent].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
     window.localStorage.setItem(LOCAL_MANUAL_EVENTS_KEY, JSON.stringify(next));
   } catch (error) {
     console.warn('Could not save local manual event backup', error);
+  }
+}
+
+function removeLocalManualEventBackup(event) {
+  if (typeof window === 'undefined' || !event?.id) return;
+  try {
+    const existing = loadLocalManualEvents();
+    const next = existing.filter(item => item.id !== event.id && item.supabaseId !== event.supabaseId);
+    window.localStorage.setItem(LOCAL_MANUAL_EVENTS_KEY, JSON.stringify(next));
+  } catch (error) {
+    console.warn('Could not remove local manual event backup', error);
   }
 }
 
@@ -535,7 +547,7 @@ function PlanningBoard({ events, onClick, onAddEvent }) {
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }} title="Double-click to add an event" className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
+  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => e && e.date === date); return <div key={date} onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }} title="Double-click to add an event" className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onClick={() => onClick(event)} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.localBackupOnly ? '⚠ ' : ''}{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
 
 
@@ -2674,25 +2686,42 @@ export default function SchedulerApp() {
       }
 
       const savedEvent = supabaseRowToEvent(data);
-      saveLocalManualEvent(savedEvent);
+
+      const readbackResult = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', data.id)
+        .single();
+
+      const readbackConfirmed = !readbackResult.error && Boolean(readbackResult.data);
+      const confirmedEvent = readbackConfirmed ? { ...supabaseRowToEvent(readbackResult.data), localBackupOnly: false } : { ...savedEvent, localBackupOnly: true };
+
+      if (readbackConfirmed) {
+        removeLocalManualEventBackup(confirmedEvent);
+      } else {
+        saveLocalManualEvent(confirmedEvent);
+        console.warn('Event save returned data, but readback verification failed', readbackResult.error);
+      }
+
       setLocalManualEvents(loadLocalManualEvents());
       setSupabaseEvents(prev => {
-        const without = (prev || []).filter(item => item.id !== savedEvent.id && item.supabaseId !== savedEvent.supabaseId);
-        return [...without, savedEvent].sort((a, b) => a.date.localeCompare(b.date));
+        const without = (prev || []).filter(item => item.id !== confirmedEvent.id && item.supabaseId !== confirmedEvent.supabaseId);
+        return [...without, confirmedEvent].sort((a, b) => a.date.localeCompare(b.date));
       });
 
-      // Keep the confirmed saved row visible immediately.
-      // Do not immediately reload the full Supabase list here; a fast reload can briefly return
-      // without the new row and make the event look like it disappeared even though it saved.
       setSelected(null);
       setEditingEvent(null);
       setQuery('');
       setCalendarMode('Month');
-      setEventsMessage(eventWithId.supabaseId ? 'Event changes saved to Supabase.' : `Event saved to Supabase and shown on ${formatDate(savedEvent.date)}.`);
-      setMonth(monthKey(savedEvent.date));
-      setSelectedDate(savedEvent.date);
+      setEventsMessage(
+        readbackConfirmed
+          ? (eventWithId.supabaseId ? 'Event changes saved and verified in Supabase.' : `Event saved and verified in Supabase for ${formatDate(confirmedEvent.date)}.`)
+          : `Event appeared to save, but Supabase readback could not verify it: ${readbackResult.error?.message || 'unknown readback error'}. It is shown with a warning until verified.`
+      );
+      setMonth(monthKey(confirmedEvent.date));
+      setSelectedDate(confirmedEvent.date);
       setActiveTab('Calendar View');
-      return savedEvent;
+      return confirmedEvent;
     } catch (unexpectedError) {
       console.error('Unexpected event save failure', unexpectedError, row);
       setEventsMessage(`Could not save event to Supabase: ${unexpectedError?.message || 'Unexpected error'}.`);
@@ -2788,6 +2817,7 @@ export default function SchedulerApp() {
         <LoginRequiredNotice />
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
         {eventsMessage && activeTab === 'Calendar View' ? <div className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm">{eventsMessage}</div> : null}
+        {activeTab === 'Calendar View' && localManualEvents.length ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>
