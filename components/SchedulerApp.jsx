@@ -13,6 +13,50 @@ function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
 }
 
+function LoginRequiredNotice() {
+  const [checked, setChecked] = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
+
+  useEffect(() => {
+    if (!hasSupabaseEnv()) {
+      setChecked(true);
+      return;
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      setChecked(true);
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      setUserEmail(data.session?.user?.email || null);
+      setChecked(true);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user?.email || null);
+      setChecked(true);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  if (!checked || userEmail) return null;
+
+  return (
+    <section className="rounded-[2rem] border border-amber-300 bg-amber-50 p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold text-amber-950">You are not logged in</div>
+          <p className="mt-1 text-sm text-amber-900">You can see the app layout, but shared Supabase data and saves require login.</p>
+        </div>
+        <a href="/login" className="inline-flex items-center justify-center rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Login before proceeding</a>
+      </div>
+    </section>
+  );
+}
+
 function CalendarColorKey() {
   const items = [
     ['Fall Picture Day', TYPE_COLORS['Fall Picture Day']],
@@ -2467,6 +2511,7 @@ export default function SchedulerApp() {
     <main className="min-h-screen font-sans text-zinc-900">
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="mx-auto max-w-7xl space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
+        <LoginRequiredNotice />
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
         {eventsMessage && activeTab === 'Calendar View' ? <div className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm">{eventsMessage}</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
@@ -2474,7 +2519,9 @@ export default function SchedulerApp() {
           {activeTab === 'Overview' && <>
             <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
             <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />
-            <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} />
+            <div className="pt-6">
+              <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} />
+            </div>
           </>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={() => setAddingEvent(true)} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
