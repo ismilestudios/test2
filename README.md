@@ -162,3 +162,12 @@ This ZIP includes the latest ICS comparison/import update in the same full-proje
 - Detailed handoff: `ICS_LATEST_IMPORT_HANDOFF.md`
 
 Use the Delta SQL only if the previous ICS import was already applied. Use the Full latest SQL if no ICS import has been applied yet.
+
+
+## SQL correction note
+
+If the earlier FULL SQL throws `ERROR: 42P01: relation "the" does not exist`, use:
+
+`/sql/ismile_calendar_import_FULL_latest_after_2025_05_31_DOLLAR_QUOTED_SAFE.sql`
+
+This version uses PostgreSQL dollar-quoted text literals so apostrophes/quotes inside Picture Day Info cannot break the SQL parser.
