@@ -2922,7 +2922,7 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
       .order('active', { ascending: false })
       .order('name', { ascending: true });
     if (error) {
-      setAdminUsersMessage(`Users table is not ready yet: ${error.message}. Run supabase/admin_users_permissions_migration.sql once, then reload.`);
+      setAdminUsersMessage(`Users table is not ready yet: ${error.message}. Run supabase/admin_auth_users_sync_migration.sql once, then reload.`);
       return;
     }
     setAdminUsers(data || []);
@@ -3115,7 +3115,7 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h3 className="font-semibold text-zinc-950">Users & Permissions</h3>
-            <p className="mt-1 text-sm leading-6 text-zinc-600">Simple access list for who should be allowed into iSmile Scheduler. Detailed permission enforcement can be tightened later.</p>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">Synced access list for everyone who has created a Supabase account. Detailed permission enforcement can be tightened later.</p>
             {authEmail ? <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Signed in as {authEmail}</p> : null}
           </div>
           <button type="button" onClick={loadAdminUsers} disabled={adminUsersSaving} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Reload Users</button>
@@ -3153,7 +3153,7 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
               </div>
             ))}
             {!adminUsers.length ? (
-              <div className="p-4 text-sm text-zinc-500">No users loaded yet. Run the migration SQL, then add users here.</div>
+              <div className="p-4 text-sm text-zinc-500">No users loaded yet. Run the auth sync migration SQL, then reload users.</div>
             ) : null}
           </div>
         </div>

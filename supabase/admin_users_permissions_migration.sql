@@ -43,3 +43,6 @@ on conflict (email) do update
 set role = excluded.role,
     active = true,
     updated_at = now();
+
+-- NOTE: For showing every Supabase Auth account automatically, run:
+-- supabase/admin_auth_users_sync_migration.sql
