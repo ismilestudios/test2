@@ -1404,7 +1404,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 
 
 function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null }) {
-  const isEditing = Boolean(initialEvent);
+  const isDuplicate = Boolean(initialEvent && sourceLabel === 'Duplicate Event' && !initialEvent?.supabaseId);
+  const isEditing = Boolean(initialEvent?.supabaseId);
   const [date, setDate] = useState(initialEvent?.date || defaultDate);
   const [isTwoDay, setIsTwoDay] = useState(Boolean(initialEvent?.endDate && initialEvent.endDate !== initialEvent.date));
   const [endDate, setEndDate] = useState(initialEvent?.endDate || '');
@@ -1438,8 +1439,8 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       return;
     }
     const event = {
-      id: initialEvent?.id || `custom-${Date.now()}`,
-      supabaseId: initialEvent?.supabaseId,
+      id: isDuplicate ? `custom-${Date.now()}` : (initialEvent?.id || `custom-${Date.now()}`),
+      supabaseId: isDuplicate ? undefined : initialEvent?.supabaseId,
       date,
       endDate: cleanEndDate || null,
       title: cleanTitle,
@@ -1455,7 +1456,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       time: startTime || 'TBD',
       notes: notes || '',
       rainInfo: '',
-      history: matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
+      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
     const result = await onSave(event);
     if (result) {
@@ -1473,9 +1474,9 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{isEditing ? "Edit Event" : "Add Event"}</Pill>
-                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">{isEditing ? "Edit event" : "Create an event"}</h2>
-                <p className="mt-1 text-sm text-zinc-600">Optionally associate this event with a school/account, or leave it blank for internal/special events.</p>
+                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{isDuplicate ? "Duplicate Event" : isEditing ? "Edit Event" : "Add Event"}</Pill>
+                <h2 className="mt-3 text-2xl font-semibold text-zinc-950">{isDuplicate ? "Duplicate event" : isEditing ? "Edit event" : "Create an event"}</h2>
+                <p className="mt-1 text-sm text-zinc-600">{isDuplicate ? "Review the copied details, adjust the date/type/timing, then save it as a new event." : "Optionally associate this event with a school/account, or leave it blank for internal/special events."}</p>
               </div>
               <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
             </div>
@@ -1547,7 +1548,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
           </div>
           <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
-            <button type="button" onClick={save} disabled={saving} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : (isEditing ? "Save Changes" : "Save Event")}</button>
+            <button type="button" onClick={save} disabled={saving} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : (isDuplicate ? "Save Duplicate" : isEditing ? "Save Changes" : "Save Event")}</button>
           </div>
         </motion.div>
       </motion.div>
@@ -2767,8 +2768,8 @@ function RemovedEventsModule({ events, onRestore }) {
   );
 }
 
-function Drawer({ event, onClose, onViewSchool, onEditEvent, onRemoveEvent }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
+function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent }) {
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
               <Info icon={Pencil} title="Picture Day Info" value={event.notes || '—'} large /></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
@@ -3180,6 +3181,7 @@ export default function SchedulerApp() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [duplicatingEvent, setDuplicatingEvent] = useState(null);
   const [quickAssignment, setQuickAssignment] = useState(null);
   const [photographers, setPhotographers] = useState(uniqueCanonicalPhotographers(PHOTOGRAPHERS));
   const [assistants, setAssistants] = useState(ASSISTANTS);
@@ -3656,6 +3658,20 @@ export default function SchedulerApp() {
     setAddingEvent(true);
   };
 
+  const openDuplicateEvent = (event) => {
+    if (!event) return;
+    const duplicate = {
+      ...event,
+      id: `custom-${Date.now()}`,
+      supabaseId: undefined,
+      source: 'manual_app',
+      status: event.photographers?.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      history: [event.history, `Duplicated from ${event.title || 'event'} on ${formatDate(todayKey())}.`].filter(Boolean).join('\n\n')
+    };
+    setDuplicatingEvent(duplicate);
+    setSelected(null);
+  };
+
   const queryFilteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allEvents;
@@ -3712,8 +3728,9 @@ export default function SchedulerApp() {
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} />}
       {quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
-      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onRemoveEvent={handleRemoveEvent} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
+      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
       {editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
+      {duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} />}
     </main>
   );
 }
