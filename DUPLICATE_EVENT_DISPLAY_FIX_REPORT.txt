@@ -1,0 +1,10 @@
+Duplicate Event display fix
+
+What changed:
+1. Disabled the old automatic bundled/code-baseline event import on app load.
+2. Added a visible-event guard so obsolete imported_code_baseline rows are not shown in the main scheduler/calendar views.
+3. Kept the Duplicate Event button behavior: it opens a prefilled editable modal and only creates a new event when Save Duplicate is clicked.
+4. Preserved Remove Event confirmation and smaller secondary Remove Event button styling.
+
+Optional SQL:
+Run supabase/disable_code_baseline_cleanup.sql if old bundled baseline rows are already present in Supabase and you want them soft-hidden in the database too.

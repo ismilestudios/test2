@@ -2218,6 +2218,8 @@ function supabaseRowToEvent(row = {}) {
   return {
     id: row.client_event_id || row.id,
     supabaseId: row.id,
+    source: row.source || '',
+    sourceEventId: row.source_event_id || null,
     date: row.date,
     endDate: row.end_date || null,
     title: row.title,
@@ -3201,32 +3203,11 @@ export default function SchedulerApp() {
     setLocalManualEvents(loadLocalManualEvents());
   }, []);
 
-  const importHistoricalEventsToSupabase = async (supabase, existingRows = []) => {
-    const existingImportedIds = new Set(
-      (existingRows || [])
-        .filter(row => row.source === 'imported_code_baseline' && row.source_event_id)
-        .map(row => row.source_event_id)
-    );
-
-    const rowsToImport = EVENTS
-      .filter(event => event?.id && !existingImportedIds.has(event.id))
-      .map(importedEventToSupabaseRow);
-
-    if (!rowsToImport.length) {
-      return { importedCount: 0, skipped: true };
-    }
-
-    const { data, error } = await supabase
-      .from('events')
-      .insert(rowsToImport)
-      .select('*');
-
-    if (error) {
-      console.warn('Could not import historical events into Supabase', error);
-      return { importedCount: 0, error };
-    }
-
-    return { importedCount: data?.length || 0, data: data || [] };
+  const importHistoricalEventsToSupabase = async () => {
+    // Safety fix: do not auto-insert bundled/code-baseline events on app load.
+    // iSmile Scheduler now uses Supabase/ICS/manual events as the source of truth.
+    // The old automatic seed path could make pre-existing calendar dates look duplicated.
+    return { importedCount: 0, skipped: true };
   };
 
   const loadManualEventsFromSupabase = async (supabase) => {
@@ -3503,7 +3484,7 @@ export default function SchedulerApp() {
     };
   }, []);
 
-  const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false;
+  const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false && event.source !== 'imported_code_baseline';
   const allEvents = useMemo(() => {
     const baseEvents = supabaseEvents.length ? supabaseEvents.filter(event => event.active !== false) : EVENTS;
     return mergeEventsById(baseEvents, localManualEvents).filter(isValidEvent);
