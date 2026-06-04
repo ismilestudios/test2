@@ -446,7 +446,7 @@ function MonthNavigator({ month, setMonth }) {
   );
 }
 
-function TodayTomorrowList({ title, date, events }) {
+function TodayTomorrowList({ title, date, events, onClickEvent }) {
   const dayEvents = events
     .filter(event => isDateInEventRange(event, date) && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
     .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
@@ -462,13 +462,17 @@ function TodayTomorrowList({ title, date, events }) {
       </div>
       <div className="mt-3 space-y-2">
         {dayEvents.length ? dayEvents.slice(0, 4).map(event => (
-          <div key={event.id} className="rounded-2xl border border-zinc-100 bg-white/80 p-3">
+          <button
+            key={event.id}
+            type="button"
+            onClick={() => onClickEvent?.(event)}
+            className="block w-full rounded-2xl border border-zinc-100 bg-white/80 p-3 text-left transition hover:-translate-y-0.5 hover:border-[#AEBB9E] hover:bg-white hover:shadow-soft focus:outline-none focus:ring-4 focus:ring-[#AEBB9E]/30"
+          >
             <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
-              <span>{event.time || 'TBD'}</span>
-              {event.photographers?.length ? <span>Assigned: {event.photographers.join(', ')}</span> : <span>Needs photographers assigned</span>}
+            <div className="mt-1 truncate text-xs text-zinc-500">
+              {event.photographers?.length ? <>Assigned: {event.photographers.join(', ')}</> : <>Needs photographers assigned</>}
             </div>
-          </div>
+          </button>
         )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-400">Nothing currently scheduled.</div>}
         {dayEvents.length > 4 ? <div className="text-xs font-medium text-zinc-500">+ {dayEvents.length - 4} more</div> : null}
       </div>
@@ -526,12 +530,12 @@ function CurrentWeeklyRolloutCard({ events }) {
   );
 }
 
-function OperationalSummary({ events }) {
+function OperationalSummary({ events, onClickEvent }) {
   const today = todayKey();
   return (
     <section className="grid gap-3 lg:grid-cols-3">
-      <TodayTomorrowList title="What We're Photographing Today" date={today} events={events} />
-      <TodayTomorrowList title="What We're Photographing Tomorrow" date={addDays(today, 1)} events={events} />
+      <TodayTomorrowList title="What We're Photographing Today" date={today} events={events} onClickEvent={onClickEvent} />
+      <TodayTomorrowList title="What We're Photographing Tomorrow" date={addDays(today, 1)} events={events} onClickEvent={onClickEvent} />
       <CurrentWeeklyRolloutCard events={events} />
     </section>
   );
@@ -3534,7 +3538,7 @@ export default function SchedulerApp() {
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="mx-auto max-w-7xl space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
         <LoginRequiredNotice />
-        {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} /> : null}
+        {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
         {eventsMessage && activeTab === 'Calendar View' ? (
           <div className="flex flex-col gap-2 rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div>{eventsMessage}</div>
