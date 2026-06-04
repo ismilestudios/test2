@@ -9,6 +9,19 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 
+const USER_PERMISSION_ROLES = ['Admin', 'Scheduler', 'Viewer / Photographer'];
+const USER_PERMISSION_ROLE_VALUES = {
+  'Admin': 'admin',
+  'Scheduler': 'scheduler',
+  'Viewer / Photographer': 'viewer_photographer'
+};
+const USER_PERMISSION_ROLE_LABELS = {
+  admin: 'Admin',
+  scheduler: 'Scheduler',
+  viewer_photographer: 'Viewer / Photographer'
+};
+
+
 const PHOTOGRAPHER_ALIASES = {
   steph: 'Stephanie',
   stephanie: 'Stephanie'
@@ -2878,7 +2891,7 @@ function makeBackupFilename(label, extension) {
   return `ismile-scheduler-${label}-${stamp}.${extension}`;
 }
 
-function AdminPage({ events, schools, photographers, assistants, eventsMessage, schoolsMessage, reloadEvents, reloadSchools }) {
+function AdminPage({ events, schools, photographers, assistants, eventsMessage, schoolsMessage, reloadEvents, reloadSchools, authEmail }) {
   const activeEvents = (events || []).filter(event => event.active !== false);
   const removedEvents = (events || []).filter(event => event.active === false);
   const googleImported = activeEvents.filter(event => event.source === 'google_calendar_import');
@@ -2888,6 +2901,83 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
   const unlinked = activeEvents.filter(event => !event.canonicalSchool);
   const activeSchools = (schools || []).filter(school => school.active !== false);
   const inactiveSchools = (schools || []).filter(school => school.active === false || school.mergedInto);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [adminUsersMessage, setAdminUsersMessage] = useState('Loading users and permissions...');
+  const [adminUsersSaving, setAdminUsersSaving] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'viewer_photographer' });
+
+  const loadAdminUsers = async () => {
+    if (!hasSupabaseEnv()) {
+      setAdminUsersMessage('Supabase is not connected yet. Users and permissions require Supabase.');
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setAdminUsersMessage('Supabase client was not available.');
+      return;
+    }
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('id, name, email, role, active, created_at, updated_at')
+      .order('active', { ascending: false })
+      .order('name', { ascending: true });
+    if (error) {
+      setAdminUsersMessage(`Users table is not ready yet: ${error.message}. Run supabase/admin_users_permissions_migration.sql once, then reload.`);
+      return;
+    }
+    setAdminUsers(data || []);
+    setAdminUsersMessage(`${data?.length || 0} user${data?.length === 1 ? '' : 's'} loaded.`);
+  };
+
+  useEffect(() => {
+    loadAdminUsers();
+  }, []);
+
+  const saveAdminUser = async (event) => {
+    event?.preventDefault?.();
+    const email = newUser.email.trim().toLowerCase();
+    const name = newUser.name.trim() || email;
+    if (!email) {
+      setAdminUsersMessage('Enter an email before adding a user.');
+      return;
+    }
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setAdminUsersMessage('Supabase is not connected yet.');
+      return;
+    }
+    setAdminUsersSaving(true);
+    const { error } = await supabase
+      .from('app_users')
+      .upsert({ name, email, role: newUser.role, active: true, updated_at: new Date().toISOString() }, { onConflict: 'email' });
+    setAdminUsersSaving(false);
+    if (error) {
+      setAdminUsersMessage(`Could not save user: ${error.message}`);
+      return;
+    }
+    setNewUser({ name: '', email: '', role: 'viewer_photographer' });
+    await loadAdminUsers();
+    setAdminUsersMessage(`${name} now has access as ${USER_PERMISSION_ROLE_LABELS[newUser.role] || newUser.role}.`);
+  };
+
+  const updateAdminUser = async (id, patch) => {
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setAdminUsersMessage('Supabase is not connected yet.');
+      return;
+    }
+    setAdminUsersSaving(true);
+    const { error } = await supabase
+      .from('app_users')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    setAdminUsersSaving(false);
+    if (error) {
+      setAdminUsersMessage(`Could not update user: ${error.message}`);
+      return;
+    }
+    await loadAdminUsers();
+  };
 
   const exportPackage = () => {
     const payload = {
@@ -3019,6 +3109,54 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
             <div className="mt-2 text-2xl font-black text-zinc-950">{value}</div>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h3 className="font-semibold text-zinc-950">Users & Permissions</h3>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">Simple access list for who should be allowed into iSmile Scheduler. Detailed permission enforcement can be tightened later.</p>
+            {authEmail ? <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Signed in as {authEmail}</p> : null}
+          </div>
+          <button type="button" onClick={loadAdminUsers} disabled={adminUsersSaving} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Reload Users</button>
+        </div>
+
+        <form onSubmit={saveAdminUser} className="mt-4 grid gap-2 md:grid-cols-[1fr_1.2fr_220px_auto]">
+          <input value={newUser.name} onChange={event => setNewUser(prev => ({ ...prev, name: event.target.value }))} placeholder="Name" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
+          <input value={newUser.email} onChange={event => setNewUser(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" type="email" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
+          <select value={newUser.role} onChange={event => setNewUser(prev => ({ ...prev, role: event.target.value }))} className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#AEBB9E]">
+            {USER_PERMISSION_ROLES.map(label => <option key={label} value={USER_PERMISSION_ROLE_VALUES[label]}>{label}</option>)}
+          </select>
+          <button type="submit" disabled={adminUsersSaving} className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400">Add User</button>
+        </form>
+
+        {adminUsersMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-700">{adminUsersMessage}</p> : null}
+
+        <div className="mt-4 overflow-hidden rounded-3xl border border-zinc-200">
+          <div className="grid grid-cols-[1.2fr_1.4fr_220px_140px] gap-3 bg-zinc-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-500 max-md:hidden">
+            <div>Name</div><div>Email</div><div>Role</div><div>Status</div>
+          </div>
+          <div className="divide-y divide-zinc-200 bg-white/80">
+            {adminUsers.map(user => (
+              <div key={user.id || user.email} className={`grid gap-3 px-4 py-3 md:grid-cols-[1.2fr_1.4fr_220px_140px] md:items-center ${user.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
+                <div>
+                  <div className="font-semibold">{user.name || user.email}</div>
+                  <div className="text-xs text-zinc-500 md:hidden">{user.email}</div>
+                </div>
+                <div className="text-sm text-zinc-600 max-md:hidden">{user.email}</div>
+                <select value={user.role || 'viewer_photographer'} disabled={adminUsersSaving} onChange={event => updateAdminUser(user.id, { role: event.target.value })} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60">
+                  {USER_PERMISSION_ROLES.map(label => <option key={label} value={USER_PERMISSION_ROLE_VALUES[label]}>{label}</option>)}
+                </select>
+                <button type="button" disabled={adminUsersSaving} onClick={() => updateAdminUser(user.id, { active: user.active === false })} className={`rounded-2xl border px-3 py-2 text-sm font-bold transition disabled:opacity-60 ${user.active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>
+                  {user.active === false ? 'Enable' : 'Disable'}
+                </button>
+              </div>
+            ))}
+            {!adminUsers.length ? (
+              <div className="p-4 text-sm text-zinc-500">No users loaded yet. Run the migration SQL, then add users here.</div>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
@@ -3563,7 +3701,7 @@ export default function SchedulerApp() {
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
-          {activeTab === 'Admin' && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} />}
+          {activeTab === 'Admin' && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} authEmail={authEmail} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>
