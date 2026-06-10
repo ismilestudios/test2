@@ -1,4 +1,4 @@
--- iSmile Scheduler v0.9 note attribution migration
+-- iSmile Scheduler v0.91 note attribution migration
 -- Adds non-editable metadata used to display attribution pills for notes.
 
 alter table if exists public.events
