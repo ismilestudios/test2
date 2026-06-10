@@ -212,3 +212,8 @@ This package adds a reversible **No Fall Scheduling** option for Carrie View's F
 ## Removed Events Display Fix
 
 This build keeps soft-delete behavior and improves the Overview > Removed Events panel so it sorts by the latest `updated_at` timestamp. Recently deleted events should appear at the top immediately after removal instead of being hidden behind older removed events.
+
+
+## Vercel Install Note
+
+This GitHub browser upload edition includes `vercel.json` so Vercel uses pnpm instead of npm. This avoids the Vercel/npm `Exit handler never called` install failure.
