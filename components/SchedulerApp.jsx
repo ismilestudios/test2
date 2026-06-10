@@ -42,6 +42,68 @@ function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
 }
 
+function displayNameFromEmail(email = '') {
+  const raw = String(email || '').trim();
+  const local = raw.split('@')[0] || 'User';
+  const known = {
+    matt: 'Matt',
+    matthew: 'Matt',
+    carrie: 'Carrie',
+    steph: 'Stephanie',
+    stephanie: 'Stephanie',
+    molly: 'Molly',
+    beth: 'Beth',
+    andrew: 'Andrew',
+    erin: 'Erin'
+  };
+  const normalized = local.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (known[normalized]) return known[normalized];
+  return local
+    .replace(/[._-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ') || 'User';
+}
+
+function formatShortAttributionDate(value) {
+  if (!value) return '';
+  const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
+}
+
+function makeNoteAttribution(email) {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  return {
+    name: displayNameFromEmail(email),
+    email: email || '',
+    date,
+    savedAt: now.toISOString()
+  };
+}
+
+function normalizeAttribution(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  if (typeof value === 'object') return value;
+  return null;
+}
+
+function AttributionPill({ attribution }) {
+  const clean = normalizeAttribution(attribution);
+  if (!clean?.name && !clean?.email) return null;
+  const label = `${clean.name || displayNameFromEmail(clean.email)} • ${formatShortAttributionDate(clean.date || clean.savedAt)}`;
+  return (
+    <span title={clean.email ? `Saved by ${clean.email}` : 'Automatically generated note attribution'} className="inline-flex select-none items-center rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-2.5 py-1 text-[11px] font-semibold text-zinc-800 shadow-sm">
+      {label}
+    </span>
+  );
+}
+
 function LoginRequiredNotice() {
   const [checked, setChecked] = useState(false);
   const [userEmail, setUserEmail] = useState(null);
@@ -378,7 +440,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.9</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -1210,6 +1272,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         </div>
         <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-1.5 w-full rounded-xl p-1.5 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
           <div className="whitespace-pre-wrap leading-5">{school.notes || '—'}</div>
+          {school.noteAttribution ? <div className="mt-2"><AttributionPill attribution={school.noteAttribution} /></div> : null}
         </button>
       </div>
 
@@ -1262,6 +1325,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
                 </div>
                 <div className="mt-1 text-xs font-medium text-zinc-700">{event.title}</div>
                 <div className="mt-2 whitespace-pre-wrap text-sm leading-5 text-zinc-600">{event.notes}</div>
+                {event.noteAttribution ? <div className="mt-2"><AttributionPill attribution={event.noteAttribution} /></div> : null}
               </button>
             ))}
           </div>
@@ -2086,6 +2150,7 @@ function schoolToSupabaseRow(school = {}) {
     zip: school.zip || stateZipParts.zip || null,
     state_zip: school.stateZip || joinStateZip(school.state, school.zip) || null,
     notes: school.notes || null,
+    school_notes_attribution: school.noteAttribution || school.school_notes_attribution || null,
     contact_first: school.contactFirst || null,
     contact_last: school.contactLast || null,
     contact_phone: school.contactPhone || null,
@@ -2112,6 +2177,7 @@ function supabaseRowToSchool(row = {}) {
     zip: row.zip || '',
     stateZip: row.state_zip || joinStateZip(row.state, row.zip),
     notes: row.notes || '',
+    noteAttribution: normalizeAttribution(row.school_notes_attribution),
     contactFirst: row.contact_first || '',
     contactLast: row.contact_last || '',
     contactPhone: row.contact_phone || '',
@@ -2200,6 +2266,7 @@ function eventToSupabaseRow(event = {}) {
     status: event.status || 'Scheduled',
     season: event.season || getSeasonLabel(event.date || ''),
     picture_day_info: event.notes || null,
+    picture_day_info_attribution: event.noteAttribution || event.picture_day_info_attribution || null,
     canonical_school: event.canonicalSchool || null,
     photographers: event.photographers || [],
     assistants: event.assistants || [],
@@ -2234,6 +2301,7 @@ function supabaseRowToEvent(row = {}) {
     time: row.time || 'TBD',
     arrivalTime: row.arrival_time || '',
     notes: row.picture_day_info || '',
+    noteAttribution: normalizeAttribution(row.picture_day_info_attribution),
     rainInfo: row.rain_info || '',
     history: row.history || '',
     source: row.source || 'supabase',
@@ -2245,7 +2313,7 @@ function supabaseRowToEvent(row = {}) {
   };
 }
 
-function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schools, setSchools, reloadSchools, schoolsMessage }) {
+function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schools, setSchools, reloadSchools, schoolsMessage, authEmail }) {
   const [schoolListQuery, setSchoolListQuery] = useState('');
   const q = (schoolListQuery || query).trim().toLowerCase();
   const [editingSchool, setEditingSchool] = useState(null);
@@ -2293,7 +2361,13 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     }
 
     const previous = (schools || []).find(school => (school.originalName || school.name) === originalName) || {};
-    const nextSchool = { ...previous, ...values, originalName };
+    const notesChanged = String(previous.notes || '') !== String(values.notes || '');
+    const nextSchool = {
+      ...previous,
+      ...values,
+      originalName,
+      noteAttribution: notesChanged ? makeNoteAttribution(authEmail) : (previous.noteAttribution || values.noteAttribution || null)
+    };
     const row = schoolToSupabaseRow(nextSchool);
 
     const { data, error } = await supabase
@@ -2772,7 +2846,7 @@ function RemovedEventsModule({ events, onRestore }) {
 
 function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent }) {
   return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
-              <Info icon={Pencil} title="Picture Day Info" value={event.notes || '—'} large /></div></motion.div></motion.aside>}</AnimatePresence>;
+              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Info</div><div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes || '—'}</div>{event.noteAttribution ? <div className="mt-3"><AttributionPill attribution={event.noteAttribution} /></div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -3016,7 +3090,8 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
       assistants: (event.assistants || []).join('; '),
       source: event.source || '',
       active: event.active !== false,
-      notes: event.notes || ''
+      notes: event.notes || '',
+      noteAttribution: event.noteAttribution ? JSON.stringify(event.noteAttribution) : ''
     }));
     downloadTextFile(makeBackupFilename('events', 'csv'), toCsv(rows), 'text/csv;charset=utf-8');
   };
@@ -3037,7 +3112,8 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
       contactEmail: school.contactEmail || '',
       mergedInto: school.mergedInto || '',
       active: school.active !== false,
-      notes: school.notes || ''
+      notes: school.notes || '',
+      noteAttribution: school.noteAttribution ? JSON.stringify(school.noteAttribution) : ''
     }));
     downloadTextFile(makeBackupFilename('schools', 'csv'), toCsv(rows), 'text/csv;charset=utf-8');
   };
@@ -3491,7 +3567,17 @@ export default function SchedulerApp() {
   }, [supabaseEvents, localManualEvents]);
   const removedEvents = useMemo(() => supabaseEvents.filter(event => event.active === false), [supabaseEvents]);
   const handleScheduleEvent = async (event) => {
-    const eventWithId = { ...event, id: event.id || `custom-${Date.now()}` };
+    const previousEvent = [...(supabaseEvents || []), ...(localManualEvents || [])].find(item =>
+      item.id === event.id ||
+      item.supabaseId === event.supabaseId ||
+      (event.supabaseId && item.supabaseId === event.supabaseId)
+    );
+    const notesChanged = String(previousEvent?.notes || '') !== String(event?.notes || '');
+    const eventWithId = {
+      ...event,
+      id: event.id || `custom-${Date.now()}`,
+      noteAttribution: notesChanged ? makeNoteAttribution(authEmail) : (event.noteAttribution || previousEvent?.noteAttribution || null)
+    };
 
     const supabase = createClient();
     if (!hasSupabaseEnv() || !supabase) {
@@ -3696,7 +3782,7 @@ export default function SchedulerApp() {
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} />}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
-          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} />}
+          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
           {activeTab === 'Admin' && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} authEmail={authEmail} />}
         </section>
