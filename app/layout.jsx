@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'iSmile Scheduler v0.9',
+  title: 'iSmile Scheduler v0.91',
   description: 'Internal school scheduling prototype for iSmile Studios.'
 };
 

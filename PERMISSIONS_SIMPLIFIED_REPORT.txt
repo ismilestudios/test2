@@ -1,0 +1,15 @@
+iSmile Scheduler permissions update
+
+Implemented from the last working v0.9 package:
+- User roles simplified to Admin and Photographer.
+- Admin page Users & Permissions section now shows a simple key: Photographer users cannot remove events, restore removed events, see the Admin page, or merge schools.
+- Older Scheduler / Viewer-Photographer role values normalize to Photographer in the UI.
+- Photographer users no longer see the Admin tab.
+- Photographer users no longer see Remove Event, Restore Removed Event, or Merge School actions.
+- Admin users retain full access.
+
+SQL included:
+/supabase/admin_two_role_permissions_migration.sql
+
+Build verification:
+npm run build completed successfully.

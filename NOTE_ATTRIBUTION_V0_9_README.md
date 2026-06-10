@@ -1,8 +1,8 @@
-# iSmile Scheduler v0.9 — Note Attribution Update
+# iSmile Scheduler v0.91 — Note Attribution Update
 
 Starting from the provided last-working ZIP, this update adds:
 
-- Header/browser title changed to `iSmile Scheduler v0.9`
+- Header/browser title changed to `iSmile Scheduler v0.91`
 - Automatic attribution metadata for edited Picture Day Info
 - Automatic attribution metadata for edited Notes on School
 - Non-editable attribution pills such as `[Matt • 1/24/25]`

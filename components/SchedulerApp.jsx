@@ -9,18 +9,28 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 
-const USER_PERMISSION_ROLES = ['Admin', 'Scheduler', 'Viewer / Photographer'];
+const USER_PERMISSION_ROLES = ['Admin', 'Photographer'];
 const USER_PERMISSION_ROLE_VALUES = {
   'Admin': 'admin',
-  'Scheduler': 'scheduler',
-  'Viewer / Photographer': 'viewer_photographer'
+  'Photographer': 'photographer'
 };
 const USER_PERMISSION_ROLE_LABELS = {
   admin: 'Admin',
-  scheduler: 'Scheduler',
-  viewer_photographer: 'Viewer / Photographer'
+  photographer: 'Photographer',
+  scheduler: 'Photographer',
+  viewer_photographer: 'Photographer'
 };
 
+
+
+function normalizePermissionRole(role) {
+  return role === 'admin' ? 'admin' : 'photographer';
+}
+
+function fallbackPermissionRole(email) {
+  const displayName = displayNameFromEmail(email || '');
+  return ADMINS.includes(displayName) ? 'admin' : 'photographer';
+}
 
 const PHOTOGRAPHER_ALIASES = {
   steph: 'Stephanie',
@@ -434,13 +444,13 @@ function addMonths(key, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function Header({ query, setQuery, activeTab, setActiveTab }) {
+function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }) {
   return (
     <header className="sticky top-0 z-20 border-b border-zinc-200/70 bg-cream/90 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.9</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.91</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -455,7 +465,7 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
             </label>
             <div className="flex justify-end"><AuthStatus /></div>
             <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-7">
-              {tabs.map((tab) => (
+              {visibleTabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
                 </button>
@@ -469,17 +479,17 @@ function Header({ query, setQuery, activeTab, setActiveTab }) {
 }
 
 
-function MobileBottomNav({ activeTab, setActiveTab }) {
+function MobileBottomNav({ activeTab, setActiveTab, canAdmin = false }) {
   const mobileTabs = [
     { label: 'Today', tab: 'Overview' },
     { label: 'Mobile', tab: 'Mobile View' },
     { label: 'Calendar', tab: 'Calendar View' },
     { label: 'Schools', tab: 'School List' },
-    { label: 'Admin', tab: 'Admin' }
+    ...(canAdmin ? [{ label: 'Admin', tab: 'Admin' }] : [])
   ];
   return (
     <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[1.5rem] border border-zinc-200 bg-white/95 p-1 shadow-2xl backdrop-blur sm:hidden">
-      <div className="grid grid-cols-5 gap-1">
+      <div className={`grid gap-1 ${canAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
         {mobileTabs.map(item => (
           <button
             key={item.tab}
@@ -1765,10 +1775,10 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
     const supabase = createClient();
     if (!hasSupabaseEnv() || !supabase) return;
 
-    const { error } = await supabase
-      .from('schools')
-      .update({ no_fall_scheduling_fall_2026: value, updated_at: new Date().toISOString() })
-      .eq('original_name', originalName);
+    const updatePayload = { no_fall_scheduling_fall_2026: value, updated_at: new Date().toISOString() };
+    const { error } = school.id
+      ? await supabase.from('schools').update(updatePayload).eq('id', school.id)
+      : await supabase.from('schools').update(updatePayload).eq('original_name', originalName);
 
     if (error) {
       setSchools?.(prev => (prev || []).map(item => (item.originalName || item.name) === originalName ? { ...item, noFallSchedulingFall2026: !value } : item));
@@ -2000,7 +2010,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-zinc-950">Edit School</h2>
-            <p className="mt-1 text-sm text-zinc-600">Edits save in this browser for now. Supabase can make this shared later.</p>
+            <p className="mt-1 text-sm text-zinc-600">Edits save to Supabase. Notes on School should remain attached to this school record.</p>
           </div>
           <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
         </div>
@@ -2313,7 +2323,7 @@ function supabaseRowToEvent(row = {}) {
   };
 }
 
-function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schools, setSchools, reloadSchools, schoolsMessage, authEmail }) {
+function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schools, setSchools, reloadSchools, schoolsMessage, authEmail, canMergeSchools = true }) {
   const [schoolListQuery, setSchoolListQuery] = useState('');
   const q = (schoolListQuery || query).trim().toLowerCase();
   const [editingSchool, setEditingSchool] = useState(null);
@@ -2370,11 +2380,17 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     };
     const row = schoolToSupabaseRow(nextSchool);
 
-    const { data, error } = await supabase
-      .from('schools')
-      .upsert(row, { onConflict: 'original_name' })
-      .select()
-      .single();
+    // Save School List edits back to the exact Supabase row when an id exists.
+    // Earlier builds used only upsert(original_name). If an older school row had
+    // a blank original_name, saving Notes on School could create/update a second
+    // school record, making the note look like it disappeared when the original
+    // record was shown again.
+    const saveQuery = supabase.from('schools');
+    const result = previous.id
+      ? await saveQuery.update(row).eq('id', previous.id).select().single()
+      : await saveQuery.upsert(row, { onConflict: 'original_name' }).select().single();
+
+    const { data, error } = result;
 
     if (error) {
       setMessage(`Could not save school: ${error.message}`);
@@ -2455,7 +2471,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
             ))}
           </div>
         </section>
-        <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={setEditingSchool} onMerge={setMergingSchool} />
+        <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={setEditingSchool} onMerge={canMergeSchools ? setMergingSchool : null} />
         <AnimatePresence>
           {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
           {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={activeSchools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
@@ -2800,7 +2816,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
   );
 }
 
-function RemovedEventsModule({ events, onRestore }) {
+function RemovedEventsModule({ events, onRestore, canRestore = true }) {
   const sortedRemovedEvents = useMemo(() => {
     return [...(events || [])].sort((a, b) => {
       const aTime = new Date(a.updatedAt || a.createdAt || a.date || 0).getTime();
@@ -2831,7 +2847,7 @@ function RemovedEventsModule({ events, onRestore }) {
                 <div className="mt-2 truncate text-sm font-semibold text-zinc-950">{event.title}</div>
                 <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
               </div>
-              <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore</button>
+              {canRestore ? <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore</button> : null}
             </div>
           </div>
         )) : (
@@ -2844,8 +2860,8 @@ function RemovedEventsModule({ events, onRestore }) {
   );
 }
 
-function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
+function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true }) {
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
               <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Info</div><div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes || '—'}</div>{event.noteAttribution ? <div className="mt-3"><AttributionPill attribution={event.noteAttribution} /></div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
@@ -2981,7 +2997,7 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminUsersMessage, setAdminUsersMessage] = useState('Loading users and permissions...');
   const [adminUsersSaving, setAdminUsersSaving] = useState(false);
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'viewer_photographer' });
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'photographer' });
 
   const loadAdminUsers = async () => {
     if (!hasSupabaseEnv()) {
@@ -3032,7 +3048,7 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
       setAdminUsersMessage(`Could not save user: ${error.message}`);
       return;
     }
-    setNewUser({ name: '', email: '', role: 'viewer_photographer' });
+    setNewUser({ name: '', email: '', role: 'photographer' });
     await loadAdminUsers();
     setAdminUsersMessage(`${name} now has access as ${USER_PERMISSION_ROLE_LABELS[newUser.role] || newUser.role}.`);
   };
@@ -3200,6 +3216,17 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
           <button type="button" onClick={loadAdminUsers} disabled={adminUsersSaving} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Reload Users</button>
         </div>
 
+        <div className="mt-4 rounded-3xl border border-zinc-200 bg-cream/70 p-4">
+          <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-zinc-500">Photographer users cannot</h4>
+          <div className="mt-3 grid gap-2 text-sm text-zinc-700 md:grid-cols-2">
+            <div className="rounded-2xl bg-white/70 px-3 py-2">Remove events</div>
+            <div className="rounded-2xl bg-white/70 px-3 py-2">Restore removed events</div>
+            <div className="rounded-2xl bg-white/70 px-3 py-2">See the Admin page</div>
+            <div className="rounded-2xl bg-white/70 px-3 py-2">Merge schools</div>
+          </div>
+          <p className="mt-3 text-xs text-zinc-500">Admins can do everything. All other users are treated as Photographer users.</p>
+        </div>
+
         <form onSubmit={saveAdminUser} className="mt-4 grid gap-2 md:grid-cols-[1fr_1.2fr_220px_auto]">
           <input value={newUser.name} onChange={event => setNewUser(prev => ({ ...prev, name: event.target.value }))} placeholder="Name" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
           <input value={newUser.email} onChange={event => setNewUser(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" type="email" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
@@ -3223,7 +3250,7 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
                   <div className="text-xs text-zinc-500 md:hidden">{user.email}</div>
                 </div>
                 <div className="text-sm text-zinc-600 max-md:hidden">{user.email}</div>
-                <select value={user.role || 'viewer_photographer'} disabled={adminUsersSaving} onChange={event => updateAdminUser(user.id, { role: event.target.value })} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60">
+                <select value={normalizePermissionRole(user.role || 'photographer')} disabled={adminUsersSaving} onChange={event => updateAdminUser(user.id, { role: event.target.value })} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60">
                   {USER_PERMISSION_ROLES.map(label => <option key={label} value={USER_PERMISSION_ROLE_VALUES[label]}>{label}</option>)}
                 </select>
                 <button type="button" disabled={adminUsersSaving} onClick={() => updateAdminUser(user.id, { active: user.active === false })} className={`rounded-2xl border px-3 py-2 text-sm font-bold transition disabled:opacity-60 ${user.active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>
@@ -3274,10 +3301,44 @@ export default function SchedulerApp() {
   const [schoolsMessage, setSchoolsMessage] = useState('Loading schools from Supabase...');
   const [authReady, setAuthReady] = useState(false);
   const [authEmail, setAuthEmail] = useState(null);
+  const [currentUserRole, setCurrentUserRole] = useState('photographer');
 
   useEffect(() => {
     setLocalManualEvents(loadLocalManualEvents());
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCurrentUserRole() {
+      if (!authEmail) {
+        if (!cancelled) setCurrentUserRole('photographer');
+        return;
+      }
+      const fallbackRole = fallbackPermissionRole(authEmail);
+      if (!hasSupabaseEnv()) {
+        if (!cancelled) setCurrentUserRole(fallbackRole);
+        return;
+      }
+      const supabase = createClient();
+      if (!supabase) {
+        if (!cancelled) setCurrentUserRole(fallbackRole);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('app_users')
+        .select('role, active')
+        .eq('email', authEmail.toLowerCase())
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data || data.active === false) {
+        setCurrentUserRole(fallbackRole);
+        return;
+      }
+      setCurrentUserRole(normalizePermissionRole(data.role));
+    }
+    loadCurrentUserRole();
+    return () => { cancelled = true; };
+  }, [authEmail]);
 
   const importHistoricalEventsToSupabase = async () => {
     // Safety fix: do not auto-insert bundled/code-baseline events on app load.
@@ -3745,6 +3806,13 @@ export default function SchedulerApp() {
     return allEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q));
   }, [query, allEvents]);
 
+  const isAdminUser = normalizePermissionRole(currentUserRole) === 'admin';
+  const visibleTabs = useMemo(() => tabs.filter(tab => tab !== 'Admin' || isAdminUser), [isAdminUser]);
+
+  useEffect(() => {
+    if (!isAdminUser && activeTab === 'Admin') setActiveTab('Calendar View');
+  }, [isAdminUser, activeTab]);
+
   const overviewPeriodEvents = useMemo(() => {
     if (overviewMode === 'Month') return queryFilteredEvents.filter(event => event && monthKey(event.date) <= month && monthKey(event.endDate || event.date) >= month);
     if (overviewMode === 'Week') {
@@ -3756,7 +3824,7 @@ export default function SchedulerApp() {
 
   return (
     <main className="min-h-screen font-sans text-zinc-900">
-      <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
       <div className="mx-auto max-w-7xl space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
         <LoginRequiredNotice />
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
@@ -3776,15 +3844,15 @@ export default function SchedulerApp() {
               <RecentlyAddedEventsModule events={allEvents} onClick={setSelected} />
             </div>
             <div className="pt-3">
-              <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} />
+              <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} canRestore={isAdminUser} />
             </div>
           </>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} />}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
-          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} />}
+          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canMergeSchools={isAdminUser} />}
           {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
-          {activeTab === 'Admin' && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} authEmail={authEmail} />}
+          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} authEmail={authEmail} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>
@@ -3792,10 +3860,10 @@ export default function SchedulerApp() {
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Rule</h3><p className="mt-2 text-sm text-zinc-600">Humans make scheduling decisions. This app supports reference, visibility, and notes — not automation.</p></div>
         </section>
       </div>
-      <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} canAdmin={isAdminUser} />
       {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} />}
       {quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
-      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
+      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
       {editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
       {duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} />}
     </main>
