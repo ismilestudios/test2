@@ -1810,11 +1810,12 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
     }
 
     const row = schoolToSupabaseRow(schoolValues);
-    const { data, error } = await supabase
-      .from('schools')
-      .upsert(row, { onConflict: 'original_name' })
-      .select()
-      .single();
+    const saveQuery = supabase.from('schools');
+    const result = schoolValues?.id
+      ? await saveQuery.update(row).eq('id', schoolValues.id).select().single()
+      : await saveQuery.upsert(row, { onConflict: 'original_name' }).select().single();
+
+    const { data, error } = result;
 
     if (error) {
       alert(`Could not save school: ${error.message}`);
@@ -1823,7 +1824,10 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
 
     const savedSchool = supabaseRowToSchool(data);
     setSchools?.(prev => {
-      const without = (prev || []).filter(school => (school.originalName || school.name) !== (savedSchool.originalName || savedSchool.name));
+      const without = (prev || []).filter(school => {
+        if (school.id && savedSchool.id) return school.id !== savedSchool.id;
+        return (school.originalName || school.name) !== (savedSchool.originalName || savedSchool.name);
+      });
       return [...without, savedSchool].sort((a, b) => a.name.localeCompare(b.name));
     });
     onSchoolAdded?.(savedSchool.name);
