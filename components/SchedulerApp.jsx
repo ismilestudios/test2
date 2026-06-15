@@ -456,7 +456,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.92</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.93</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -3715,16 +3715,19 @@ export default function SchedulerApp() {
 
       setSelected(null);
       setEditingEvent(null);
-      setQuery('');
-      setCalendarMode('Month');
       setEventsMessage(
         readbackConfirmed
           ? (eventWithId.supabaseId ? 'Event changes saved and verified in Supabase.' : `Event saved and verified in Supabase for ${formatDate(confirmedEvent.date)}.`)
           : `Event appeared to save, but Supabase readback could not verify it: ${readbackResult.error?.message || 'unknown readback error'}. It is shown with a warning until verified.`
       );
-      setMonth(monthKey(confirmedEvent.date));
-      setSelectedDate(confirmedEvent.date);
-      setActiveTab('Calendar View');
+      if (!eventWithId.supabaseId) {
+        setMonth(monthKey(confirmedEvent.date));
+        setSelectedDate(confirmedEvent.date);
+        setActiveTab('Calendar View');
+      } else if (activeTab === 'Calendar View') {
+        setMonth(monthKey(confirmedEvent.date));
+        setSelectedDate(confirmedEvent.date);
+      }
       return confirmedEvent;
     } catch (unexpectedError) {
       console.error('Unexpected event save failure', unexpectedError, row);
