@@ -158,11 +158,11 @@ function LoginRequiredNotice() {
           </h2>
 
           <p className="mt-3 text-base leading-7 text-amber-950">
-            The calendar may appear normal at first glance, but shared Supabase data, saved changes, assignments, edits, and scheduling actions require login first.
+            Shared calendar events, school data, assignments, edits, and scheduling details are hidden until you log in.
           </p>
 
           <div className="mt-4 rounded-2xl border border-amber-300 bg-white/70 px-4 py-3 text-sm font-semibold text-amber-950 shadow-sm">
-            If you proceed without logging in, your changes may not save or sync correctly.
+            Log in first to view or edit the live Scheduler data.
           </div>
         </div>
 
@@ -3602,7 +3602,11 @@ export default function SchedulerApp() {
       setAuthEmail(data.session?.user?.email || null);
 
       if (!data.session) {
-        setEventsMessage(`Please log in to load shared Supabase events${localBackup.length ? ` (${localBackup.length} browser backup event${localBackup.length === 1 ? '' : 's'} visible)` : ''}.`);
+        setSupabaseEvents([]);
+        setLocalManualEvents([]);
+        setEventsMessage('Please log in to load shared Supabase events. Calendar events are hidden while logged out.');
+        setSchoolsMessage('Please log in to load the School List.');
+        setTeamMembersMessage('Please log in to load Team Members.');
         return;
       }
 
@@ -3628,6 +3632,12 @@ export default function SchedulerApp() {
         loadTeamMembersFromSupabase();
         loadSchoolsFromSupabase();
         loadEventsFromSupabase();
+      } else if (!session && ['SIGNED_OUT', 'INITIAL_SESSION'].includes(event)) {
+        setSupabaseEvents([]);
+        setLocalManualEvents([]);
+        setEventsMessage('Please log in to load shared Supabase events. Calendar events are hidden while logged out.');
+        setSchoolsMessage('Please log in to load the School List.');
+        setTeamMembersMessage('Please log in to load Team Members.');
       }
     });
 
@@ -3637,12 +3647,17 @@ export default function SchedulerApp() {
     };
   }, []);
 
+  const canViewSharedData = !hasSupabaseEnv() || (authReady && Boolean(authEmail));
+  const visibleSchools = canViewSharedData ? schools : [];
+  const visiblePhotographers = canViewSharedData ? photographers : [];
+  const visibleAssistants = canViewSharedData ? assistants : [];
   const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false && event.source !== 'imported_code_baseline';
   const allEvents = useMemo(() => {
+    if (!canViewSharedData) return [];
     const baseEvents = supabaseEvents.length ? supabaseEvents.filter(event => event.active !== false) : EVENTS;
     return mergeEventsById(baseEvents, localManualEvents).filter(isValidEvent);
-  }, [supabaseEvents, localManualEvents]);
-  const removedEvents = useMemo(() => supabaseEvents.filter(event => event.active === false), [supabaseEvents]);
+  }, [supabaseEvents, localManualEvents, canViewSharedData]);
+  const removedEvents = useMemo(() => canViewSharedData ? supabaseEvents.filter(event => event.active === false) : [], [supabaseEvents, canViewSharedData]);
   const handleScheduleEvent = async (event) => {
     const previousEvent = [...(supabaseEvents || []), ...(localManualEvents || [])].find(item =>
       item.id === event.id ||
@@ -3851,7 +3866,7 @@ export default function SchedulerApp() {
           </div>
         ) : null}
         {activeTab === 'Calendar View' && localManualEvents.some(event => event.localBackupOnly) ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
-        <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
+        <GlobalSearchResults query={query} schools={visibleSchools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>
             <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
@@ -3865,24 +3880,24 @@ export default function SchedulerApp() {
           </>}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} />}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
-          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
-          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canMergeSchools={isAdminUser} />}
-          {activeTab === 'Team Members' && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
+          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={visiblePhotographers} assistants={visibleAssistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={visibleSchools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />}
+          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={visibleSchools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canMergeSchools={isAdminUser} />}
+          {activeTab === 'Team Members' && <TeamMembers photographers={visiblePhotographers} assistants={visibleAssistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
           {activeTab === 'Admin' && !isAdminUser && <PermissionDeniedPanel />}
-          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} authEmail={authEmail} />}
+          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={visibleSchools} photographers={visiblePhotographers} assistants={visibleAssistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} authEmail={authEmail} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
-          <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>
-          <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Assistants</h3><p className="mt-2 text-sm text-zinc-600">{assistants.join(', ')}</p></div>
+          <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{visiblePhotographers.join(', ')}</p></div>
+          <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Assistants</h3><p className="mt-2 text-sm text-zinc-600">{visibleAssistants.join(', ')}</p></div>
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Rule</h3><p className="mt-2 text-sm text-zinc-600">Humans make scheduling decisions. This app supports reference, visibility, and notes — not automation.</p></div>
         </section>
       </div>
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} canAdmin={isAdminUser} />
-      {addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} />}
-      {quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
+      {addingEvent && <AddEventModal photographers={visiblePhotographers} assistants={visibleAssistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} />}
+      {quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={visiblePhotographers} assistants={visibleAssistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
       <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
-      {editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
-      {duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} />}
+      {editingEvent && <AddEventModal photographers={visiblePhotographers} assistants={visibleAssistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
+      {duplicatingEvent && <AddEventModal photographers={visiblePhotographers} assistants={visibleAssistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} />}
     </main>
   );
 }
