@@ -173,15 +173,13 @@ function AttributionPill({ attribution }) {
 }
 
 function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.' }) {
-  if (!entries.length) {
-    return <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-3 text-sm text-zinc-400">{emptyLabel}</div>;
-  }
+  if (!entries.length) return null;
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {entries.map(entry => (
-        <div key={entry.id} className="rounded-2xl border border-zinc-200 bg-white/75 p-3">
+        <div key={entry.id}>
           <div><AttributionPill attribution={entry} /></div>
-          <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{entry.text}</div>
+          <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{entry.text}</div>
         </div>
       ))}
     </div>
@@ -524,7 +522,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.94</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.94b</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -1358,7 +1356,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
           {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Add Note</button> : null}
         </div>
         <div className="mt-3">
-          <NoteHistoryList entries={schoolNoteHistory} emptyLabel="No added notes yet." />
+          <NoteHistoryList entries={schoolNoteHistory} />
         </div>
         {school.notes ? (
           <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
@@ -1416,7 +1414,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
                   <span className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-zinc-500">{event.type}</span>
                 </div>
                 <div className="mt-1 text-xs font-medium text-zinc-700">{event.title}</div>
-                <div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} emptyLabel="No added picture day notes yet." /></div>
+                <div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>
                 {event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-5 text-zinc-600">{event.notes}</div> : null}
               </button>
             ))}
@@ -1699,15 +1697,15 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
                 {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
               </div>
             </section>
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(initialEvent?.noteAttribution).length})</div>
-              <div className="mt-3"><NoteHistoryList entries={getNoteHistory(initialEvent?.noteAttribution)} emptyLabel="No added picture day notes yet." /></div>
-              {notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{notes}</div> : null}
-            </section>
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Add New Picture Day Note</div>
               <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder="Add a new picture day note. Existing note history cannot be edited." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
+            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(initialEvent?.noteAttribution).length})</div>
+              <div className="mt-3"><NoteHistoryList entries={getNoteHistory(initialEvent?.noteAttribution)} /></div>
+              {notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{notes}</div> : null}
+            </section>
           </div>
           <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
@@ -2147,7 +2145,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
           </div>
           <section className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
             <div className="text-sm font-semibold text-zinc-800">Notes ({getNoteHistory(school.noteAttribution).length})</div>
-            <div className="mt-3"><NoteHistoryList entries={getNoteHistory(school.noteAttribution)} emptyLabel="No added notes yet." /></div>
+            <div className="mt-3"><NoteHistoryList entries={getNoteHistory(school.noteAttribution)} /></div>
             {school.notes ? (
               <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Imported from School Log</div>
@@ -2970,7 +2968,7 @@ function RemovedEventsModule({ events, onRestore, canRestore = true }) {
 
 function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true, canEdit = true }) {
   return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? (canEdit ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-slate-200 bg-slate-50 text-slate-700">View Only</Pill>) : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
-              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} emptyLabel="No added picture day notes yet." /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
+              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
