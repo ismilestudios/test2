@@ -1,11 +1,11 @@
-iSmile Scheduler v0.92 replacement files
+iSmile Scheduler v0.93 replacement files
 
 Replace these files in your test2 repo:
 
-1) components/SchedulerApp.jsx
-2) package.json
+- components/SchedulerApp.jsx
+- package.json
 
-Then commit both files in GitHub Desktop with:
-Add Assistant view-only role and update to v0.92
-
-Leave .DS_Store unchecked if it appears.
+Change included:
+- Keeps users on the same page after saving edits to an existing event.
+- Keeps Add Event behavior unchanged: new events still return to Calendar View on the saved date.
+- Updates the visible app version and package version to v0.93.
