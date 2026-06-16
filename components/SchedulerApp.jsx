@@ -3366,21 +3366,21 @@ function StaffDirectoryCard({ member, onCopy }) {
   const email = member.email || '';
   const title = member.title || '';
   return (
-    <div className={`rounded-3xl border border-zinc-200 bg-white/80 p-4 shadow-sm ${member.active === false ? 'opacity-60' : ''}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-base font-black text-zinc-950">{member.name || 'Unnamed Staff Member'}</div>
-          <div className="mt-1 flex flex-wrap gap-2">
-            <Pill className="border-zinc-200 bg-cream text-zinc-700">{displayStaffRole(member.role)}</Pill>
-            {title ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-800">{title}</Pill> : null}
-            {member.active === false ? <Pill className="border-zinc-200 bg-zinc-100 text-zinc-500">Inactive</Pill> : null}
+    <div className={`rounded-2xl border border-zinc-200 bg-white/85 px-3 py-2 shadow-sm ${member.active === false ? 'opacity-60' : ''}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-black text-zinc-950">{member.name || 'Unnamed Staff Member'}</span>
+            <span className="rounded-full border border-zinc-200 bg-cream px-2 py-0.5 text-[11px] font-bold text-zinc-600">{displayStaffRole(member.role)}</span>
+            {member.active === false ? <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-zinc-500">Inactive</span> : null}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-600">
+            {title ? <span>{title}</span> : <span className="text-zinc-400">No title</span>}
+            {phone ? <a href={`tel:${phone}`} className="font-semibold text-zinc-800 hover:underline">{phone}</a> : <span className="text-zinc-400">No phone</span>}
+            {email ? <a href={`mailto:${email}`} className="font-semibold text-zinc-800 hover:underline">{email}</a> : <span className="text-zinc-400">No email</span>}
           </div>
         </div>
-        <button type="button" onClick={() => onCopy?.(member)} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 shadow-sm transition hover:bg-zinc-50">Copy</button>
-      </div>
-      <div className="mt-4 space-y-2 text-sm text-zinc-700">
-        {phone ? <a href={`tel:${phone}`} className="block rounded-2xl bg-cream/70 px-3 py-2 font-semibold hover:bg-cream">Phone: {phone}</a> : <div className="rounded-2xl bg-cream/60 px-3 py-2 text-zinc-400">Phone not added yet</div>}
-        {email ? <a href={`mailto:${email}`} className="block rounded-2xl bg-cream/70 px-3 py-2 font-semibold hover:bg-cream">Email: {email}</a> : <div className="rounded-2xl bg-cream/60 px-3 py-2 text-zinc-400">Email not added yet</div>}
+        <button type="button" onClick={() => onCopy?.(member)} className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-bold text-zinc-700 shadow-sm transition hover:bg-zinc-50">Copy</button>
       </div>
     </div>
   );
@@ -3558,14 +3558,14 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
       </section>
 
       <section className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="text-lg font-black text-zinc-950">Staff Directory</h3>
-            <p className="mt-1 text-sm text-zinc-600">Search staff and tap phone/email links when you need to reach someone quickly.</p>
+            <p className="mt-1 text-sm text-zinc-600">Compact contact list for quick phone, email, and role lookup.</p>
           </div>
-          <input value={directoryQuery} onChange={event => setDirectoryQuery(event.target.value)} placeholder="Search staff..." className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
+          <input value={directoryQuery} onChange={event => setDirectoryQuery(event.target.value)} placeholder="Search staff..." className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-3 space-y-2">
           {filteredStaffMembers.map(member => <StaffDirectoryCard key={member.id || `${member.role}-${member.name}`} member={member} onCopy={copyStaffInfo} />)}
           {!filteredStaffMembers.length ? <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-4 text-sm text-zinc-500">No active staff matched that search.</div> : null}
         </div>
@@ -4294,52 +4294,54 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
         ))}
       </div>
 
-      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="font-semibold text-zinc-950">Staff Directory Manager</h3>
-            <p className="mt-1 text-sm leading-6 text-zinc-600">Edit the contact details shown on the Team Members page. Scheduling role controls whether someone appears as a photographer, assistant, or admin contact.</p>
+            <p className="mt-1 text-sm text-zinc-600">Compact editor for Team Members contact info.</p>
           </div>
-          <button type="button" onClick={reloadTeamMembers} disabled={staffSaving} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-60">Reload Staff</button>
+          <button type="button" onClick={reloadTeamMembers} disabled={staffSaving} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-60">Reload</button>
         </div>
 
-        <form onSubmit={saveStaffMember} className="mt-4 grid gap-2 lg:grid-cols-[1fr_1fr_1.2fr_1fr_180px_auto]">
-          <input value={newStaff.name} onChange={event => setNewStaff(prev => ({ ...prev, name: event.target.value }))} placeholder="Name" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
-          <input value={newStaff.title} onChange={event => setNewStaff(prev => ({ ...prev, title: event.target.value }))} placeholder="Title" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
-          <input value={newStaff.email} onChange={event => setNewStaff(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" type="email" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
-          <input value={newStaff.phone} onChange={event => setNewStaff(prev => ({ ...prev, phone: event.target.value }))} placeholder="Phone" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
-          <select value={newStaff.role} onChange={event => setNewStaff(prev => ({ ...prev, role: event.target.value }))} className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#AEBB9E]">
+        <form onSubmit={saveStaffMember} className="mt-3 grid gap-2 lg:grid-cols-[1fr_1fr_1.2fr_1fr_150px_auto]">
+          <input value={newStaff.name} onChange={event => setNewStaff(prev => ({ ...prev, name: event.target.value }))} placeholder="Name" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+          <input value={newStaff.title} onChange={event => setNewStaff(prev => ({ ...prev, title: event.target.value }))} placeholder="Title" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+          <input value={newStaff.email} onChange={event => setNewStaff(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" type="email" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+          <input value={newStaff.phone} onChange={event => setNewStaff(prev => ({ ...prev, phone: event.target.value }))} placeholder="Phone" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+          <select value={newStaff.role} onChange={event => setNewStaff(prev => ({ ...prev, role: event.target.value }))} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E]">
             <option value="photographer">Photographer</option>
             <option value="assistant">Assistant</option>
             <option value="admin">Admin</option>
           </select>
-          <button type="submit" disabled={staffSaving} className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 disabled:bg-zinc-400">Add Staff</button>
+          <button type="submit" disabled={staffSaving} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 disabled:bg-zinc-400">Add</button>
         </form>
 
-        {staffMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-700">{staffMessage}</p> : null}
+        {staffMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-2 text-sm text-zinc-700">{staffMessage}</p> : null}
 
-        <div className="mt-4 overflow-hidden rounded-3xl border border-zinc-200">
-          <div className="grid grid-cols-[1fr_1fr_1.2fr_1fr_160px_120px] gap-3 bg-zinc-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-500 max-lg:hidden">
-            <div>Name</div><div>Title</div><div>Email</div><div>Phone</div><div>Role</div><div>Status</div>
-          </div>
-          <div className="divide-y divide-zinc-200 bg-white/80">
-            {activeStaffMembers.map(member => (
-              <div key={member.id || `${member.role}-${member.name}`} className={`grid gap-2 px-4 py-3 lg:grid-cols-[1fr_1fr_1.2fr_1fr_160px_120px] lg:items-center ${member.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
-                <input defaultValue={member.name || ''} onBlur={event => event.target.value !== (member.name || '') ? updateStaffMember(member, { name: normalizeMemberName(event.target.value) }) : null} disabled={staffSaving} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
-                <input defaultValue={member.title || ''} onBlur={event => event.target.value !== (member.title || '') ? updateStaffMember(member, { title: event.target.value.trim() || null }) : null} disabled={staffSaving} placeholder="Title" className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
-                <input defaultValue={member.email || ''} onBlur={event => event.target.value !== (member.email || '') ? updateStaffMember(member, { email: event.target.value.trim().toLowerCase() || null }) : null} disabled={staffSaving} placeholder="Email" type="email" className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
-                <input defaultValue={member.phone || ''} onBlur={event => event.target.value !== (member.phone || '') ? updateStaffMember(member, { phone: event.target.value.trim() || null }) : null} disabled={staffSaving} placeholder="Phone" className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
-                <select value={member.role || 'photographer'} disabled={staffSaving || String(member.id || '').startsWith('builtin-')} onChange={event => updateStaffMember(member, { role: event.target.value })} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60">
-                  <option value="photographer">Photographer</option>
-                  <option value="assistant">Assistant</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <button type="button" disabled={staffSaving || String(member.id || '').startsWith('builtin-')} onClick={() => updateStaffMember(member, { active: member.active === false })} className={`rounded-2xl border px-3 py-2 text-sm font-bold transition disabled:opacity-60 ${member.active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>
-                  {member.active === false ? 'Enable' : 'Deactivate'}
-                </button>
-              </div>
-            ))}
-            {!activeStaffMembers.length ? <div className="p-4 text-sm text-zinc-500">No staff members loaded yet.</div> : null}
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-zinc-200">
+          <div className="min-w-[980px]">
+            <div className="grid grid-cols-[1fr_1fr_1.2fr_1fr_140px_100px] gap-2 bg-zinc-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+              <div>Name</div><div>Title</div><div>Email</div><div>Phone</div><div>Role</div><div>Status</div>
+            </div>
+            <div className="divide-y divide-zinc-200 bg-white/80">
+              {activeStaffMembers.map(member => (
+                <div key={member.id || `${member.role}-${member.name}`} className={`grid grid-cols-[1fr_1fr_1.2fr_1fr_140px_100px] items-center gap-2 px-3 py-1.5 ${member.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
+                  <input defaultValue={member.name || ''} onBlur={event => event.target.value !== (member.name || '') ? updateStaffMember(member, { name: normalizeMemberName(event.target.value) }) : null} disabled={staffSaving} className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
+                  <input defaultValue={member.title || ''} onBlur={event => event.target.value !== (member.title || '') ? updateStaffMember(member, { title: event.target.value.trim() || null }) : null} disabled={staffSaving} placeholder="Title" className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
+                  <input defaultValue={member.email || ''} onBlur={event => event.target.value !== (member.email || '') ? updateStaffMember(member, { email: event.target.value.trim().toLowerCase() || null }) : null} disabled={staffSaving} placeholder="Email" type="email" className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
+                  <input defaultValue={member.phone || ''} onBlur={event => event.target.value !== (member.phone || '') ? updateStaffMember(member, { phone: event.target.value.trim() || null }) : null} disabled={staffSaving} placeholder="Phone" className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
+                  <select value={member.role || 'photographer'} disabled={staffSaving || String(member.id || '').startsWith('builtin-')} onChange={event => updateStaffMember(member, { role: event.target.value })} className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60">
+                    <option value="photographer">Photographer</option>
+                    <option value="assistant">Assistant</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <button type="button" disabled={staffSaving || String(member.id || '').startsWith('builtin-')} onClick={() => updateStaffMember(member, { active: member.active === false })} className={`rounded-lg border px-2 py-1.5 text-xs font-bold transition disabled:opacity-60 ${member.active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>
+                    {member.active === false ? 'Enable' : 'Off'}
+                  </button>
+                </div>
+              ))}
+              {!activeStaffMembers.length ? <div className="p-4 text-sm text-zinc-500">No staff members loaded yet.</div> : null}
+            </div>
           </div>
         </div>
       </div>
