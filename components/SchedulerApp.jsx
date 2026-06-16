@@ -523,7 +523,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96c</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96d</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -1235,8 +1235,8 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr]">
-          <section className="rounded-[1.5rem] border border-yellow-200/80 bg-yellow-300/40 p-3 shadow-lg shadow-yellow-950/10">
+        <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-yellow-200/80 bg-yellow-300/40 p-3 shadow-lg shadow-yellow-950/10">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-black text-yellow-50">🟡 Hold! Needs Discussion Later</h3>
               <span className="rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">{heldEvents.length}</span>
@@ -1246,15 +1246,15 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
             </div>
           </section>
 
-          <section className="rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
+          <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
             <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 flex min-w-0 gap-2">
               <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-sm text-zinc-900 outline-none" />
               <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
             </div>
-            <div className="mt-2 flex max-h-[86px] gap-2 overflow-x-auto pb-1">
+            <div className="mt-2 flex max-h-[86px] w-full min-w-0 max-w-full gap-2 overflow-x-auto overflow-y-hidden pb-1">
               {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
-                <div key={entry.id} className="min-w-[220px] rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
+                <div key={entry.id} className="w-[220px] min-w-[220px] max-w-[220px] flex-none rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
                   <div className="text-[10px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
                   <div className="mt-1 line-clamp-2 text-xs leading-4 text-white/90">{entry.text}</div>
                 </div>
