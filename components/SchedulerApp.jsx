@@ -593,7 +593,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Scheduler v0.97f</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Scheduler v0.97g</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -3414,18 +3414,15 @@ function builtInStaffMembers() {
   return rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 }
 
-function StaffDirectoryRow({ member, onCopy }) {
+function StaffDirectoryRow({ member }) {
   const phone = member.phone || member.cell || '';
   const email = member.email || '';
-  const title = member.title || '';
   return (
     <tr className={`${member.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
       <td className="whitespace-nowrap px-3 py-1.5 text-sm font-black">{member.name || 'Unnamed Staff Member'}</td>
-      <td className="px-3 py-1.5 text-xs text-zinc-600">{title || <span className="text-zinc-400">—</span>}</td>
       <td className="whitespace-nowrap px-3 py-1.5 text-xs">{phone ? <a href={`tel:${phone}`} className="font-semibold text-zinc-800 hover:underline">{phone}</a> : <span className="text-zinc-400">—</span>}</td>
       <td className="px-3 py-1.5 text-xs">{email ? <a href={`mailto:${email}`} className="font-semibold text-zinc-800 hover:underline">{email}</a> : <span className="text-zinc-400">—</span>}</td>
       <td className="px-3 py-1.5 text-xs font-bold text-zinc-600">{displayStaffRoles(member)}</td>
-      <td className="whitespace-nowrap px-3 py-1.5 text-right"><button type="button" onClick={() => onCopy?.(member)} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold text-zinc-700 shadow-sm transition hover:bg-zinc-50">Copy</button></td>
     </tr>
   );
 }
@@ -3486,24 +3483,9 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
   const filteredStaffMembers = useMemo(() => {
     const q = directoryQuery.trim().toLowerCase();
     if (!q) return activeStaffMembers;
-    return activeStaffMembers.filter(member => [member.name, member.title, member.email, member.phone, displayStaffRoles(member)].filter(Boolean).join('\n').toLowerCase().includes(q));
+    return activeStaffMembers.filter(member => [member.name, member.email, member.phone, displayStaffRoles(member)].filter(Boolean).join('\n').toLowerCase().includes(q));
   }, [activeStaffMembers, directoryQuery]);
 
-  const copyStaffInfo = async (member) => {
-    const lines = [
-      member.name || 'Staff Member',
-      member.title ? `Title: ${member.title}` : null,
-      (member.roles?.length || member.role) ? `Scheduling Roles: ${displayStaffRoles(member)}` : null,
-      member.phone ? `Phone: ${member.phone}` : null,
-      member.email ? `Email: ${member.email}` : null
-    ].filter(Boolean).join('\n');
-    try {
-      await navigator.clipboard.writeText(lines);
-      setMessage(`Copied contact info for ${member.name || 'staff member'}.`);
-    } catch (error) {
-      setMessage('Could not copy contact info in this browser.');
-    }
-  };
 
   const saveMember = async (role, value) => {
     const name = normalizeMemberName(value);
@@ -3594,7 +3576,7 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
     <div className="space-y-4">
       <section className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/60 p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-950">Team Members</h2>
-        <p className="mt-1 text-sm text-zinc-700">Internal staff directory for names, titles, phone numbers, emails, and scheduling roles. Edit contact details from the Admin page.</p>
+        <p className="mt-1 text-sm text-zinc-700">Internal staff directory for quick phone, email, and scheduling-role lookup. Edit contact details from the Admin page.</p>
         {teamMembersMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{teamMembersMessage}</p> : null}
         {message ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{message}</p> : null}
       </section>
@@ -3611,10 +3593,10 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
           <div className="max-h-[420px] overflow-auto">
             <table className="w-full min-w-[780px] text-left">
               <thead className="sticky top-0 z-10 bg-zinc-50 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Title</th><th className="px-3 py-2">Phone</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Roles</th><th className="px-3 py-2 text-right">Copy</th></tr>
+                <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Phone</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Roles</th></tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {filteredStaffMembers.map(member => <StaffDirectoryRow key={member.id || member.name} member={member} onCopy={copyStaffInfo} />)}
+                {filteredStaffMembers.map(member => <StaffDirectoryRow key={member.id || member.name} member={member} />)}
               </tbody>
             </table>
           </div>
@@ -4045,7 +4027,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'photographer' });
   const [staffSaving, setStaffSaving] = useState(false);
   const [staffMessage, setStaffMessage] = useState('');
-  const [newStaff, setNewStaff] = useState({ name: '', title: '', email: '', phone: '', roles: ['photographer'] });
+  const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '', roles: ['photographer'] });
 
   const activeStaffMembers = useMemo(() => groupStaffMembers(staffMembers?.length ? staffMembers : builtInStaffMembers()), [staffMembers]);
 
@@ -4065,7 +4047,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
     const selectedRoles = newStaff.roles?.length ? newStaff.roles : ['photographer'];
     const rows = selectedRoles.map(role => ({
       name,
-      title: newStaff.title.trim() || null,
+      title: null,
       email: newStaff.email.trim().toLowerCase() || null,
       phone: newStaff.phone.trim() || null,
       role,
@@ -4080,7 +4062,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
       setStaffMessage(`Could not save staff contact: ${error.message}. If this mentions the title column, run supabase/staff_directory_migration.sql once.`);
       return;
     }
-    setNewStaff({ name: '', title: '', email: '', phone: '', roles: ['photographer'] });
+    setNewStaff({ name: '', email: '', phone: '', roles: ['photographer'] });
     await reloadTeamMembers?.();
     setStaffMessage(`${name} was saved to the staff directory.`);
   };
@@ -4175,6 +4157,32 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
     }
     await reloadTeamMembers?.();
     setStaffMessage(`${member.name || 'Staff member'} roles updated.`);
+  };
+
+  const setStaffGroupActive = async (member, active) => {
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setStaffMessage('Supabase is not connected yet.');
+      return;
+    }
+    const editableRows = (member.originalRows || []).filter(row => row?.id && !String(row.id).startsWith('builtin-'));
+    if (!editableRows.length) {
+      setStaffMessage('This built-in staff member needs to be saved to Supabase before changing active status.');
+      return;
+    }
+    setStaffSaving(true);
+    const updates = await Promise.all(editableRows.map(row => supabase
+      .from('staff_members')
+      .update({ active, updated_at: new Date().toISOString() })
+      .eq('id', row.id)));
+    setStaffSaving(false);
+    const failed = updates.find(result => result.error);
+    if (failed?.error) {
+      setStaffMessage(`Could not update staff status: ${failed.error.message}.`);
+      return;
+    }
+    await reloadTeamMembers?.();
+    setStaffMessage(`${member.name || 'Staff member'} was marked ${active ? 'active' : 'inactive'}.`);
   };
 
   const loadAdminUsers = async () => {
@@ -4423,9 +4431,8 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
           <button type="button" onClick={reloadTeamMembers} disabled={staffSaving} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-60">Reload</button>
         </div>
 
-        <form onSubmit={saveStaffMember} className="mt-3 grid gap-2 lg:grid-cols-[1fr_1fr_1.2fr_1fr_150px_auto]">
+        <form onSubmit={saveStaffMember} className="mt-3 grid gap-2 lg:grid-cols-[1fr_1.2fr_1fr_150px_auto]">
           <input value={newStaff.name} onChange={event => setNewStaff(prev => ({ ...prev, name: event.target.value }))} placeholder="Name" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
-          <input value={newStaff.title} onChange={event => setNewStaff(prev => ({ ...prev, title: event.target.value }))} placeholder="Title" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
           <input value={newStaff.email} onChange={event => setNewStaff(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" type="email" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
           <input value={newStaff.phone} onChange={event => setNewStaff(prev => ({ ...prev, phone: event.target.value }))} placeholder="Phone" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700">
@@ -4443,9 +4450,9 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
 
         <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80">
           <div className="max-h-[360px] overflow-auto">
-            <table className="w-full min-w-[1100px] text-left">
+            <table className="w-full min-w-[900px] text-left">
               <thead className="sticky top-0 z-10 bg-zinc-50 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Title</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Phone</th><th className="px-3 py-2">Roles</th><th className="px-3 py-2">Status</th></tr>
+                <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Phone</th><th className="px-3 py-2">Roles</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Active</th></tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {activeStaffMembers.map(member => {
@@ -4453,7 +4460,6 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
                   return (
                     <tr key={member.id || member.name} className={`${member.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
                       <td className="px-3 py-1.5"><input defaultValue={member.name || ''} onBlur={event => event.target.value !== (member.name || '') ? updateStaffGroup(member, { name: normalizeMemberName(event.target.value) }) : null} disabled={staffSaving || builtin} className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60" /></td>
-                      <td className="px-3 py-1.5"><input defaultValue={member.title || ''} onBlur={event => event.target.value !== (member.title || '') ? updateStaffGroup(member, { title: event.target.value.trim() || null }) : null} disabled={staffSaving || builtin} placeholder="Title" className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" /></td>
                       <td className="px-3 py-1.5"><input defaultValue={member.email || ''} onBlur={event => event.target.value !== (member.email || '') ? updateStaffGroup(member, { email: event.target.value.trim().toLowerCase() || null }) : null} disabled={staffSaving || builtin} placeholder="Email" type="email" className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" /></td>
                       <td className="px-3 py-1.5"><input defaultValue={member.phone || ''} onBlur={event => event.target.value !== (member.phone || '') ? updateStaffGroup(member, { phone: event.target.value.trim() || null }) : null} disabled={staffSaving || builtin} placeholder="Phone" className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" /></td>
                       <td className="px-3 py-1.5">
@@ -4467,6 +4473,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-1.5 text-xs font-bold text-zinc-600">{builtin ? 'Built-in' : member.active === false ? 'Inactive' : 'Active'}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-right">{!builtin ? <button type="button" onClick={() => setStaffGroupActive(member, member.active === false)} disabled={staffSaving} className={`${member.active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'} rounded-full border px-2.5 py-1 text-[11px] font-black disabled:opacity-60`}>{member.active === false ? 'Enable' : 'Deactivate'}</button> : <span className="text-[11px] text-zinc-400">—</span>}</td>
                     </tr>
                   );
                 })}
