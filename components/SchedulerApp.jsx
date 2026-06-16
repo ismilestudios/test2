@@ -593,7 +593,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.97</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.97a</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -943,6 +943,24 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
 
 const SCHEDULE_LIVE_SESSION_ID = 'main';
 const SCHEDULE_LIVE_HOLD_STATUS = 'Hold! Needs Discussion Later';
+const SCHEDULE_LIVE_COMMENTARY_RETENTION_DAYS = 15;
+
+function getCleanScheduleLiveCommentary(commentary = []) {
+  const cutoff = Date.now() - SCHEDULE_LIVE_COMMENTARY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  return (Array.isArray(commentary) ? commentary : [])
+    .filter(entry => {
+      const savedAt = entry?.savedAt ? new Date(entry.savedAt).getTime() : 0;
+      return savedAt && savedAt >= cutoff;
+    })
+    .slice(0, 40);
+}
+
+function cleanScheduleLiveState(state = {}) {
+  return {
+    ...state,
+    commentary: getCleanScheduleLiveCommentary(state.commentary)
+  };
+}
 
 function getMondayStart(date = todayKey()) {
   const d = new Date(`${date}T12:00:00`);
@@ -1129,7 +1147,8 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
 
   const saveLiveState = async (updater) => {
     const baseState = liveStateRef.current || liveState;
-    const next = typeof updater === 'function' ? updater(baseState) : { ...baseState, ...updater };
+    const rawNext = typeof updater === 'function' ? updater(baseState) : { ...baseState, ...updater };
+    const next = cleanScheduleLiveState(rawNext);
     const activeUsers = {
       ...(next.activeUsers || {}),
       ...(authEmail ? { [authEmail]: { name: currentUserName, email: authEmail, seenAt: new Date().toISOString() } } : {})
@@ -1172,7 +1191,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
         setStatusMessage(`Run the Schedule Live SQL setup to share host/commentary: ${error.message}`);
         return;
       }
-      if (data?.data) { const incoming = { ...scheduleLiveDefaultState(todayKey()), ...data.data }; liveStateRef.current = incoming; setLiveState(incoming); }
+      if (data?.data) { const incoming = cleanScheduleLiveState({ ...scheduleLiveDefaultState(todayKey()), ...data.data }); liveStateRef.current = incoming; setLiveState(incoming); }
       else await saveLiveState(scheduleLiveDefaultState(todayKey()));
     }
 
@@ -1182,7 +1201,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
       ? supabase.channel('schedule-live-room')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_live_sessions', filter: `id=eq.${SCHEDULE_LIVE_SESSION_ID}` }, payload => {
           const nextData = payload?.new?.data;
-          if (nextData && !cancelled) { const incoming = { ...scheduleLiveDefaultState(todayKey()), ...nextData }; liveStateRef.current = incoming; setLiveState(incoming); }
+          if (nextData && !cancelled) { const incoming = cleanScheduleLiveState({ ...scheduleLiveDefaultState(todayKey()), ...nextData }); liveStateRef.current = incoming; setLiveState(incoming); }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => reloadEvents?.())
         .subscribe()
@@ -1249,7 +1268,14 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
     if (!body) return;
     const entry = { id: `comment-${Date.now()}`, name: currentUserName, email: authEmail || '', text: body, savedAt: new Date().toISOString() };
     setCommentText('');
-    await saveLiveState(prev => ({ ...prev, commentary: [entry, ...(prev.commentary || [])].slice(0, 40) }));
+    await saveLiveState(prev => ({ ...prev, commentary: [entry, ...getCleanScheduleLiveCommentary(prev.commentary)].slice(0, 40) }));
+  };
+
+  const clearCommentary = async () => {
+    if (!isHost) return;
+    const ok = window.confirm('Clear all commentary messages?\n\nThis cannot be undone.');
+    if (!ok) return;
+    await saveLiveState(prev => ({ ...prev, commentary: [] }));
   };
 
   return (
@@ -1351,6 +1377,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
                 <div className="mt-2 flex flex-col gap-2">
                   <button type="button" onClick={() => saveLiveState(prev => ({ ...prev, hostEmail: authEmail || '', hostName: currentUserName }))} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30">{isHost ? 'Refresh Host' : 'Become Host'}</button>
                   {isHost ? <button type="button" onClick={() => saveLiveState(prev => ({ ...prev, hostEmail: '', hostName: '' }))} className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-black text-white">Release Host</button> : null}
+                  {isHost ? <button type="button" onClick={clearCommentary} className="rounded-2xl border border-red-200/35 bg-red-950/35 px-3 py-2 text-sm font-black text-red-100 hover:bg-red-600 hover:text-white">🗑 Clear Commentary</button> : null}
                 </div>
               ) : <div className="mt-2 text-sm font-semibold text-white/70">Admins control the shared week.</div>}
             </div>
