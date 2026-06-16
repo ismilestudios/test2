@@ -209,7 +209,10 @@ function getNoteHistory(attribution) {
       email: entry.email || '',
       savedAt: entry.savedAt || entry.createdAt || entry.date || '',
       date: entry.date || (entry.savedAt ? String(entry.savedAt).slice(0, 10) : ''),
-      text: String(entry.text || entry.note || entry.content || '').trim()
+      text: String(entry.text || entry.note || entry.content || '').trim(),
+      editedName: entry.editedName || entry.edited_by_name || entry.editedByName || '',
+      editedEmail: entry.editedEmail || entry.edited_by_email || entry.editedByEmail || '',
+      editedAt: entry.editedAt || entry.edited_at || entry.updatedAt || ''
     }))
     .filter(entry => entry.text)
     .sort((a, b) => new Date(b.savedAt || b.date || 0).getTime() - new Date(a.savedAt || a.date || 0).getTime());
@@ -232,6 +235,24 @@ function appendNoteHistory(attribution, email, text) {
   return { ...previous, history: [entry, ...history] };
 }
 
+function editNoteHistory(attribution, noteId, email, text) {
+  const cleanText = String(text || '').trim();
+  if (!cleanText || !noteId) return normalizeAttribution(attribution);
+  const now = new Date();
+  const previous = normalizeAttribution(attribution) || {};
+  const history = getNoteHistory(previous).map(entry => {
+    if (entry.id !== noteId) return entry;
+    return {
+      ...entry,
+      text: cleanText,
+      editedName: displayNameFromEmail(email),
+      editedEmail: email || '',
+      editedAt: now.toISOString()
+    };
+  });
+  return { ...previous, history };
+}
+
 function AttributionPill({ attribution }) {
   const clean = normalizeAttribution(attribution);
   if (!clean?.name && !clean?.email) return null;
@@ -243,16 +264,38 @@ function AttributionPill({ attribution }) {
   );
 }
 
-function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.' }) {
+function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.', canEdit = false, onEditNote = null }) {
+  const [editingId, setEditingId] = useState(null);
+  const [draftText, setDraftText] = useState('');
   if (!entries.length) return null;
   return (
     <div className="space-y-4">
-      {entries.map(entry => (
-        <div key={entry.id}>
-          <div><AttributionPill attribution={entry} /></div>
-          <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{entry.text}</div>
-        </div>
-      ))}
+      {entries.map(entry => {
+        const isEditing = editingId === entry.id;
+        const editedLabel = entry.editedAt ? `Edited by ${entry.editedName || displayNameFromEmail(entry.editedEmail || '')} • ${formatAttributionTime(entry.editedAt)} ${formatShortAttributionDate(entry.editedAt)}` : '';
+        return (
+          <div key={entry.id} className={isEditing ? 'rounded-2xl border border-[#AEBB9E] bg-white/80 p-3' : ''}>
+            <div className="flex items-center justify-between gap-3">
+              <AttributionPill attribution={entry} />
+              {canEdit && onEditNote ? (
+                <button type="button" onClick={() => { setEditingId(entry.id); setDraftText(entry.text); }} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-600 transition hover:bg-zinc-50">Edit</button>
+              ) : null}
+            </div>
+            {editedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{editedLabel}</div> : null}
+            {isEditing ? (
+              <div className="mt-3 space-y-2">
+                <textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} rows={4} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => { setEditingId(null); setDraftText(''); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button>
+                  <button type="button" onClick={() => { onEditNote(entry.id, draftText); setEditingId(null); setDraftText(''); }} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white">Save Note Edit</button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{entry.text}</div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -593,7 +636,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Scheduler v0.97g</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Scheduler v0.98</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -2172,7 +2215,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 }
 
 
-function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null }) {
+function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null, authEmail = '', canEditNotes = false }) {
   const isDuplicate = Boolean(initialEvent && sourceLabel === 'Duplicate Event' && !initialEvent?.supabaseId);
   const isEditing = Boolean(initialEvent?.supabaseId);
   const [date, setDate] = useState(initialEvent?.date || defaultDate);
@@ -2188,6 +2231,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
   const [notes] = useState(initialEvent?.notes || '');
   const [newNote, setNewNote] = useState('');
+  const [noteAttribution, setNoteAttribution] = useState(initialEvent?.noteAttribution || null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -2226,6 +2270,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       time: startTime || 'TBD',
       notes: notes || '',
       newNote: newNote.trim(),
+      noteAttribution,
       rainInfo: '',
       history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
@@ -2314,11 +2359,14 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
             </section>
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Add New Picture Day Note</div>
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder="Add a new picture day note. Existing note history cannot be edited." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder="Add a new picture day note. Admins can edit prior note entries if details change." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(initialEvent?.noteAttribution).length})</div>
-              <div className="mt-3"><NoteHistoryList entries={getNoteHistory(initialEvent?.noteAttribution)} /></div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(noteAttribution).length})</div>
+                {canEditNotes ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-800">Admin note editing enabled</Pill> : null}
+              </div>
+              <div className="mt-3"><NoteHistoryList entries={getNoteHistory(noteAttribution)} canEdit={canEditNotes} onEditNote={(noteId, text) => setNoteAttribution(prev => editNoteHistory(prev, noteId, authEmail, text))} /></div>
               {notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{notes}</div> : null}
             </section>
           </div>
@@ -3656,6 +3704,58 @@ function RecentlyAddedEventsModule({ events, onClick }) {
   );
 }
 
+
+function RecentlyModifiedEventsModule({ events, onClick }) {
+  const modifiedEvents = useMemo(() => {
+    const cutoff = Date.now() - (72 * 60 * 60 * 1000);
+    return (events || [])
+      .filter(event => {
+        if (!event?.updatedAt || event.active === false) return false;
+        const updatedTime = new Date(event.updatedAt).getTime();
+        const createdTime = event.createdAt ? new Date(event.createdAt).getTime() : 0;
+        const isRecent = Number.isFinite(updatedTime) && updatedTime >= cutoff;
+        const notJustCreated = !Number.isFinite(createdTime) || Math.abs(updatedTime - createdTime) > 60000;
+        return isRecent && notJustCreated;
+      })
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 8);
+  }, [events]);
+
+  return (
+    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">Recently Modified Events</h2>
+          <p className="mt-1 text-sm text-zinc-600">Events changed in the last 72 hours. Use this to confirm edits hit the live Scheduler.</p>
+        </div>
+        <Pill className="border-zinc-200 bg-white text-zinc-600">{modifiedEvents.length} modified</Pill>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {modifiedEvents.length ? modifiedEvents.map(event => {
+          const edited = getEventLastEditedMeta(event);
+          const editedName = edited?.name || 'Before We Began Tracking';
+          const editedAt = edited?.editedAt || event.updatedAt;
+          return (
+            <button key={event.supabaseId || event.id} type="button" onClick={() => onClick?.(event)} className="block w-full rounded-2xl border border-zinc-200 bg-cream/75 p-3 text-left transition hover:bg-white hover:shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-zinc-950">{event.title}</div>
+                  <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
+                  <div className="mt-1 text-xs font-semibold text-zinc-600">Modified {formatEventMetaDateTime(editedAt) || 'recently'} by {editedName}</div>
+                </div>
+                <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+              </div>
+            </button>
+          );
+        }) : (
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events modified in the last 72 hours.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function RemovedEventsModule({ events, onRestore, canRestore = true }) {
   const sortedRemovedEvents = useMemo(() => {
     return [...(events || [])].sort((a, b) => {
@@ -4948,8 +5048,8 @@ export default function SchedulerApp() {
       notes: event.notes ?? previousEvent?.notes ?? '',
       history: historyWithEdit,
       noteAttribution: newNote
-        ? appendNoteHistory(previousEvent?.noteAttribution || event.noteAttribution, authEmail, newNote)
-        : notesChanged ? makeNoteAttribution(authEmail) : (event.noteAttribution || previousEvent?.noteAttribution || null)
+        ? appendNoteHistory(event.noteAttribution || previousEvent?.noteAttribution, authEmail, newNote)
+        : (event.noteAttribution || (notesChanged ? makeNoteAttribution(authEmail) : (previousEvent?.noteAttribution || null)))
     };
 
     const supabase = createClient();
@@ -5181,6 +5281,9 @@ export default function SchedulerApp() {
               <RecentlyAddedEventsModule events={allEvents} onClick={setSelected} />
             </div>
             <div className="pt-3">
+              <RecentlyModifiedEventsModule events={allEvents} onClick={setSelected} />
+            </div>
+            <div className="pt-3">
               <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} canRestore={isAdminUser} />
             </div>
           </>}
@@ -5199,11 +5302,11 @@ export default function SchedulerApp() {
         </section>
       </div>
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} canAdmin={isAdminUser} />
-      {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} />}
+      {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} authEmail={authEmail} canEditNotes={isAdminUser} />}
       {canEditScheduler && quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
       <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} canEdit={canEditScheduler} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
-      {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
-      {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} />}
+      {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
+      {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
     </main>
   );
 }
