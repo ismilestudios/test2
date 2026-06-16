@@ -8,7 +8,6 @@ export const metadata = {
   description: 'Internal workspace for school picture days, staffing, notes, and historical reference.',
   icons: {
     icon: [
-      { url: '/favicon.ico' },
       { url: '/scheduler-icon-16.png', sizes: '16x16', type: 'image/png' },
       { url: '/scheduler-icon-32.png', sizes: '32x32', type: 'image/png' },
       { url: '/scheduler-icon-192.png', sizes: '192x192', type: 'image/png' }
