@@ -102,7 +102,7 @@ function getEventAddedMeta(event = {}) {
     return { name: 'Google Calendar Import', email: '', addedAt: event.createdAt || '', source: 'import' };
   }
   if (event.source && String(event.source).includes('import')) {
-    return { name: 'Imported / Unknown', email: '', addedAt: event.createdAt || '', source: 'import' };
+    return { name: 'Google Calendar Import', email: '', addedAt: event.createdAt || '', source: 'import' };
   }
   return { name: 'Before We Began Tracking', email: '', addedAt: event.createdAt || '', source: 'legacy' };
 }
@@ -114,8 +114,43 @@ function makeEventAddedHistoryLine(authEmail = '') {
   return `[added_by_meta name="${name.replace(/"/g, "'")}" email="${email.replace(/"/g, '')}" at="${at}"]`;
 }
 
+function makeEventEditedHistoryLine(authEmail = '') {
+  const email = String(authEmail || '').trim();
+  const name = displayNameFromEmail(email || 'User');
+  const at = new Date().toISOString();
+  return `[last_edited_meta name="${name.replace(/"/g, "'")}" email="${email.replace(/"/g, '')}" at="${at}"]`;
+}
+
+function getEventLastEditedMeta(event = {}) {
+  const history = String(event.history || '');
+  const matches = [...history.matchAll(/\[last_edited_meta name="([^"]*)" email="([^"]*)" at="([^"]*)"\]/g)];
+  if (matches.length) {
+    const match = matches[matches.length - 1];
+    const [, rawName, rawEmail, rawAt] = match;
+    const email = rawEmail || '';
+    const name = rawName || displayNameFromEmail(email || '');
+    return { name: name || 'Before We Began Tracking', email, editedAt: rawAt || event.updatedAt || '', source: 'manual' };
+  }
+  if (event.updatedAt && event.updatedAt !== event.createdAt) {
+    return { name: 'Before We Began Tracking', email: '', editedAt: event.updatedAt, source: 'legacy' };
+  }
+  return null;
+}
+
+function formatEventMetaDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const datePart = `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
+  const timePart = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return `${datePart} ${timePart}`;
+}
+
 function stripInternalEventMeta(history = '') {
-  return String(history || '').replace(/\n?\[added_by_meta[^\]]*\]/g, '').trim();
+  return String(history || '')
+    .replace(/\n?\[added_by_meta[^\]]*\]/g, '')
+    .replace(/\n?\[last_edited_meta[^\]]*\]/g, '')
+    .trim();
 }
 
 function formatShortAttributionDate(value) {
@@ -558,7 +593,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96h</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.97</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -1905,7 +1940,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
 
       <div className="mt-3 max-w-4xl rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm font-semibold text-zinc-800">Notes ({schoolNoteHistory.length})</div>
+          <div className="text-sm font-semibold text-zinc-800">School Notes ({schoolNoteHistory.length})</div>
           {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Add Note</button> : null}
         </div>
         <div className="mt-3">
@@ -2379,7 +2414,7 @@ function AddSchoolModal({ onClose, onSave }) {
             </div>
 
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Notes on School</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">School Notes</div>
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Persistent notes about this school/account..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
           </div>
@@ -2657,7 +2692,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-zinc-950">Edit School</h2>
-            <p className="mt-1 text-sm text-zinc-600">Edits save to Supabase. Notes on School should remain attached to this school record.</p>
+            <p className="mt-1 text-sm text-zinc-600">Edits save to Supabase. School Notes should remain attached to this school record.</p>
           </div>
           <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
         </div>
@@ -2697,7 +2732,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
             </label>
           </div>
           <section className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
-            <div className="text-sm font-semibold text-zinc-800">Notes ({getNoteHistory(school.noteAttribution).length})</div>
+            <div className="text-sm font-semibold text-zinc-800">School Notes ({getNoteHistory(school.noteAttribution).length})</div>
             <div className="mt-3"><NoteHistoryList entries={getNoteHistory(school.noteAttribution)} /></div>
             {school.notes ? (
               <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
@@ -3041,7 +3076,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
 
     // Save School List edits back to the exact Supabase row when an id exists.
     // Earlier builds used only upsert(original_name). If an older school row had
-    // a blank original_name, saving Notes on School could create/update a second
+    // a blank original_name, saving School Notes could create/update a second
     // school record, making the note look like it disappeared when the original
     // record was shown again.
     const saveQuery = supabase.from('schools');
@@ -3520,8 +3555,14 @@ function RemovedEventsModule({ events, onRestore, canRestore = true }) {
 }
 
 function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true, canEdit = true }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? (canEdit ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-slate-200 bg-slate-50 text-slate-700">View Only</Pill>) : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={UserRoundCheck} title="Added By" value={`${getEventAddedMeta(event).name}${getEventAddedMeta(event).addedAt ? ` · ${formatShortAttributionDate(getEventAddedMeta(event).addedAt)}` : ''}`} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
-              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
+  if (!event) return null;
+  const addedMeta = getEventAddedMeta(event);
+  const editedMeta = getEventLastEditedMeta(event);
+  const createdLabel = event.createdAt ? formatEventMetaDateTime(event.createdAt) : '';
+  const addedLabel = `${addedMeta.name}${addedMeta.addedAt ? ` · ${formatEventMetaDateTime(addedMeta.addedAt)}` : ''}`;
+  const editedLabel = editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : 'Not recorded yet';
+
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-3 grid gap-1 text-xs leading-5 text-zinc-500"><div><span className="font-semibold text-zinc-700">Created:</span> {createdLabel || 'Before We Began Tracking'}</div><div><span className="font-semibold text-zinc-700">Added By:</span> {addedLabel}</div><div><span className="font-semibold text-zinc-700">Last Edited:</span> {editedLabel}</div></div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -4517,11 +4558,14 @@ export default function SchedulerApp() {
     const historyWithCreator = isNewEvent && !/\[added_by_meta/.test(String(existingHistory || ''))
       ? [stripInternalEventMeta(existingHistory), makeEventAddedHistoryLine(authEmail)].filter(Boolean).join('\n')
       : existingHistory;
+    const historyWithEdit = !isNewEvent
+      ? [historyWithCreator, makeEventEditedHistoryLine(authEmail)].filter(Boolean).join('\n')
+      : historyWithCreator;
     const eventWithId = {
       ...event,
       id: event.id || `custom-${Date.now()}`,
       notes: event.notes ?? previousEvent?.notes ?? '',
-      history: historyWithCreator,
+      history: historyWithEdit,
       noteAttribution: newNote
         ? appendNoteHistory(previousEvent?.noteAttribution || event.noteAttribution, authEmail, newNote)
         : notesChanged ? makeNoteAttribution(authEmail) : (event.noteAttribution || previousEvent?.noteAttribution || null)
