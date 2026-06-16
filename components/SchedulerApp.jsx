@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2 } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
@@ -457,7 +457,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96b</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -908,7 +908,7 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
       layout
       onDragOver={(e) => { if (canEdit && draggedPhotographer) e.preventDefault(); }}
       onDrop={(e) => { e.preventDefault(); if (draggedPhotographer) assign(draggedPhotographer); setDraggedPhotographer?.(''); }}
-      className={`group relative overflow-hidden rounded-2xl border bg-white/96 p-2 text-left shadow-md shadow-zinc-950/10 transition hover:-translate-y-0.5 hover:shadow-xl ${isHeld ? 'border-yellow-300 ring-2 ring-yellow-300/50' : 'border-white/70'}`}
+      className={`group relative overflow-hidden rounded-2xl border bg-white p-2 text-left shadow-md shadow-zinc-950/10 transition hover:-translate-y-0.5 hover:shadow-xl ${isHeld ? 'border-yellow-300 ring-2 ring-yellow-300/50' : 'border-white/70'}`}
     >
       <div className={`absolute inset-x-0 top-0 h-1 ${TYPE_COLORS[event.type] || 'bg-zinc-200'}`} />
       <div className="pt-1">
@@ -980,6 +980,11 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
   const [commentText, setCommentText] = useState('');
   const [draggedPhotographer, setDraggedPhotographer] = useState('');
   const [selectedPhotographer, setSelectedPhotographer] = useState('');
+  const liveStateRef = useRef(liveState);
+
+  useEffect(() => {
+    liveStateRef.current = liveState;
+  }, [liveState]);
 
   const currentUserName = displayNameFromEmail(authEmail || '');
   const isHost = liveState.hostEmail && authEmail && liveState.hostEmail === authEmail;
@@ -987,12 +992,14 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
   const canControlWeek = isHost || (!liveState.hostEmail && canHost);
 
   const saveLiveState = async (updater) => {
-    const next = typeof updater === 'function' ? updater(liveState) : { ...liveState, ...updater };
+    const baseState = liveStateRef.current || liveState;
+    const next = typeof updater === 'function' ? updater(baseState) : { ...baseState, ...updater };
     const activeUsers = {
       ...(next.activeUsers || {}),
       ...(authEmail ? { [authEmail]: { name: currentUserName, email: authEmail, seenAt: new Date().toISOString() } } : {})
     };
     const cleanNext = { ...next, activeUsers };
+    liveStateRef.current = cleanNext;
     setLiveState(cleanNext);
 
     const supabase = createClient();
@@ -1029,7 +1036,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
         setStatusMessage(`Run the Schedule Live SQL setup to share host/commentary: ${error.message}`);
         return;
       }
-      if (data?.data) setLiveState({ ...scheduleLiveDefaultState(todayKey()), ...data.data });
+      if (data?.data) { const incoming = { ...scheduleLiveDefaultState(todayKey()), ...data.data }; liveStateRef.current = incoming; setLiveState(incoming); }
       else await saveLiveState(scheduleLiveDefaultState(todayKey()));
     }
 
@@ -1039,7 +1046,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
       ? supabase.channel('schedule-live-room')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_live_sessions', filter: `id=eq.${SCHEDULE_LIVE_SESSION_ID}` }, payload => {
           const nextData = payload?.new?.data;
-          if (nextData && !cancelled) setLiveState({ ...scheduleLiveDefaultState(todayKey()), ...nextData });
+          if (nextData && !cancelled) { const incoming = { ...scheduleLiveDefaultState(todayKey()), ...nextData }; liveStateRef.current = incoming; setLiveState(incoming); }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => reloadEvents?.())
         .subscribe()
@@ -1110,11 +1117,11 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
   };
 
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#010c09] via-[#052016] to-[#0b2f22] p-3 text-white shadow-2xl">
-      <div className="rounded-[1.65rem] border border-white/10 bg-white/[0.07] p-4 shadow-inner backdrop-blur">
+    <div className="overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#000604] via-[#00120c] to-[#031b13] p-3 text-white shadow-2xl">
+      <div className="rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-inner backdrop-blur">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-red-300/50 bg-red-500/20 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-red-100 shadow-lg shadow-red-950/30"><span className="animate-pulse">🔴</span> Schedule Live!</div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-red-300/50 bg-red-500/25 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-red-100 shadow-[0_0_26px_rgba(239,68,68,0.45)]"><span className="animate-pulse">🔴</span> Schedule Live!</div>
             <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{getScheduleLiveSessionMonthLabel(liveState.weekStart)} Scheduling Session</h2>
             <p className="mt-1 text-sm font-semibold text-red-100/80">Week of {getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-white/80">
@@ -1163,7 +1170,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
         </div>
 
         <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr]">
-          <section className="rounded-[1.5rem] border border-yellow-300/55 bg-yellow-300/25 p-3 shadow-lg shadow-yellow-950/10">
+          <section className="rounded-[1.5rem] border border-yellow-200/80 bg-yellow-300/40 p-3 shadow-lg shadow-yellow-950/10">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-black text-yellow-50">🟡 Hold! Needs Discussion Later</h3>
               <span className="rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">{heldEvents.length}</span>
