@@ -593,7 +593,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.97c</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.97d</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -3345,6 +3345,47 @@ function normalizeMemberName(value) {
   return value.trim().replace(/\s+/g, ' ');
 }
 
+function displayStaffRole(role) {
+  const clean = String(role || '').trim().toLowerCase();
+  if (clean === 'photographer') return 'Photographer';
+  if (clean === 'assistant') return 'Assistant';
+  if (clean === 'admin') return 'Admin';
+  return role || 'Staff';
+}
+
+function builtInStaffMembers() {
+  const rows = [
+    ...uniqueCanonicalPhotographers(PHOTOGRAPHERS).map(name => ({ id: `builtin-photographer-${name}`, name, role: 'photographer', active: true })),
+    ...ASSISTANTS.map(name => ({ id: `builtin-assistant-${name}`, name, role: 'assistant', active: true }))
+  ];
+  return rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+}
+
+function StaffDirectoryCard({ member, onCopy }) {
+  const phone = member.phone || member.cell || '';
+  const email = member.email || '';
+  const title = member.title || '';
+  return (
+    <div className={`rounded-3xl border border-zinc-200 bg-white/80 p-4 shadow-sm ${member.active === false ? 'opacity-60' : ''}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-base font-black text-zinc-950">{member.name || 'Unnamed Staff Member'}</div>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <Pill className="border-zinc-200 bg-cream text-zinc-700">{displayStaffRole(member.role)}</Pill>
+            {title ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-800">{title}</Pill> : null}
+            {member.active === false ? <Pill className="border-zinc-200 bg-zinc-100 text-zinc-500">Inactive</Pill> : null}
+          </div>
+        </div>
+        <button type="button" onClick={() => onCopy?.(member)} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 shadow-sm transition hover:bg-zinc-50">Copy</button>
+      </div>
+      <div className="mt-4 space-y-2 text-sm text-zinc-700">
+        {phone ? <a href={`tel:${phone}`} className="block rounded-2xl bg-cream/70 px-3 py-2 font-semibold hover:bg-cream">Phone: {phone}</a> : <div className="rounded-2xl bg-cream/60 px-3 py-2 text-zinc-400">Phone not added yet</div>}
+        {email ? <a href={`mailto:${email}`} className="block rounded-2xl bg-cream/70 px-3 py-2 font-semibold hover:bg-cream">Email: {email}</a> : <div className="rounded-2xl bg-cream/60 px-3 py-2 text-zinc-400">Email not added yet</div>}
+      </div>
+    </div>
+  );
+}
+
 function TeamMemberEditor({ title, description, members, value, setValue, role, saving, onSaveMember, onDeactivateMember }) {
   return (
     <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
@@ -3386,11 +3427,41 @@ function TeamMemberEditor({ title, description, members, value, setValue, role, 
   );
 }
 
-function TeamMembers({ photographers, assistants, setPhotographers, setAssistants, reloadTeamMembers, teamMembersMessage }) {
+function TeamMembers({ photographers, assistants, staffMembers = [], setPhotographers, setAssistants, reloadTeamMembers, teamMembersMessage }) {
   const [photographerInput, setPhotographerInput] = useState('');
   const [assistantInput, setAssistantInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [directoryQuery, setDirectoryQuery] = useState('');
+
+  const activeStaffMembers = useMemo(() => {
+    const rows = staffMembers?.length ? staffMembers : builtInStaffMembers();
+    return rows
+      .filter(member => member.active !== false)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  }, [staffMembers]);
+
+  const filteredStaffMembers = useMemo(() => {
+    const q = directoryQuery.trim().toLowerCase();
+    if (!q) return activeStaffMembers;
+    return activeStaffMembers.filter(member => [member.name, member.title, member.email, member.phone, displayStaffRole(member.role)].filter(Boolean).join('\n').toLowerCase().includes(q));
+  }, [activeStaffMembers, directoryQuery]);
+
+  const copyStaffInfo = async (member) => {
+    const lines = [
+      member.name || 'Staff Member',
+      member.title ? `Title: ${member.title}` : null,
+      member.role ? `Scheduling Role: ${displayStaffRole(member.role)}` : null,
+      member.phone ? `Phone: ${member.phone}` : null,
+      member.email ? `Email: ${member.email}` : null
+    ].filter(Boolean).join('\n');
+    try {
+      await navigator.clipboard.writeText(lines);
+      setMessage(`Copied contact info for ${member.name || 'staff member'}.`);
+    } catch (error) {
+      setMessage('Could not copy contact info in this browser.');
+    }
+  };
 
   const saveMember = async (role, value) => {
     const name = normalizeMemberName(value);
@@ -3481,10 +3552,25 @@ function TeamMembers({ photographers, assistants, setPhotographers, setAssistant
     <div className="space-y-4">
       <section className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/60 p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-950">Team Members</h2>
-        <p className="mt-1 text-sm text-zinc-700">Team Members now save to Supabase. Use the trash icon to deactivate someone instead of deleting them, so historical staffing remains usable later.</p>
+        <p className="mt-1 text-sm text-zinc-700">Internal staff directory for names, titles, phone numbers, emails, and scheduling roles. Edit contact details from the Admin page.</p>
         {teamMembersMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{teamMembersMessage}</p> : null}
         {message ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{message}</p> : null}
       </section>
+
+      <section className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h3 className="text-lg font-black text-zinc-950">Staff Directory</h3>
+            <p className="mt-1 text-sm text-zinc-600">Search staff and tap phone/email links when you need to reach someone quickly.</p>
+          </div>
+          <input value={directoryQuery} onChange={event => setDirectoryQuery(event.target.value)} placeholder="Search staff..." className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {filteredStaffMembers.map(member => <StaffDirectoryCard key={member.id || `${member.role}-${member.name}`} member={member} onCopy={copyStaffInfo} />)}
+          {!filteredStaffMembers.length ? <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-4 text-sm text-zinc-500">No active staff matched that search.</div> : null}
+        </div>
+      </section>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <TeamMemberEditor title="Photographers" description="Active photographers available for future scheduling." members={photographers} value={photographerInput} setValue={setPhotographerInput} role="photographer" saving={saving} onSaveMember={saveMember} onDeactivateMember={deactivateMember} />
         <TeamMemberEditor title="Assistants" description="Active assistants available for future scheduling." members={assistants} value={assistantInput} setValue={setAssistantInput} role="assistant" saving={saving} onSaveMember={saveMember} onDeactivateMember={deactivateMember} />
@@ -3892,7 +3978,7 @@ function makeBackupFilename(label, extension) {
   return `ismile-scheduler-${label}-${stamp}.${extension}`;
 }
 
-function AdminPage({ events, schools, photographers, assistants, eventsMessage, schoolsMessage, reloadEvents, reloadSchools, authEmail }) {
+function AdminPage({ events, schools, photographers, assistants, staffMembers = [], eventsMessage, schoolsMessage, reloadEvents, reloadSchools, reloadTeamMembers, authEmail }) {
   const activeEvents = (events || []).filter(event => event.active !== false);
   const removedEvents = (events || []).filter(event => event.active === false);
   const googleImported = activeEvents.filter(event => event.source === 'google_calendar_import');
@@ -3906,6 +3992,70 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
   const [adminUsersMessage, setAdminUsersMessage] = useState('Loading users and permissions...');
   const [adminUsersSaving, setAdminUsersSaving] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'photographer' });
+  const [staffSaving, setStaffSaving] = useState(false);
+  const [staffMessage, setStaffMessage] = useState('');
+  const [newStaff, setNewStaff] = useState({ name: '', title: '', email: '', phone: '', role: 'photographer' });
+
+  const activeStaffMembers = useMemo(() => (staffMembers?.length ? staffMembers : builtInStaffMembers()).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))), [staffMembers]);
+
+  const saveStaffMember = async (event) => {
+    event?.preventDefault?.();
+    const name = normalizeMemberName(newStaff.name || '');
+    if (!name) {
+      setStaffMessage('Enter a staff member name.');
+      return;
+    }
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setStaffMessage('Supabase is not connected yet.');
+      return;
+    }
+    setStaffSaving(true);
+    const row = {
+      name,
+      title: newStaff.title.trim() || null,
+      email: newStaff.email.trim().toLowerCase() || null,
+      phone: newStaff.phone.trim() || null,
+      role: newStaff.role,
+      active: true,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase
+      .from('staff_members')
+      .upsert(row, { onConflict: 'name,role' });
+    setStaffSaving(false);
+    if (error) {
+      setStaffMessage(`Could not save staff contact: ${error.message}. If this mentions the title column, run supabase/staff_directory_migration.sql once.`);
+      return;
+    }
+    setNewStaff({ name: '', title: '', email: '', phone: '', role: 'photographer' });
+    await reloadTeamMembers?.();
+    setStaffMessage(`${name} was saved to the staff directory.`);
+  };
+
+  const updateStaffMember = async (member, patch) => {
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setStaffMessage('Supabase is not connected yet.');
+      return;
+    }
+    if (!member?.id || String(member.id).startsWith('builtin-')) {
+      setStaffMessage('This built-in staff member needs to be saved to Supabase before editing contact details.');
+      return;
+    }
+    setStaffSaving(true);
+    const { error } = await supabase
+      .from('staff_members')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', member.id);
+    setStaffSaving(false);
+    if (error) {
+      setStaffMessage(`Could not update staff contact: ${error.message}. If this mentions the title column, run supabase/staff_directory_migration.sql once.`);
+      return;
+    }
+    await reloadTeamMembers?.();
+    setStaffMessage(`${member.name || 'Staff member'} was updated.`);
+  };
 
   const loadAdminUsers = async () => {
     if (!hasSupabaseEnv()) {
@@ -4147,6 +4297,56 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
+            <h3 className="font-semibold text-zinc-950">Staff Directory Manager</h3>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">Edit the contact details shown on the Team Members page. Scheduling role controls whether someone appears as a photographer, assistant, or admin contact.</p>
+          </div>
+          <button type="button" onClick={reloadTeamMembers} disabled={staffSaving} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-60">Reload Staff</button>
+        </div>
+
+        <form onSubmit={saveStaffMember} className="mt-4 grid gap-2 lg:grid-cols-[1fr_1fr_1.2fr_1fr_180px_auto]">
+          <input value={newStaff.name} onChange={event => setNewStaff(prev => ({ ...prev, name: event.target.value }))} placeholder="Name" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
+          <input value={newStaff.title} onChange={event => setNewStaff(prev => ({ ...prev, title: event.target.value }))} placeholder="Title" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
+          <input value={newStaff.email} onChange={event => setNewStaff(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" type="email" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
+          <input value={newStaff.phone} onChange={event => setNewStaff(prev => ({ ...prev, phone: event.target.value }))} placeholder="Phone" className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#AEBB9E]" />
+          <select value={newStaff.role} onChange={event => setNewStaff(prev => ({ ...prev, role: event.target.value }))} className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-[#AEBB9E]">
+            <option value="photographer">Photographer</option>
+            <option value="assistant">Assistant</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button type="submit" disabled={staffSaving} className="rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 disabled:bg-zinc-400">Add Staff</button>
+        </form>
+
+        {staffMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-700">{staffMessage}</p> : null}
+
+        <div className="mt-4 overflow-hidden rounded-3xl border border-zinc-200">
+          <div className="grid grid-cols-[1fr_1fr_1.2fr_1fr_160px_120px] gap-3 bg-zinc-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-500 max-lg:hidden">
+            <div>Name</div><div>Title</div><div>Email</div><div>Phone</div><div>Role</div><div>Status</div>
+          </div>
+          <div className="divide-y divide-zinc-200 bg-white/80">
+            {activeStaffMembers.map(member => (
+              <div key={member.id || `${member.role}-${member.name}`} className={`grid gap-2 px-4 py-3 lg:grid-cols-[1fr_1fr_1.2fr_1fr_160px_120px] lg:items-center ${member.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
+                <input defaultValue={member.name || ''} onBlur={event => event.target.value !== (member.name || '') ? updateStaffMember(member, { name: normalizeMemberName(event.target.value) }) : null} disabled={staffSaving} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
+                <input defaultValue={member.title || ''} onBlur={event => event.target.value !== (member.title || '') ? updateStaffMember(member, { title: event.target.value.trim() || null }) : null} disabled={staffSaving} placeholder="Title" className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
+                <input defaultValue={member.email || ''} onBlur={event => event.target.value !== (member.email || '') ? updateStaffMember(member, { email: event.target.value.trim().toLowerCase() || null }) : null} disabled={staffSaving} placeholder="Email" type="email" className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
+                <input defaultValue={member.phone || ''} onBlur={event => event.target.value !== (member.phone || '') ? updateStaffMember(member, { phone: event.target.value.trim() || null }) : null} disabled={staffSaving} placeholder="Phone" className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" />
+                <select value={member.role || 'photographer'} disabled={staffSaving || String(member.id || '').startsWith('builtin-')} onChange={event => updateStaffMember(member, { role: event.target.value })} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60">
+                  <option value="photographer">Photographer</option>
+                  <option value="assistant">Assistant</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <button type="button" disabled={staffSaving || String(member.id || '').startsWith('builtin-')} onClick={() => updateStaffMember(member, { active: member.active === false })} className={`rounded-2xl border px-3 py-2 text-sm font-bold transition disabled:opacity-60 ${member.active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>
+                  {member.active === false ? 'Enable' : 'Deactivate'}
+                </button>
+              </div>
+            ))}
+            {!activeStaffMembers.length ? <div className="p-4 text-sm text-zinc-500">No staff members loaded yet.</div> : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
             <h3 className="font-semibold text-zinc-950">Users & Permissions</h3>
             <p className="mt-1 text-sm leading-6 text-zinc-600">Synced access list for everyone who has created a Supabase account. Detailed permission enforcement can be tightened later.</p>
             {authEmail ? <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Signed in as {authEmail}</p> : null}
@@ -4228,6 +4428,7 @@ export default function SchedulerApp() {
   const [photographers, setPhotographers] = useState(uniqueCanonicalPhotographers(PHOTOGRAPHERS));
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
+  const [staffMembers, setStaffMembers] = useState(builtInStaffMembers());
   const [supabaseEvents, setSupabaseEvents] = useState([]);
   const [localManualEvents, setLocalManualEvents] = useState([]);
   const [eventsMessage, setEventsMessage] = useState('Loading events from Supabase...');
@@ -4447,8 +4648,7 @@ export default function SchedulerApp() {
 
     const { data, error } = await supabase
       .from('staff_members')
-      .select('name, role, active')
-      .in('role', ['photographer', 'assistant'])
+      .select('*')
       .order('name', { ascending: true });
 
     if (error) {
@@ -4459,8 +4659,8 @@ export default function SchedulerApp() {
 
     if (!data?.length) {
       const seedRows = [
-        ...PHOTOGRAPHERS.map(name => ({ name, role: 'photographer', active: true })),
-        ...ASSISTANTS.map(name => ({ name, role: 'assistant', active: true }))
+        ...PHOTOGRAPHERS.map(name => ({ name, role: 'photographer', title: null, email: null, phone: null, active: true })),
+        ...ASSISTANTS.map(name => ({ name, role: 'assistant', title: null, email: null, phone: null, active: true }))
       ];
 
       const { error: seedError } = await supabase.from('staff_members').insert(seedRows);
@@ -4471,25 +4671,39 @@ export default function SchedulerApp() {
         return;
       }
 
+      setStaffMembers(seedRows.map((row, index) => ({ ...row, id: `seeded-${index}` })).sort((a, b) => a.name.localeCompare(b.name)));
       setPhotographers(uniqueCanonicalPhotographers(PHOTOGRAPHERS).sort((a, b) => a.localeCompare(b)));
       setAssistants([...ASSISTANTS].sort((a, b) => a.localeCompare(b)));
       setTeamMembersMessage('Seeded the starter photographers and assistants into Supabase.');
       return;
     }
 
-    const activePhotographers = uniqueCanonicalPhotographers(data
+    const loadedStaffMembers = (data || []).map(member => ({
+      id: member.id,
+      name: member.name,
+      title: member.title || '',
+      email: member.email || '',
+      phone: member.phone || '',
+      role: member.role,
+      active: member.active !== false,
+      createdAt: member.created_at,
+      updatedAt: member.updated_at
+    })).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+    const activePhotographers = uniqueCanonicalPhotographers(loadedStaffMembers
       .filter(member => member.active && member.role === 'photographer')
       .map(member => member.name))
       .sort((a, b) => a.localeCompare(b));
 
-    const activeAssistants = data
+    const activeAssistants = loadedStaffMembers
       .filter(member => member.active && member.role === 'assistant')
       .map(member => member.name)
       .sort((a, b) => a.localeCompare(b));
 
+    setStaffMembers(loadedStaffMembers);
     setPhotographers(activePhotographers);
     setAssistants(activeAssistants);
-    setTeamMembersMessage('Team Members are loading from Supabase.');
+    setTeamMembersMessage(`Loaded ${loadedStaffMembers.length} staff member${loadedStaffMembers.length === 1 ? '' : 's'} from Supabase.`);
   };
 
   useEffect(() => {
@@ -4835,8 +5049,8 @@ export default function SchedulerApp() {
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} />}
-          {activeTab === 'Team Members' && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
-          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} authEmail={authEmail} />}
+          {activeTab === 'Team Members' && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
+          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>
