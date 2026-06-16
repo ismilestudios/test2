@@ -28,5 +28,5 @@
   "engines": {
     "node": "20.x"
   },
-  "schedulerDisplayVersion": "0.99a"
+  "schedulerDisplayVersion": "0.99.1"
 }
