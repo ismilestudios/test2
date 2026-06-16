@@ -83,6 +83,41 @@ function displayNameFromEmail(email = '') {
     .join(' ') || 'User';
 }
 
+
+function getEventAddedMeta(event = {}) {
+  const history = String(event.history || '');
+  const match = history.match(/\[added_by_meta name="([^"]*)" email="([^"]*)" at="([^"]*)"\]/);
+  if (match) {
+    const [, rawName, rawEmail, rawAt] = match;
+    const email = rawEmail || '';
+    const name = rawName || displayNameFromEmail(email || '');
+    return {
+      name: name || 'Unknown',
+      email,
+      addedAt: rawAt || event.createdAt || '',
+      source: 'manual'
+    };
+  }
+  if (event.source === 'google_calendar_import') {
+    return { name: 'Google Calendar Import', email: '', addedAt: event.createdAt || '', source: 'import' };
+  }
+  if (event.source && String(event.source).includes('import')) {
+    return { name: 'Imported / Unknown', email: '', addedAt: event.createdAt || '', source: 'import' };
+  }
+  return { name: 'Unknown', email: '', addedAt: event.createdAt || '', source: 'unknown' };
+}
+
+function makeEventAddedHistoryLine(authEmail = '') {
+  const email = String(authEmail || '').trim();
+  const name = displayNameFromEmail(email || 'User');
+  const at = new Date().toISOString();
+  return `[added_by_meta name="${name.replace(/"/g, "'")}" email="${email.replace(/"/g, '')}" at="${at}"]`;
+}
+
+function stripInternalEventMeta(history = '') {
+  return String(history || '').replace(/\n?\[added_by_meta[^\]]*\]/g, '').trim();
+}
+
 function formatShortAttributionDate(value) {
   if (!value) return '';
   const raw = String(value);
@@ -523,7 +558,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96e</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96f</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -1032,7 +1067,7 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
         {expandedInfo ? (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] leading-5 text-zinc-700">
             {event.notes ? <div className="whitespace-pre-wrap">{event.notes}</div> : <div className="text-zinc-500">No Picture Day Info entered.</div>}
-            {event.history ? <div className="mt-2 whitespace-pre-wrap border-t border-zinc-100 pt-2 text-zinc-500">{event.history}</div> : null}
+            {stripInternalEventMeta(event.history) ? <div className="mt-2 whitespace-pre-wrap border-t border-zinc-100 pt-2 text-zinc-500">{stripInternalEventMeta(event.history)}</div> : null}
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -1298,17 +1333,17 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
             </div>
           </section>
 
-          <section className="schedule-live-premium-glow rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
+          <section className="schedule-live-premium-glow min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
             <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
             <div className="mt-2 flex gap-2">
               <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-sm text-zinc-900 outline-none" />
               <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
             </div>
-            <div className="mt-2 flex max-h-[86px] gap-2 overflow-x-auto pb-1">
+            <div className="mt-2 flex max-h-[96px] max-w-full min-w-0 gap-2 overflow-x-auto overflow-y-auto pb-1 pr-1">
               {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
-                <div key={entry.id} className="schedule-live-comment-card min-w-[220px] rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
+                <div key={entry.id} className="schedule-live-comment-card w-[240px] min-w-[220px] max-w-[280px] shrink-0 rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
                   <div className="text-[10px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
-                  <div className="mt-1 line-clamp-2 text-xs leading-4 text-white/90">{entry.text}</div>
+                  <div className="mt-1 max-h-10 overflow-hidden break-words text-xs leading-4 text-white/90 [overflow-wrap:anywhere]">{entry.text}</div>
                 </div>
               )) : <div className="w-full rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No live commentary yet.</div>}
             </div>
@@ -1852,12 +1887,12 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
           <div className="text-sm font-semibold text-zinc-800">Address</div>
           <div className="mt-1 whitespace-pre-wrap leading-5">{addressLine || '—'}</div>
-          {school.address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-[#DDE8D2]">Maps</a> : null}
+          {school.address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join('\n'))}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-[#DDE8D2]">Maps</a> : null}
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
           <div className="text-sm font-semibold text-zinc-800">Primary Contact</div>
-          <div className="mt-1 text-sm font-medium text-zinc-700">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || '—'}</div>
+          <div className="mt-1 text-sm font-medium text-zinc-700">{[school.contactFirst, school.contactLast].filter(Boolean).join('\n') || '—'}</div>
           {school.contactTitle ? <div className="mt-0.5 text-xs text-zinc-500">{school.contactTitle}</div> : null}
           {school.contactPhone ? <div className="mt-1">{school.contactPhone}</div> : null}
           {school.contactEmail ? <div className="break-words">{school.contactEmail}</div> : null}
@@ -2404,7 +2439,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
 
   const q = query.trim().toLowerCase();
   const filteredSchools = q
-    ? schools.filter(item => [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
+    ? schools.filter(item => [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join('\n').toLowerCase().includes(q))
     : schools;
 
   const saveSchool = async (schoolValues) => {
@@ -2765,7 +2800,7 @@ function splitStateZip(value = '') {
 }
 
 function joinStateZip(state, zip, fallback = '') {
-  const joined = [state, zip].filter(Boolean).join(' ').trim();
+  const joined = [state, zip].filter(Boolean).join('\n').trim();
   return joined || fallback || '';
 }
 
@@ -3485,7 +3520,7 @@ function RemovedEventsModule({ events, onRestore, canRestore = true }) {
 }
 
 function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true, canEdit = true }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? (canEdit ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-slate-200 bg-slate-50 text-slate-700">View Only</Pill>) : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? (canEdit ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-slate-200 bg-slate-50 text-slate-700">View Only</Pill>) : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={UserRoundCheck} title="Added By" value={`${getEventAddedMeta(event).name}${getEventAddedMeta(event).addedAt ? ` · ${formatShortAttributionDate(getEventAddedMeta(event).addedAt)}` : ''}`} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
               <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
@@ -3501,7 +3536,7 @@ function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, 
   const normalizedQuery = normalizeSchoolLookupKey(query);
   const allSchoolMatches = (schools || []).filter(school => school.active !== false && !school.mergedInto && [
     school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone
-  ].filter(Boolean).join(' ').toLowerCase().includes(q));
+  ].filter(Boolean).join('\n').toLowerCase().includes(q));
   const schoolMatches = allSchoolMatches.slice(0, 6);
 
   const matchedSchoolKeys = new Set(allSchoolMatches.map(school => normalizeSchoolLookupKey(school.name)).filter(Boolean));
@@ -3554,7 +3589,7 @@ function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, 
             {schoolMatches.length ? schoolMatches.map(school => (
               <button key={school.name} onClick={() => onSelectSchool(school.name)} className="w-full rounded-2xl border border-zinc-100 bg-cream/70 p-3 text-left transition hover:bg-white hover:shadow-sm">
                 <div className="text-sm font-semibold text-zinc-900">{school.name}</div>
-                <div className="mt-1 text-xs text-zinc-500">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || school.city || 'School List match'}{school.irm ? ` · IRM ${school.irm}` : ''}</div>
+                <div className="mt-1 text-xs text-zinc-500">{[school.contactFirst, school.contactLast].filter(Boolean).join('\n') || school.city || 'School List match'}{school.irm ? ` · IRM ${school.irm}` : ''}</div>
               </button>
             )) : <div className="text-xs text-zinc-400">No school matches.</div>}
           </div>
@@ -4266,10 +4301,16 @@ export default function SchedulerApp() {
     );
     const notesChanged = String(previousEvent?.notes || '') !== String(event?.notes || '');
     const newNote = String(event?.newNote || '').trim();
+    const isNewEvent = !event?.supabaseId && !previousEvent?.supabaseId;
+    const existingHistory = event.history || previousEvent?.history || '';
+    const historyWithCreator = isNewEvent && !/\[added_by_meta/.test(String(existingHistory || ''))
+      ? [stripInternalEventMeta(existingHistory), makeEventAddedHistoryLine(authEmail)].filter(Boolean).join('\n')
+      : existingHistory;
     const eventWithId = {
       ...event,
       id: event.id || `custom-${Date.now()}`,
       notes: event.notes ?? previousEvent?.notes ?? '',
+      history: historyWithCreator,
       noteAttribution: newNote
         ? appendNoteHistory(previousEvent?.noteAttribution || event.noteAttribution, authEmail, newNote)
         : notesChanged ? makeNoteAttribution(authEmail) : (event.noteAttribution || previousEvent?.noteAttribution || null)
@@ -4443,7 +4484,7 @@ export default function SchedulerApp() {
   const queryFilteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allEvents;
-    return allEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q));
+    return allEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join('\n').toLowerCase().includes(q));
   }, [query, allEvents]);
 
   const normalizedCurrentUserRole = normalizePermissionRole(currentUserRole);
