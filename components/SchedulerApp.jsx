@@ -92,7 +92,7 @@ function getEventAddedMeta(event = {}) {
     const email = rawEmail || '';
     const name = rawName || displayNameFromEmail(email || '');
     return {
-      name: name || 'Unknown',
+      name: name || 'Before We Began Tracking',
       email,
       addedAt: rawAt || event.createdAt || '',
       source: 'manual'
@@ -104,25 +104,8 @@ function getEventAddedMeta(event = {}) {
   if (event.source && String(event.source).includes('import')) {
     return { name: 'Imported / Unknown', email: '', addedAt: event.createdAt || '', source: 'import' };
   }
-  return { name: 'Unknown', email: '', addedAt: event.createdAt || '', source: 'unknown' };
+  return { name: 'Before We Began Tracking', email: '', addedAt: event.createdAt || '', source: 'legacy' };
 }
-
-function getEventAddedDisplay(event = {}) {
-  const meta = getEventAddedMeta(event);
-  const dateLabel = meta.addedAt ? formatShortAttributionDate(meta.addedAt) : '';
-  return `${meta.name || 'Unknown'}${dateLabel ? ` · ${dateLabel}` : ''}`;
-}
-
-function EventAddedByBadge({ event, compact = false }) {
-  const meta = getEventAddedMeta(event);
-  return (
-    <div className={`${compact ? 'mt-2 inline-flex rounded-xl px-2 py-1 text-[10px]' : 'mt-3 rounded-2xl px-3 py-2 text-xs'} border border-sky-200 bg-sky-50 font-bold text-sky-950`}>
-      <span className="font-black uppercase tracking-wide text-sky-700">Added to calendar:</span> {getEventAddedDisplay(event)}
-      {meta.email ? <span className="ml-1 font-semibold text-sky-700">({meta.email})</span> : null}
-    </div>
-  );
-}
-
 
 function makeEventAddedHistoryLine(authEmail = '') {
   const email = String(authEmail || '').trim();
@@ -552,7 +535,6 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
         <div className="mt-3 space-y-1 text-xs text-zinc-600">
           <div>Photographers Assigned: {displayPhotographerAssignment(event)}</div>
           <div>Assistants: {event.assistants.length ? event.assistants.join(', ') : '—'}</div>
-          <div>Added to calendar: {getEventAddedDisplay(event)}</div>
         </div>
       )}
       {onAction && actionLabel ? (
@@ -576,7 +558,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96g</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96h</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -1084,7 +1066,6 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
         ) : null}
         {expandedInfo ? (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] leading-5 text-zinc-700">
-            <div className="mb-2 rounded-lg border border-sky-100 bg-sky-50 px-2 py-1 font-bold text-sky-950">Added to calendar: {getEventAddedDisplay(event)}</div>
             {event.notes ? <div className="whitespace-pre-wrap">{event.notes}</div> : <div className="text-zinc-500">No Picture Day Info entered.</div>}
             {stripInternalEventMeta(event.history) ? <div className="mt-2 whitespace-pre-wrap border-t border-zinc-100 pt-2 text-zinc-500">{stripInternalEventMeta(event.history)}</div> : null}
           </motion.div>
@@ -3539,7 +3520,7 @@ function RemovedEventsModule({ events, onRestore, canRestore = true }) {
 }
 
 function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true, canEdit = true }) {
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? (canEdit ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-slate-200 bg-slate-50 text-slate-700">View Only</Pill>) : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><EventAddedByBadge event={event} /></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={UserRoundCheck} title="Added To Calendar" value={getEventAddedDisplay(event)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? (canEdit ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-slate-200 bg-slate-50 text-slate-700">View Only</Pill>) : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /><Info icon={UserRoundCheck} title="Added By" value={`${getEventAddedMeta(event).name}${getEventAddedMeta(event).addedAt ? ` · ${formatShortAttributionDate(getEventAddedMeta(event).addedAt)}` : ''}`} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
               <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
@@ -3656,6 +3637,187 @@ function toCsv(rows = []) {
   if (!allKeys.length) return '';
   return [allKeys.map(csvEscape).join(','), ...rows.map(row => allKeys.map(key => csvEscape(row?.[key])).join(','))].join('\n');
 }
+
+function stripHtmlForIcs(value = '') {
+  return String(value || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function escapeIcsText(value = '') {
+  return stripHtmlForIcs(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
+function foldIcsLine(line = '') {
+  const text = String(line || '');
+  const parts = [];
+  let remaining = text;
+  while (remaining.length > 73) {
+    parts.push(remaining.slice(0, 73));
+    remaining = ' ' + remaining.slice(73);
+  }
+  parts.push(remaining);
+  return parts.join('\r\n');
+}
+
+function icsDate(value) {
+  return String(value || '').replace(/-/g, '').slice(0, 8);
+}
+
+function makeIcsUid(event = {}) {
+  const raw = String(event.sourceEventId || event.supabaseId || event.id || `${event.title}-${event.date}` || `event-${Date.now()}`);
+  return `${raw.replace(/[^a-zA-Z0-9._-]/g, '-') }@ismile-scheduler`;
+}
+
+function eventToIcsBlock(event = {}, index = 0) {
+  const startDate = icsDate(event.date || todayKey());
+  const endDate = icsDate(addDays(event.endDate || event.date || todayKey(), 1));
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const lines = [
+    'BEGIN:VEVENT',
+    `DTSTART;VALUE=DATE:${startDate}`,
+    `DTEND;VALUE=DATE:${endDate}`,
+    `DTSTAMP:${stamp}`,
+    `UID:${escapeIcsText(makeIcsUid(event) || `ismile-${index}@ismile-scheduler`)}`,
+    `CREATED:${stamp}`,
+    event.notes ? `DESCRIPTION:${escapeIcsText(event.notes)}` : '',
+    event.updatedAt ? `LAST-MODIFIED:${new Date(event.updatedAt).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}` : `LAST-MODIFIED:${stamp}`,
+    event.canonicalSchool || event.address ? `LOCATION:${escapeIcsText(event.address || event.canonicalSchool || '')}` : '',
+    'SEQUENCE:0',
+    'STATUS:CONFIRMED',
+    `SUMMARY:${escapeIcsText(event.title || 'Untitled Event')}`,
+    'TRANSP:TRANSPARENT',
+    'END:VEVENT'
+  ].filter(Boolean);
+  return lines.map(foldIcsLine).join('\r\n');
+}
+
+function eventsToIcs(events = [], calendarName = 'iSmile Scheduler Events') {
+  const blocks = (events || [])
+    .filter(event => event && event.active !== false && event.date && event.title)
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.title || '').localeCompare(String(b.title || '')))
+    .map(eventToIcsBlock);
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//iSmile Studios//iSmile Scheduler//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${escapeIcsText(calendarName)}`,
+    ...blocks,
+    'END:VCALENDAR'
+  ].map(foldIcsLine).join('\r\n');
+}
+
+function crc32Bytes(bytes = new Uint8Array()) {
+  let crc = -1;
+  for (let i = 0; i < bytes.length; i += 1) {
+    crc ^= bytes[i];
+    for (let j = 0; j < 8; j += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+function stringToBytes(text = '') {
+  return new TextEncoder().encode(text);
+}
+
+function writeUint16(bytes, offset, value) {
+  bytes[offset] = value & 255;
+  bytes[offset + 1] = (value >>> 8) & 255;
+}
+
+function writeUint32(bytes, offset, value) {
+  bytes[offset] = value & 255;
+  bytes[offset + 1] = (value >>> 8) & 255;
+  bytes[offset + 2] = (value >>> 16) & 255;
+  bytes[offset + 3] = (value >>> 24) & 255;
+}
+
+function downloadZipFile(filename, files = []) {
+  if (typeof window === 'undefined') return;
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  files.forEach(file => {
+    const nameBytes = stringToBytes(file.name);
+    const dataBytes = stringToBytes(file.content || '');
+    const crc = crc32Bytes(dataBytes);
+    const local = new Uint8Array(30 + nameBytes.length);
+    writeUint32(local, 0, 0x04034b50);
+    writeUint16(local, 4, 20);
+    writeUint16(local, 6, 0x0800);
+    writeUint16(local, 8, 0);
+    writeUint16(local, 10, 0);
+    writeUint16(local, 12, 0);
+    writeUint32(local, 14, crc);
+    writeUint32(local, 18, dataBytes.length);
+    writeUint32(local, 22, dataBytes.length);
+    writeUint16(local, 26, nameBytes.length);
+    writeUint16(local, 28, 0);
+    local.set(nameBytes, 30);
+    localParts.push(local, dataBytes);
+
+    const central = new Uint8Array(46 + nameBytes.length);
+    writeUint32(central, 0, 0x02014b50);
+    writeUint16(central, 4, 20);
+    writeUint16(central, 6, 20);
+    writeUint16(central, 8, 0x0800);
+    writeUint16(central, 10, 0);
+    writeUint16(central, 12, 0);
+    writeUint16(central, 14, 0);
+    writeUint32(central, 16, crc);
+    writeUint32(central, 20, dataBytes.length);
+    writeUint32(central, 24, dataBytes.length);
+    writeUint16(central, 28, nameBytes.length);
+    writeUint16(central, 30, 0);
+    writeUint16(central, 32, 0);
+    writeUint16(central, 34, 0);
+    writeUint16(central, 36, 0);
+    writeUint32(central, 38, 0);
+    writeUint32(central, 42, offset);
+    central.set(nameBytes, 46);
+    centralParts.push(central);
+    offset += local.length + dataBytes.length;
+  });
+  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const end = new Uint8Array(22);
+  writeUint32(end, 0, 0x06054b50);
+  writeUint16(end, 4, 0);
+  writeUint16(end, 6, 0);
+  writeUint16(end, 8, files.length);
+  writeUint16(end, 10, files.length);
+  writeUint32(end, 12, centralSize);
+  writeUint32(end, 16, offset);
+  writeUint16(end, 20, 0);
+  const blob = new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 
 function makeBackupFilename(label, extension) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -3812,6 +3974,32 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
     downloadTextFile(makeBackupFilename('schools', 'csv'), toCsv(rows), 'text/csv;charset=utf-8');
   };
 
+  const exportIcsPackage = () => {
+    const activeExportEvents = activeEvents.filter(event => event?.date && event?.title);
+    const groups = [
+      ['all_events.ics', activeExportEvents, 'iSmile Scheduler — All Events'],
+      ['fall_picture_days.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('fall')), 'iSmile Scheduler — Fall Picture Days'],
+      ['spring_picture_days.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('spring')), 'iSmile Scheduler — Spring Picture Days'],
+      ['makeups.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('makeup')), 'iSmile Scheduler — Makeups'],
+      ['sports.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('sport')), 'iSmile Scheduler — Sports'],
+      ['special_events.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('special')), 'iSmile Scheduler — Special Events']
+    ];
+    const readme = [
+      'iSmile Scheduler ICS Backup Package',
+      `Exported: ${new Date().toISOString()}`,
+      '',
+      'Import these .ics files into Google Calendar if you ever need to rebuild calendar events from Scheduler.',
+      'Picture Day Info from Scheduler is exported as the Google Calendar event description.',
+      'Events are exported as all-day events to match the original school-calendar import style.',
+      '',
+      `Active events exported: ${activeExportEvents.length}`
+    ].join('\n');
+    downloadZipFile(makeBackupFilename('ics-package', 'zip'), [
+      { name: 'README.txt', content: readme },
+      ...groups.map(([name, groupEvents, calendarName]) => ({ name, content: eventsToIcs(groupEvents, calendarName) }))
+    ]);
+  };
+
   const copyBackupSql = async () => {
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
     const sql = `create table if not exists events_backup_${stamp} as select * from public.events;\ncreate table if not exists schools_backup_${stamp} as select * from public.schools;`;
@@ -3850,10 +4038,14 @@ function AdminPage({ events, schools, photographers, assistants, eventsMessage, 
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <button type="button" onClick={exportPackage} className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/70 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">
           <div className="text-sm font-bold text-zinc-950">Download Full Backup</div>
           <div className="mt-2 text-sm leading-6 text-zinc-600">JSON package with events, schools, team members, removed events, and counts.</div>
+        </button>
+        <button type="button" onClick={exportIcsPackage} className="rounded-3xl border border-sky-200 bg-sky-50/80 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-100">
+          <div className="text-sm font-bold text-zinc-950">Download ICS Package</div>
+          <div className="mt-2 text-sm leading-6 text-zinc-600">Google Calendar-friendly .ics backup package. Picture Day Info becomes the calendar description.</div>
         </button>
         <button type="button" onClick={exportEventsCsv} className="rounded-3xl border border-zinc-200 bg-white/70 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
           <div className="text-sm font-bold text-zinc-950">Download Events CSV</div>
