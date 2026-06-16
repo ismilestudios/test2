@@ -8,6 +8,7 @@ import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
+const WEEKLY_ROLLOUT_CAPACITY = 21;
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -456,7 +457,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.95c</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -470,9 +471,9 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
               />
             </label>
             <div className="flex justify-end"><AuthStatus /></div>
-            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-8">
+            <nav className="hidden justify-end gap-2 sm:flex sm:flex-wrap">
               {visibleTabs.map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
+                <button key={tab} onClick={() => setActiveTab(tab)} className={`min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
                 </button>
               ))}
@@ -537,19 +538,52 @@ function MonthNavigator({ month, setMonth }) {
   );
 }
 
+
+function compactCrewList(event = {}) {
+  return [
+    ...uniqueCanonicalPhotographers(event.photographers || []),
+    ...(event.assistants || []).filter(Boolean)
+  ].filter(Boolean);
+}
+
+function buildDayCopyText(title, dayEvents) {
+  const label = title.includes('Tomorrow') ? "Schools We're Photographing Tomorrow" : "Schools We're Photographing Today";
+  if (!dayEvents.length) return `${label}: Nothing scheduled.`;
+  const items = dayEvents.map(event => {
+    const crew = compactCrewList(event);
+    return `${event.canonicalSchool || event.title}${crew.length ? ` (${crew.join(', ')})` : ''}`;
+  });
+  return `${label}: ${items.join(', ')}.`;
+}
+
 function TodayTomorrowList({ title, date, events, onClickEvent }) {
+  const [copied, setCopied] = useState(false);
   const dayEvents = events
     .filter(event => isDateInEventRange(event, date) && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
     .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
+  const copyDay = async () => {
+    const text = buildDayCopyText(title, dayEvents);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (error) {
+      window.prompt('Copy this text:', text);
+    }
+  };
+
   return (
     <div className="rounded-3xl border border-zinc-200/80 bg-white/75 p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</div>
           <div className="mt-1 text-sm font-medium text-zinc-900">{formatDate(date)}</div>
         </div>
-        <Pill className="border-zinc-200 bg-cream text-zinc-700">{dayEvents.length}</Pill>
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" onClick={copyDay} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-xs font-black text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">{copied ? 'Copied' : 'Copy'}</button>
+          <Pill className="border-zinc-200 bg-cream text-zinc-700">{dayEvents.length}</Pill>
+        </div>
       </div>
       <div className="mt-3 space-y-2">
         {dayEvents.length ? dayEvents.slice(0, 4).map(event => (
@@ -561,7 +595,7 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
           >
             <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
             <div className="mt-1 truncate text-xs text-zinc-500">
-              {event.photographers?.length ? <>Assigned: {event.photographers.join(', ')}</> : <>Needs photographers assigned</>}
+              {compactCrewList(event).length ? <>Crew: {compactCrewList(event).join(', ')}</> : <>Needs photographers assigned</>}
             </div>
           </button>
         )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-400">Nothing currently scheduled.</div>}
@@ -577,7 +611,7 @@ function CurrentWeeklyRolloutCard({ events }) {
   const weekEvents = events.filter(event => event && event.date >= start && event.date <= end);
   const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
+  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
   const photographerSummary = Array.from(
     weekEvents.reduce((counts, event) => {
       if (!isRolloutEvent(event)) return counts;
@@ -597,7 +631,7 @@ function CurrentWeeklyRolloutCard({ events }) {
         </div>
         <Pill className={`border-current bg-white/60 ${capacity.className}`}>{capacity.label}</Pill>
       </div>
-      <div className="mt-5 text-3xl font-semibold">{weeklyRollouts} / 22</div>
+      <div className="mt-5 text-3xl font-semibold">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
       <div className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-75">Photographer rollouts</div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/70">
         <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
@@ -874,70 +908,65 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
       layout
       onDragOver={(e) => { if (canEdit && draggedPhotographer) e.preventDefault(); }}
       onDrop={(e) => { e.preventDefault(); if (draggedPhotographer) assign(draggedPhotographer); setDraggedPhotographer?.(''); }}
-      className={`group relative overflow-hidden rounded-[1.1rem] border bg-white/95 p-2.5 text-left shadow-lg shadow-zinc-950/5 transition hover:-translate-y-0.5 hover:shadow-2xl ${isHeld ? 'border-amber-300 ring-2 ring-amber-300/30' : 'border-white/60'}`}
+      className={`group relative overflow-hidden rounded-2xl border bg-white/96 p-2 text-left shadow-md shadow-zinc-950/10 transition hover:-translate-y-0.5 hover:shadow-xl ${isHeld ? 'border-yellow-300 ring-2 ring-yellow-300/50' : 'border-white/70'}`}
     >
-      <div className={`absolute inset-x-0 top-0 h-1.5 ${TYPE_COLORS[event.type] || 'bg-zinc-200'}`} />
-      <div className="flex items-start justify-between gap-3 pt-1">
-        <div className="min-w-0">
-          <button type="button" onClick={() => onClickEvent(event)} className="text-left text-sm font-black leading-tight text-zinc-950 hover:underline">{event.title}</button>
-          <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</div>
+      <div className={`absolute inset-x-0 top-0 h-1 ${TYPE_COLORS[event.type] || 'bg-zinc-200'}`} />
+      <div className="pt-1">
+        <div className="flex items-start justify-between gap-2">
+          <button type="button" onClick={() => onClickEvent(event)} className="min-w-0 text-left text-[13px] font-black leading-tight text-zinc-950 hover:underline">{event.title}</button>
+          {getEventIrm(event) ? <Pill className="shrink-0 border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
-          {getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+          <span>{event.type}</span>
+          <span>{getEventTimeLabel(event)}</span>
+          {event.arrivalTime ? <span>Arrival {event.arrivalTime}</span> : null}
         </div>
       </div>
 
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        <div className="rounded-xl border border-zinc-200/80 bg-cream/70 p-2">
-          <div className="text-[10px] font-black uppercase tracking-wide text-zinc-500">Photographers</div>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {assigned.length ? assigned.map(name => (
-              <span key={name} className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2 py-1 text-xs font-bold text-zinc-800">
-                {name}
-                {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
-              </span>
-            )) : <span className="text-xs font-semibold text-rose-700">Needs Photographer</span>}
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-200/80 bg-cream/70 p-2">
-          <div className="text-[10px] font-black uppercase tracking-wide text-zinc-500">Need</div>
-          <div className="mt-1 text-xs font-semibold text-zinc-700">{Math.max(1, assigned.length || 1)} photographer{Math.max(1, assigned.length || 1) === 1 ? '' : 's'} · {event.noAssistant ? 'No assistant' : `${event.assistants?.length || 0} assistant${(event.assistants?.length || 0) === 1 ? '' : 's'} noted`}</div>
-        </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {assigned.length ? assigned.map(name => (
+          <span key={name} className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2 py-1 text-[11px] font-bold text-zinc-800">
+            {name}
+            {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
+          </span>
+        )) : <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700">Needs Photographer</span>}
+      </div>
+
+      <div className="mt-2 text-[11px] font-semibold text-zinc-600">
+        Need: {Math.max(1, assigned.length || 1)} photographer{Math.max(1, assigned.length || 1) === 1 ? '' : 's'} · {event.noAssistant ? 'No assistant' : `${event.assistants?.length || 0} assistant${(event.assistants?.length || 0) === 1 ? '' : 's'} noted`}
       </div>
 
       {canEdit ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {photographers.map(name => (
-            <button key={name} type="button" onClick={() => assign(name)} className={`rounded-full border px-2.5 py-1.5 text-[11px] font-black transition ${assigned.includes(canonicalPhotographerName(name)) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:border-[#AEBB9E] hover:bg-[#DDE8D2]'}`}>{canonicalPhotographerName(name)}</button>
-          ))}
-        </div>
+        <select value="" onChange={(e) => { assign(e.target.value); e.target.value = ''; }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
+          <option value="">Assign photographer...</option>
+          {photographers.map(name => <option key={name} value={name}>{canonicalPhotographerName(name)}</option>)}
+        </select>
       ) : null}
 
       {makeupPhotographers.length ? (
-        <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50/80 p-2 text-xs text-rose-900">
+        <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50/80 p-2 text-[11px] text-rose-900">
           <div className="font-black uppercase tracking-wide">Makeup shortcut</div>
           <div className="mt-1">Picture Day crew: {makeupPhotographers.join(', ')}</div>
-          {canEdit ? <button type="button" onClick={() => makeupPhotographers.forEach(assign)} className="mt-2 rounded-full bg-rose-600 px-3 py-1.5 text-[11px] font-black text-white shadow-sm">Use same photographer{makeupPhotographers.length === 1 ? '' : 's'}</button> : null}
+          {canEdit ? <button type="button" onClick={() => makeupPhotographers.forEach(assign)} className="mt-2 rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white shadow-sm">Use same</button> : null}
         </div>
       ) : null}
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <button type="button" onClick={() => setExpandedHistory(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold text-zinc-700">Past Photographers</button>
-        <button type="button" onClick={() => setExpandedInfo(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold text-zinc-700">Picture Day Info</button>
-        {canEdit ? <button type="button" onClick={() => onToggleHold(event)} className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${isHeld ? 'border-amber-300 bg-amber-100 text-amber-950' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>{isHeld ? 'Return from Hold' : 'Hold! Needs Discussion Later'}</button> : null}
+        <button type="button" onClick={() => setExpandedHistory(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold text-zinc-700">Past</button>
+        <button type="button" onClick={() => setExpandedInfo(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold text-zinc-700">Info</button>
+        {canEdit ? <button type="button" onClick={() => onToggleHold(event)} className={`rounded-full border px-2 py-1 text-[10px] font-black ${isHeld ? 'border-yellow-300 bg-yellow-200 text-yellow-950' : 'border-yellow-300 bg-yellow-100 text-yellow-950'}`}>{isHeld ? 'Return' : 'Hold!'}</button> : null}
       </div>
 
       <AnimatePresence>
         {expandedHistory ? (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80 p-3 text-xs text-zinc-700">
-            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-1"><span className="font-black">{row.date?.slice(0, 4) || 'Past'}</span> — {row.photographers.length ? row.photographers.join(', ') : 'No photographer listed'} <span className="text-zinc-400">({shortDate(row.date)})</span></div>) : <div className="text-zinc-500">No past photographer history found.</div>}
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] text-zinc-700">
+            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-0.5"><span className="font-black">{row.date?.slice(0, 4) || 'Past'}</span> — {row.photographers.length ? row.photographers.join(', ') : 'No photographer listed'}</div>) : <div className="text-zinc-500">No past photographer history found.</div>}
           </motion.div>
         ) : null}
         {expandedInfo ? (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80 p-3 text-xs leading-5 text-zinc-700">
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] leading-5 text-zinc-700">
             {event.notes ? <div className="whitespace-pre-wrap">{event.notes}</div> : <div className="text-zinc-500">No Picture Day Info entered.</div>}
-            {event.history ? <div className="mt-3 whitespace-pre-wrap border-t border-zinc-100 pt-3 text-zinc-500">{event.history}</div> : null}
+            {event.history ? <div className="mt-2 whitespace-pre-wrap border-t border-zinc-100 pt-2 text-zinc-500">{event.history}</div> : null}
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -1034,7 +1063,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
   const heldEvents = (events || []).filter(event => event && event.status === SCHEDULE_LIVE_HOLD_STATUS && monthKey(event.date) === monthKey(liveState.weekStart));
   const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
+  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
   const progress = getScheduleLiveProgress(events, liveState.weekStart);
   const activeUsers = Object.values(liveState.activeUsers || {})
     .filter(user => user?.seenAt && Date.now() - new Date(user.seenAt).getTime() < 120000)
@@ -1081,11 +1110,11 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
   };
 
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#071d16] via-[#0f2f23] to-[#163f2e] p-3 text-white shadow-2xl">
+    <div className="overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#010c09] via-[#052016] to-[#0b2f22] p-3 text-white shadow-2xl">
       <div className="rounded-[1.65rem] border border-white/10 bg-white/[0.07] p-4 shadow-inner backdrop-blur">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-red-300/50 bg-red-500/20 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-red-100 shadow-lg shadow-red-950/30">🔴 Schedule Live!</div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-red-300/50 bg-red-500/20 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-red-100 shadow-lg shadow-red-950/30"><span className="animate-pulse">🔴</span> Schedule Live!</div>
             <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{getScheduleLiveSessionMonthLabel(liveState.weekStart)} Scheduling Session</h2>
             <p className="mt-1 text-sm font-semibold text-red-100/80">Week of {getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-white/80">
@@ -1098,9 +1127,9 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[760px]">
             <div className={`rounded-[1.5rem] border p-4 ${capacity.className} bg-white text-zinc-900`}>
               <div className="text-xs font-black uppercase tracking-wide opacity-70">Weekly Rollouts</div>
-              <div className="mt-1 text-3xl font-black">{weeklyRollouts} / 22</div>
+              <div className="mt-1 text-3xl font-black">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200"><div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} /></div>
-              <div className="mt-2 text-xs font-black">{22 - weeklyRollouts >= 0 ? `${22 - weeklyRollouts} remaining` : `${weeklyRollouts - 22} over capacity`} · {capacity.label}</div>
+              <div className="mt-2 text-xs font-black">{WEEKLY_ROLLOUT_CAPACITY - weeklyRollouts >= 0 ? `${WEEKLY_ROLLOUT_CAPACITY - weeklyRollouts} remaining` : `${weeklyRollouts - WEEKLY_ROLLOUT_CAPACITY} over capacity`} · {capacity.label}</div>
               <div className="mt-3 border-t border-zinc-200/70 pt-2">
                 <div className="mb-1 text-[10px] font-black uppercase tracking-wide opacity-60">Weekly Rollouts</div>
                 <div className="flex flex-wrap gap-1.5">
@@ -1133,7 +1162,35 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr]">
+          <section className="rounded-[1.5rem] border border-yellow-300/55 bg-yellow-300/25 p-3 shadow-lg shadow-yellow-950/10">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-black text-yellow-50">🟡 Hold! Needs Discussion Later</h3>
+              <span className="rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">{heldEvents.length}</span>
+            </div>
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="min-w-[220px] rounded-2xl border border-yellow-200/50 bg-white/15 p-3 text-left text-xs font-bold text-white hover:bg-white/20"><div>{event.title}</div><div className="mt-1 text-white/60">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">Return to week</span> : null}</button>) : <div className="w-full rounded-2xl border border-dashed border-yellow-200/40 bg-white/5 p-4 text-center text-xs font-semibold text-yellow-50/70">Nothing on hold.</div>}
+            </div>
+          </section>
+
+          <section className="rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
+            <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
+            <div className="mt-2 flex gap-2">
+              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-sm text-zinc-900 outline-none" />
+              <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
+            </div>
+            <div className="mt-2 flex max-h-[86px] gap-2 overflow-x-auto pb-1">
+              {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
+                <div key={entry.id} className="min-w-[220px] rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
+                  <div className="text-[10px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
+                  <div className="mt-1 line-clamp-2 text-xs leading-4 text-white/90">{entry.text}</div>
+                </div>
+              )) : <div className="w-full rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No live commentary yet.</div>}
+            </div>
+          </section>
+        </div>
+
+        <div className="mt-4">
           <section className="min-w-0">
             <div className="mb-3 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/10 p-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-2">
@@ -1150,8 +1207,8 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
             <div className={`grid gap-3 ${liveState.showWeekends ? 'xl:grid-cols-7' : 'xl:grid-cols-5'}`}>
               {days.map(date => {
                 const dayEvents = weekEvents.filter(event => isDateInEventRange(event, date)).sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
-                return <div key={date} className="min-h-[320px] rounded-[1.5rem] border border-white/10 bg-white/10 p-2.5">
-                  <div className="mb-3 flex items-center justify-between gap-2">
+                return <div key={date} className="min-h-[260px] rounded-[1.35rem] border border-white/10 bg-white/10 p-2">
+                  <div className="mb-2 flex items-center justify-between gap-2">
                     <div>
                       <div className="text-sm font-black text-white">{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}</div>
                       <div className="text-xs font-semibold text-white/50">{shortDate(date)}</div>
@@ -1159,42 +1216,14 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
                     <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
                   </div>
                   <div className="space-y-2">
-                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={selectedPhotographer ? [selectedPhotographer] : photographers} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onToggleHold={toggleHold} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
+                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={photographers} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onToggleHold={toggleHold} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
                   </div>
                 </div>;
               })}
             </div>
           </section>
 
-          <aside className="space-y-4">
-            <section className="rounded-[1.5rem] border border-amber-300/30 bg-amber-300/15 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-black text-amber-50">🟡 Hold! Needs Discussion Later</h3>
-                <span className="rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black text-amber-950">{heldEvents.length}</span>
-              </div>
-              <div className="mt-3 space-y-2">
-                {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="w-full rounded-2xl border border-amber-200/30 bg-white/10 p-3 text-left text-xs font-bold text-white hover:bg-white/15"><div>{event.title}</div><div className="mt-1 text-white/50">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black text-amber-950">Return to week</span> : null}</button>) : <div className="rounded-2xl border border-dashed border-amber-200/25 bg-white/5 p-4 text-center text-xs font-semibold text-amber-50/60">Nothing on hold.</div>}
-              </div>
-            </section>
-
-            <section className="rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
-              <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
-              <div className="mt-3 flex gap-2">
-                <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-sm text-zinc-900 outline-none" />
-                <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white disabled:opacity-40">Add</button>
-              </div>
-              <div className="mt-3 max-h-[360px] space-y-2 overflow-auto pr-1">
-                {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
-                  <div key={entry.id} className="rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
-                    <div className="text-[11px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
-                    <div className="mt-1 leading-5 text-white/90">{entry.text}</div>
-                  </div>
-                )) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No live commentary yet.</div>}
-              </div>
-            </section>
-
-            {statusMessage ? <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-xs font-semibold text-white/65">{statusMessage}</div> : null}
-          </aside>
+          {statusMessage ? <div className="mt-4 rounded-2xl border border-white/10 bg-white/10 p-3 text-xs font-semibold text-white/65">{statusMessage}</div> : null}
         </div>
       </div>
     </div>
@@ -1238,7 +1267,7 @@ function getRolloutCount(event) {
 }
 
 function getCapacityTone(rollouts) {
-  if (rollouts >= 20) return {
+  if (rollouts >= WEEKLY_ROLLOUT_CAPACITY) return {
     label: 'Overloaded',
     className: 'border-rose-200 bg-rose-50 text-rose-800',
     barClassName: 'bg-rose-500'
@@ -1340,7 +1369,7 @@ function WeekView({ events, selectedDate, onClick }) {
   const weekEvents = days.flatMap(date => events.filter(e => isDateInEventRange(e, date)));
   const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
+  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
   const photographerSummary = Array.from(
     weekEvents.reduce((counts, event) => {
       if (!isRolloutEvent(event)) return counts;
@@ -1359,7 +1388,7 @@ function WeekView({ events, selectedDate, onClick }) {
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Weekly Rollouts</div>
-              <div className="mt-1 text-lg font-semibold">{weeklyRollouts} / 22</div>
+              <div className="mt-1 text-lg font-semibold">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
             </div>
             <Pill className={`border-current bg-white/60 ${capacity.className}`}>{capacity.label}</Pill>
           </div>
@@ -4306,11 +4335,11 @@ export default function SchedulerApp() {
               <div className="mb-4 rounded-[1.75rem] border border-red-200 bg-gradient-to-r from-red-50 via-white to-[#DDE8D2]/55 p-4 shadow-soft">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <div className="text-xs font-black uppercase tracking-[0.2em] text-red-600">🔴 Schedule Live!</div>
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-red-600"><span className="animate-pulse">🔴</span> Schedule Live!</div>
                     <div className="mt-1 text-lg font-black text-zinc-950">Open the live scheduling draft room</div>
                     <div className="mt-1 text-sm font-semibold text-zinc-600">Assign photographers week by week with live rollout counts, host control, Hold, and commentary.</div>
                   </div>
-                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-6 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-red-200 transition hover:-translate-y-0.5 hover:bg-red-700">Launch Schedule Live!</button>
+                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-7 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-red-200 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-red-700">Launch Schedule Live!</button>
                 </div>
               </div>
             ) : null}
