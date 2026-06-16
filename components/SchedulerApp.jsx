@@ -636,7 +636,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Scheduler v0.98a</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">Scheduler v0.99</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -3297,6 +3297,8 @@ function MobileView({ events, photographers, selectedDate, setSelectedDate, onCl
   const available = Array.from(new Set([...fieldPhotographers, ...uniqueCanonicalPhotographers(photographers || [])])).filter(Boolean);
   const [selectedPhotographer, setSelectedPhotographer] = useState('Stephanie');
   const [viewMode, setViewMode] = useState('Day');
+  const [plainViewMode, setPlainViewMode] = useState('Week');
+  const [plainDensity, setPlainDensity] = useState('Compact');
 
   const today = todayKey();
   const todayEvents = (events || [])
@@ -3321,6 +3323,47 @@ function MobileView({ events, photographers, selectedDate, setSelectedDate, onCl
     if (viewMode === 'Month') setSelectedDate(addDays(selectedDate, delta * 30));
     else if (viewMode === 'Week') setSelectedDate(addDays(selectedDate, delta * 7));
     else setSelectedDate(addDays(selectedDate, delta));
+  };
+
+  const movePlainView = (delta) => {
+    if (plainViewMode === 'Month') setSelectedDate(addDays(selectedDate, delta * 30));
+    else if (plainViewMode === 'Week') setSelectedDate(addDays(selectedDate, delta * 7));
+    else setSelectedDate(addDays(selectedDate, delta));
+  };
+
+  const plainViewEvents = useMemo(() => {
+    const activeProductionEvents = (events || []).filter(event => event?.active !== false && event.type !== 'Call or Meeting' && event.type !== 'Edit Day');
+    if (plainViewMode === 'Month') {
+      const key = monthKey(selectedDate);
+      return activeProductionEvents.filter(event => monthKey(event.date) <= key && monthKey(event.endDate || event.date) >= key);
+    }
+    if (plainViewMode === 'Week') {
+      const { start, end } = weekBounds(selectedDate);
+      return activeProductionEvents.filter(event => event.date <= end && (event.endDate || event.date) >= start);
+    }
+    return activeProductionEvents.filter(event => isDateInEventRange(event, selectedDate));
+  }, [events, selectedDate, plainViewMode]);
+
+  const sortedPlainViewEvents = useMemo(() => (plainViewEvents || [])
+    .slice()
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || ''))), [plainViewEvents]);
+
+  const groupedPlainViewEvents = useMemo(() => {
+    const map = new Map();
+    sortedPlainViewEvents.forEach(event => {
+      const key = event.date || todayKey();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(event);
+    });
+    return Array.from(map.entries());
+  }, [sortedPlainViewEvents]);
+
+  const plainViewLabel = plainViewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : plainViewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate);
+
+  const plainNotesPreview = (event) => {
+    const text = String(event.notes || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    return text.length > 120 ? `${text.slice(0, 120).trim()}…` : text;
   };
 
   return (
@@ -3366,6 +3409,61 @@ function MobileView({ events, photographers, selectedDate, setSelectedDate, onCl
               </div>
             </button>
           )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-4 text-center text-sm text-zinc-500">No {viewMode.toLowerCase()} events for {selectedPhotographer}.</div>}
+        </div>
+      </section>
+
+      <section className="rounded-[2rem] border border-zinc-200 bg-white/90 p-3 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Plain View</div>
+            <div className="mt-1 text-sm font-semibold text-zinc-600">Spreadsheet-style production schedule.</div>
+          </div>
+          <div className="rounded-full border border-zinc-200 bg-cream/80 px-2.5 py-1 text-[11px] font-black text-zinc-500">{sortedPlainViewEvents.length}</div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 rounded-2xl border border-zinc-200 bg-cream/80 p-1">
+          {['Day', 'Week', 'Month'].map(mode => <button key={mode} type="button" onClick={() => setPlainViewMode(mode)} className={`rounded-xl px-2 py-1.5 text-xs font-black ${plainViewMode === mode ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}>{mode}</button>)}
+        </div>
+        <div className="mt-2 grid grid-cols-2 rounded-2xl border border-zinc-200 bg-white p-1">
+          {['Compact', 'Detailed'].map(mode => <button key={mode} type="button" onClick={() => setPlainDensity(mode)} className={`rounded-xl px-2 py-1.5 text-xs font-black ${plainDensity === mode ? 'bg-[#DDE8D2] text-zinc-950 shadow-sm' : 'text-zinc-500'}`}>{mode}</button>)}
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => movePlainView(-1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Prev</button>
+          <div className="text-center text-xs font-black text-zinc-900">{plainViewLabel}</div>
+          <button type="button" onClick={() => movePlainView(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Next</button>
+        </div>
+
+        <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+          <div className={`grid ${plainDensity === 'Detailed' ? 'grid-cols-[74px_1.7fr_1fr_1fr]' : 'grid-cols-[64px_1.8fr_1fr]'} border-b border-zinc-200 bg-zinc-50 text-[10px] font-black uppercase tracking-wide text-zinc-500`}>
+            <div className="px-2 py-2">Date</div>
+            <div className="px-2 py-2">Event</div>
+            <div className="px-2 py-2">Photog</div>
+            {plainDensity === 'Detailed' ? <div className="px-2 py-2">Assist / Notes</div> : null}
+          </div>
+          <div className="max-h-[520px] overflow-y-auto">
+            {groupedPlainViewEvents.length ? groupedPlainViewEvents.map(([date, dayEvents]) => (
+              <div key={date}>
+                {plainViewMode !== 'Day' ? <div className="border-b border-zinc-100 bg-cream/80 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-zinc-500">{formatDate(date)}</div> : null}
+                {dayEvents.map(event => {
+                  const photogs = uniqueCanonicalPhotographers(event.photographers || []).join(', ') || 'TBD';
+                  const assistantsLabel = (event.assistants || []).filter(Boolean).join(', ') || '—';
+                  const note = plainNotesPreview(event);
+                  return (
+                    <button key={event.id} type="button" onClick={() => onClick(event)} className={`grid w-full ${plainDensity === 'Detailed' ? 'grid-cols-[74px_1.7fr_1fr_1fr]' : 'grid-cols-[64px_1.8fr_1fr]'} border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45`}>
+                      <div className="px-2 py-1.5 font-semibold italic text-zinc-600">{plainViewMode === 'Day' ? shortDate(event.date) : shortDate(date)}</div>
+                      <div className="min-w-0 px-2 py-1.5">
+                        <div className="truncate font-black text-zinc-950">{event.title}</div>
+                        {plainDensity === 'Detailed' ? <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">{getEventTimeLabel(event)}</div> : null}
+                      </div>
+                      <div className="px-2 py-1.5 font-semibold text-zinc-800">{photogs}</div>
+                      {plainDensity === 'Detailed' ? <div className="min-w-0 px-2 py-1.5"><div className="font-semibold text-zinc-800">{assistantsLabel}</div>{note ? <div className="mt-0.5 line-clamp-2 text-[11px] text-red-600">{note}</div> : null}</div> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )) : <div className="p-4 text-center text-sm font-semibold text-zinc-500">No events in this {plainViewMode.toLowerCase()} view.</div>}
+          </div>
         </div>
       </section>
     </div>
