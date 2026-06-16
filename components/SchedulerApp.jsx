@@ -593,7 +593,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.97a</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.97b</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
