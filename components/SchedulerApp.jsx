@@ -523,7 +523,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96d</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.96e</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -1183,22 +1183,74 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
   };
 
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#000604] via-[#00120c] to-[#031b13] p-3 text-white shadow-2xl">
-      <div className="rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-inner backdrop-blur">
+    <div className="schedule-live-stage overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#000604] via-[#00120c] to-[#031b13] p-3 text-white shadow-2xl">
+      <style jsx global>{`
+        @keyframes scheduleLiveShimmer {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes scheduleLivePulse {
+          0%, 100% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.38), 0 0 0 rgba(239, 68, 68, 0.20); transform: scale(1); }
+          50% { box-shadow: 0 0 32px rgba(239, 68, 68, 0.70), 0 0 18px rgba(248, 113, 113, 0.35); transform: scale(1.035); }
+        }
+        @keyframes scheduleLiveGlow {
+          0%, 100% { box-shadow: 0 0 18px rgba(255, 255, 255, 0.08), 0 0 20px rgba(255, 214, 10, 0.08); }
+          50% { box-shadow: 0 0 26px rgba(255, 255, 255, 0.13), 0 0 30px rgba(255, 214, 10, 0.18); }
+        }
+        @keyframes scheduleLiveCommentIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scheduleLivePresencePulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.40); }
+          50% { box-shadow: 0 0 0 5px rgba(52, 211, 153, 0.00); }
+        }
+        .schedule-live-stage {
+          background-size: 230% 230%;
+          animation: scheduleLiveShimmer 18s ease-in-out infinite;
+          position: relative;
+        }
+        .schedule-live-stage::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(circle at 18% 12%, rgba(255, 214, 10, 0.12), transparent 24%), radial-gradient(circle at 88% 18%, rgba(239, 68, 68, 0.12), transparent 22%), radial-gradient(circle at 50% 105%, rgba(16, 185, 129, 0.12), transparent 32%);
+        }
+        .schedule-live-live-badge { animation: scheduleLivePulse 2.1s ease-in-out infinite; }
+        .schedule-live-premium-glow { animation: scheduleLiveGlow 4.2s ease-in-out infinite; }
+        .schedule-live-comment-card { animation: scheduleLiveCommentIn 260ms ease-out both; }
+        .schedule-live-presence-dot { animation: scheduleLivePresencePulse 2.2s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .schedule-live-stage, .schedule-live-live-badge, .schedule-live-premium-glow, .schedule-live-comment-card, .schedule-live-presence-dot { animation: none !important; }
+        }
+      `}</style>
+      <div className="relative rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-inner backdrop-blur">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-red-300/50 bg-red-500/25 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-red-100 shadow-[0_0_26px_rgba(239,68,68,0.45)]"><span className="animate-pulse">🔴</span> Schedule Live!</div>
+            <div className="schedule-live-live-badge inline-flex items-center gap-2 rounded-full border border-red-200/70 bg-red-500/30 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-red-50 shadow-[0_0_26px_rgba(239,68,68,0.45)]"><span className="animate-pulse">🔴</span> Schedule Live!</div>
             <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{getScheduleLiveSessionMonthLabel(liveState.weekStart)} Scheduling Session</h2>
             <p className="mt-1 text-sm font-semibold text-red-100/80">Week of {getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-white/80">
               <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">Host: {liveState.hostName || 'None yet'}</span>
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{activeUsers.length || 1} user{(activeUsers.length || 1) === 1 ? '' : 's'} connected</span>
               <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">Production schedule</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(activeUsers.length ? activeUsers : [{ name: currentUserName || 'You', email: authEmail || 'local', seenAt: new Date().toISOString() }]).map(user => {
+                  const hostMatch = liveState.hostEmail && user.email && String(user.email).toLowerCase() === String(liveState.hostEmail).toLowerCase();
+                  return (
+                    <span key={user.email || user.name} className="inline-flex items-center gap-1 rounded-full border border-emerald-200/25 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-black text-emerald-50">
+                      <span className="schedule-live-presence-dot h-2 w-2 rounded-full bg-emerald-300" />
+                      {user.name || displayNameFromEmail(user.email || '') || 'User'}{hostMatch ? ' 👑' : ''}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[760px]">
-            <div className={`rounded-[1.5rem] border p-4 ${capacity.className} bg-white text-zinc-900`}>
+            <div className={`schedule-live-premium-glow rounded-[1.5rem] border p-4 ${capacity.className} bg-white text-zinc-900`}>
               <div className="text-xs font-black uppercase tracking-wide opacity-70">Weekly Rollouts</div>
               <div className="mt-1 text-3xl font-black">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200"><div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} /></div>
@@ -1217,13 +1269,13 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
                 </div>
               </div>
             </div>
-            <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+            <div className="schedule-live-premium-glow rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
               <div className="text-xs font-black uppercase tracking-wide opacity-70">Scheduling Complete</div>
               <div className="mt-1 text-3xl font-black">{progress.pct}%</div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${progress.pct}%` }} /></div>
               <div className="mt-2 text-xs font-black">{progress.assigned} of {progress.total} {monthLabel(monthKey(liveState.weekStart))} events assigned</div>
             </div>
-            <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-4">
+            <div className="schedule-live-premium-glow rounded-[1.5rem] border border-white/15 bg-white/10 p-4">
               <div className="text-xs font-black uppercase tracking-wide text-white/60">Host Controls</div>
               {canHost ? (
                 <div className="mt-2 flex flex-col gap-2">
@@ -1235,26 +1287,26 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
           </div>
         </div>
 
-        <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-yellow-200/80 bg-yellow-300/40 p-3 shadow-lg shadow-yellow-950/10">
+        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr]">
+          <section className="schedule-live-premium-glow rounded-[1.5rem] border border-[#FFEA00] bg-[#FFEA00] p-3 text-zinc-950 shadow-lg shadow-yellow-950/20">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-black text-yellow-50">🟡 Hold! Needs Discussion Later</h3>
-              <span className="rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">{heldEvents.length}</span>
+              <h3 className="text-sm font-black text-zinc-950">🟡 Hold! Needs Discussion Later</h3>
+              <span className="rounded-full bg-zinc-950 px-2 py-1 text-[10px] font-black text-[#FFEA00]">{heldEvents.length}</span>
             </div>
             <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-              {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="min-w-[220px] rounded-2xl border border-yellow-200/50 bg-white/15 p-3 text-left text-xs font-bold text-white hover:bg-white/20"><div>{event.title}</div><div className="mt-1 text-white/60">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">Return to week</span> : null}</button>) : <div className="w-full rounded-2xl border border-dashed border-yellow-200/40 bg-white/5 p-4 text-center text-xs font-semibold text-yellow-50/70">Nothing on hold.</div>}
+              {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="min-w-[220px] rounded-2xl border border-zinc-950/10 bg-white/85 p-3 text-left text-xs font-bold text-zinc-950 shadow-sm hover:bg-white"><div>{event.title}</div><div className="mt-1 text-zinc-700">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">Return to week</span> : null}</button>) : <div className="w-full rounded-2xl border border-dashed border-zinc-950/20 bg-white/35 p-4 text-center text-xs font-black text-zinc-800">Nothing on hold.</div>}
             </div>
           </section>
 
-          <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
+          <section className="schedule-live-premium-glow rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
             <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
-            <div className="mt-2 flex min-w-0 gap-2">
+            <div className="mt-2 flex gap-2">
               <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-sm text-zinc-900 outline-none" />
               <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
             </div>
-            <div className="mt-2 flex max-h-[86px] w-full min-w-0 max-w-full gap-2 overflow-x-auto overflow-y-hidden pb-1">
+            <div className="mt-2 flex max-h-[86px] gap-2 overflow-x-auto pb-1">
               {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
-                <div key={entry.id} className="w-[220px] min-w-[220px] max-w-[220px] flex-none rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
+                <div key={entry.id} className="schedule-live-comment-card min-w-[220px] rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
                   <div className="text-[10px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
                   <div className="mt-1 line-clamp-2 text-xs leading-4 text-white/90">{entry.text}</div>
                 </div>
