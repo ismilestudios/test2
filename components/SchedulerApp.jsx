@@ -7,7 +7,7 @@ import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOO
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
-const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
+const tabs = ['Overview', 'Schedule Live!', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -84,27 +84,9 @@ function displayNameFromEmail(email = '') {
 
 function formatShortAttributionDate(value) {
   if (!value) return '';
-  const raw = String(value);
-  const hasTime = raw.includes('T');
-  const date = new Date(hasTime ? raw : `${raw.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return raw;
+  const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return String(value);
   return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
-}
-
-function formatAttributionTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function formatAttributionLabel(attribution) {
-  const clean = normalizeAttribution(attribution);
-  if (!clean?.name && !clean?.email) return '';
-  const savedAt = clean.savedAt || clean.createdAt || clean.date;
-  const time = formatAttributionTime(savedAt);
-  const date = formatShortAttributionDate(savedAt || clean.date);
-  return `${clean.name || displayNameFromEmail(clean.email)}${time ? ` • ${time}` : ''}${date ? ` ${date}` : ''}`;
 }
 
 function makeNoteAttribution(email) {
@@ -123,66 +105,18 @@ function normalizeAttribution(value) {
   if (typeof value === 'string') {
     try { return JSON.parse(value); } catch { return null; }
   }
-  if (Array.isArray(value)) return { history: value };
   if (typeof value === 'object') return value;
   return null;
-}
-
-function getNoteHistory(attribution) {
-  const clean = normalizeAttribution(attribution);
-  const rawHistory = Array.isArray(clean?.history) ? clean.history : Array.isArray(clean?.notes) ? clean.notes : [];
-  return rawHistory
-    .map((entry, index) => ({
-      id: entry.id || `${entry.savedAt || entry.createdAt || entry.date || 'note'}-${index}`,
-      name: entry.name || displayNameFromEmail(entry.email || ''),
-      email: entry.email || '',
-      savedAt: entry.savedAt || entry.createdAt || entry.date || '',
-      date: entry.date || (entry.savedAt ? String(entry.savedAt).slice(0, 10) : ''),
-      text: String(entry.text || entry.note || entry.content || '').trim()
-    }))
-    .filter(entry => entry.text)
-    .sort((a, b) => new Date(b.savedAt || b.date || 0).getTime() - new Date(a.savedAt || a.date || 0).getTime());
-}
-
-function appendNoteHistory(attribution, email, text) {
-  const cleanText = String(text || '').trim();
-  if (!cleanText) return normalizeAttribution(attribution);
-  const now = new Date();
-  const previous = normalizeAttribution(attribution) || {};
-  const history = getNoteHistory(previous);
-  const entry = {
-    id: `note-${now.getTime()}`,
-    name: displayNameFromEmail(email),
-    email: email || '',
-    text: cleanText,
-    date: now.toISOString().slice(0, 10),
-    savedAt: now.toISOString()
-  };
-  return { ...previous, history: [entry, ...history] };
 }
 
 function AttributionPill({ attribution }) {
   const clean = normalizeAttribution(attribution);
   if (!clean?.name && !clean?.email) return null;
-  const label = formatAttributionLabel(clean);
+  const label = `${clean.name || displayNameFromEmail(clean.email)} • ${formatShortAttributionDate(clean.date || clean.savedAt)}`;
   return (
     <span title={clean.email ? `Saved by ${clean.email}` : 'Automatically generated note attribution'} className="inline-flex select-none items-center rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-2.5 py-1 text-[11px] font-semibold text-zinc-800 shadow-sm">
       {label}
     </span>
-  );
-}
-
-function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.' }) {
-  if (!entries.length) return null;
-  return (
-    <div className="space-y-4">
-      {entries.map(entry => (
-        <div key={entry.id}>
-          <div><AttributionPill attribution={entry} /></div>
-          <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{entry.text}</div>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -522,7 +456,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.94b</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.95</h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
@@ -536,7 +470,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
               />
             </label>
             <div className="flex justify-end"><AuthStatus /></div>
-            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-7">
+            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-8">
               {visibleTabs.map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
@@ -832,6 +766,442 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
           </div>
         );
       })}
+      </div>
+    </div>
+  );
+}
+
+const SCHEDULE_LIVE_SESSION_ID = 'main';
+const SCHEDULE_LIVE_HOLD_STATUS = 'Hold! Needs Discussion Later';
+
+function getMondayStart(date = todayKey()) {
+  const d = new Date(`${date}T12:00:00`);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function scheduleLiveDefaultState(date = todayKey()) {
+  return {
+    weekStart: getMondayStart(date),
+    showWeekends: false,
+    hostEmail: '',
+    hostName: '',
+    commentary: [],
+    activeUsers: {}
+  };
+}
+
+function getScheduleLiveSessionMonthLabel(weekStart) {
+  return monthLabel(monthKey(weekStart || todayKey()));
+}
+
+function getScheduleLiveDays(weekStart, showWeekends) {
+  const start = getMondayStart(weekStart || todayKey());
+  const count = showWeekends ? 7 : 5;
+  return Array.from({ length: count }, (_, index) => addDays(start, index));
+}
+
+function getScheduleLiveWeekLabel(weekStart, showWeekends) {
+  const days = getScheduleLiveDays(weekStart, showWeekends);
+  return `${shortDate(days[0])} – ${shortDate(days[days.length - 1])}`;
+}
+
+function getScheduleLiveMonthEvents(events, weekStart) {
+  const targetMonth = monthKey(weekStart || todayKey());
+  return (events || []).filter(event => event && event.active !== false && monthKey(event.date) === targetMonth && isRolloutEvent(event));
+}
+
+function getScheduleLiveProgress(events, weekStart) {
+  const monthEvents = getScheduleLiveMonthEvents(events, weekStart);
+  const total = monthEvents.length;
+  const assigned = monthEvents.filter(event => getAssignedPhotographerCount(event) > 0).length;
+  const pct = total ? Math.round((assigned / total) * 100) : 0;
+  return { total, assigned, pct };
+}
+
+function getScheduleLiveHistoricalRows(event, events) {
+  const key = normalizeSchoolLookupKey(event?.canonicalSchool || event?.title || '');
+  if (!key) return [];
+  return (events || [])
+    .filter(item => item && item.id !== event.id && item.date && String(item.date).localeCompare(String(event.date || '9999-12-31')) < 0)
+    .filter(item => {
+      const itemKey = normalizeSchoolLookupKey(item.canonicalSchool || item.title || '');
+      return itemKey && (itemKey.includes(key) || key.includes(itemKey));
+    })
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, 3)
+    .map(item => ({
+      date: item.date,
+      title: item.title,
+      photographers: uniqueCanonicalPhotographers(item.photographers || [])
+    }));
+}
+
+function getMakeupSourcePictureDay(event, events) {
+  if (event?.type !== 'Makeup Day') return null;
+  const key = normalizeSchoolLookupKey(event?.canonicalSchool || event?.title || '');
+  const year = String(event?.date || '').slice(0, 4);
+  if (!key || !year) return null;
+  return (events || [])
+    .filter(item => item && item.id !== event.id && String(item.date || '').startsWith(year))
+    .filter(item => ['Fall Picture Day', 'Spring Picture Day'].includes(item.type))
+    .filter(item => String(item.date || '').localeCompare(String(event.date || '9999-12-31')) <= 0)
+    .filter(item => {
+      const itemKey = normalizeSchoolLookupKey(item.canonicalSchool || item.title || '');
+      return itemKey && (itemKey.includes(key) || key.includes(itemKey));
+    })
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0] || null;
+}
+
+function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onAssignPhotographer, onRemovePhotographer, onToggleHold, canEdit = true, draggedPhotographer, setDraggedPhotographer }) {
+  const [expandedInfo, setExpandedInfo] = useState(false);
+  const [expandedHistory, setExpandedHistory] = useState(false);
+  const assigned = uniqueCanonicalPhotographers(event.photographers || []);
+  const history = getScheduleLiveHistoricalRows(event, events);
+  const makeupSource = getMakeupSourcePictureDay(event, events);
+  const makeupPhotographers = uniqueCanonicalPhotographers(makeupSource?.photographers || []);
+  const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
+
+  const assign = (name) => {
+    if (!canEdit || !name) return;
+    onAssignPhotographer(event, canonicalPhotographerName(name));
+  };
+
+  return (
+    <motion.article
+      layout
+      onDragOver={(e) => { if (canEdit && draggedPhotographer) e.preventDefault(); }}
+      onDrop={(e) => { e.preventDefault(); if (draggedPhotographer) assign(draggedPhotographer); setDraggedPhotographer?.(''); }}
+      className={`group relative overflow-hidden rounded-[1.35rem] border bg-white/90 p-3 text-left shadow-lg shadow-zinc-950/5 transition hover:-translate-y-0.5 hover:shadow-2xl ${isHeld ? 'border-amber-300 ring-2 ring-amber-300/30' : 'border-white/60'}`}
+    >
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${TYPE_COLORS[event.type] || 'bg-zinc-200'}`} />
+      <div className="flex items-start justify-between gap-3 pt-1">
+        <div className="min-w-0">
+          <button type="button" onClick={() => onClickEvent(event)} className="text-left text-base font-black leading-tight text-zinc-950 hover:underline">{event.title}</button>
+          <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
+          {getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-2xl border border-zinc-200/80 bg-cream/70 p-2">
+          <div className="text-[10px] font-black uppercase tracking-wide text-zinc-500">Photographers</div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {assigned.length ? assigned.map(name => (
+              <span key={name} className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2 py-1 text-xs font-bold text-zinc-800">
+                {name}
+                {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
+              </span>
+            )) : <span className="text-xs font-semibold text-rose-700">Needs Photographer</span>}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-zinc-200/80 bg-cream/70 p-2">
+          <div className="text-[10px] font-black uppercase tracking-wide text-zinc-500">Need</div>
+          <div className="mt-1 text-xs font-semibold text-zinc-700">{Math.max(1, assigned.length || 1)} photographer{Math.max(1, assigned.length || 1) === 1 ? '' : 's'} · {event.noAssistant ? 'No assistant' : `${event.assistants?.length || 0} assistant${(event.assistants?.length || 0) === 1 ? '' : 's'} noted`}</div>
+        </div>
+      </div>
+
+      {canEdit ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {photographers.map(name => (
+            <button key={name} type="button" onClick={() => assign(name)} className={`rounded-full border px-2.5 py-1.5 text-[11px] font-black transition ${assigned.includes(canonicalPhotographerName(name)) ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:border-[#AEBB9E] hover:bg-[#DDE8D2]'}`}>{canonicalPhotographerName(name)}</button>
+          ))}
+        </div>
+      ) : null}
+
+      {makeupPhotographers.length ? (
+        <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50/80 p-2 text-xs text-rose-900">
+          <div className="font-black uppercase tracking-wide">Makeup shortcut</div>
+          <div className="mt-1">Picture Day crew: {makeupPhotographers.join(', ')}</div>
+          {canEdit ? <button type="button" onClick={() => makeupPhotographers.forEach(assign)} className="mt-2 rounded-full bg-rose-600 px-3 py-1.5 text-[11px] font-black text-white shadow-sm">Use same photographer{makeupPhotographers.length === 1 ? '' : 's'}</button> : null}
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => setExpandedHistory(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700">Past Photographers</button>
+        <button type="button" onClick={() => setExpandedInfo(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700">Picture Day Info</button>
+        {canEdit ? <button type="button" onClick={() => onToggleHold(event)} className={`rounded-full border px-3 py-1.5 text-xs font-black ${isHeld ? 'border-amber-300 bg-amber-100 text-amber-950' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>{isHeld ? 'Return from Hold' : 'Hold! Needs Discussion Later'}</button> : null}
+      </div>
+
+      <AnimatePresence>
+        {expandedHistory ? (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80 p-3 text-xs text-zinc-700">
+            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-1"><span className="font-black">{row.date?.slice(0, 4) || 'Past'}</span> — {row.photographers.length ? row.photographers.join(', ') : 'No photographer listed'} <span className="text-zinc-400">({shortDate(row.date)})</span></div>) : <div className="text-zinc-500">No past photographer history found.</div>}
+          </motion.div>
+        ) : null}
+        {expandedInfo ? (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80 p-3 text-xs leading-5 text-zinc-700">
+            {event.notes ? <div className="whitespace-pre-wrap">{event.notes}</div> : <div className="text-zinc-500">No Picture Day Info entered.</div>}
+            {event.history ? <div className="mt-3 whitespace-pre-wrap border-t border-zinc-100 pt-3 text-zinc-500">{event.history}</div> : null}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </motion.article>
+  );
+}
+
+function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, authEmail, isAdminUser, canEdit = true, reloadEvents }) {
+  const [liveState, setLiveState] = useState(() => scheduleLiveDefaultState(todayKey()));
+  const [statusMessage, setStatusMessage] = useState('');
+  const [commentText, setCommentText] = useState('');
+  const [draggedPhotographer, setDraggedPhotographer] = useState('');
+  const [selectedPhotographer, setSelectedPhotographer] = useState('');
+
+  const currentUserName = displayNameFromEmail(authEmail || '');
+  const isHost = liveState.hostEmail && authEmail && liveState.hostEmail === authEmail;
+  const canHost = isAdminUser;
+  const canControlWeek = isHost || (!liveState.hostEmail && canHost);
+
+  const saveLiveState = async (updater) => {
+    const next = typeof updater === 'function' ? updater(liveState) : { ...liveState, ...updater };
+    const activeUsers = {
+      ...(next.activeUsers || {}),
+      ...(authEmail ? { [authEmail]: { name: currentUserName, email: authEmail, seenAt: new Date().toISOString() } } : {})
+    };
+    const cleanNext = { ...next, activeUsers };
+    setLiveState(cleanNext);
+
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setStatusMessage('Schedule Live is running locally because Supabase is not connected.');
+      return cleanNext;
+    }
+
+    const { error } = await supabase
+      .from('schedule_live_sessions')
+      .upsert({ id: SCHEDULE_LIVE_SESSION_ID, data: cleanNext, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+
+    if (error) {
+      setStatusMessage(`Schedule Live shared session needs setup: ${error.message}. Assignments still save to events.`);
+    } else {
+      setStatusMessage('Schedule Live session synced.');
+    }
+    return cleanNext;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+
+    async function loadSession() {
+      if (!hasSupabaseEnv() || !supabase) return;
+      const { data, error } = await supabase
+        .from('schedule_live_sessions')
+        .select('data')
+        .eq('id', SCHEDULE_LIVE_SESSION_ID)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) {
+        setStatusMessage(`Run the Schedule Live SQL setup to share host/commentary: ${error.message}`);
+        return;
+      }
+      if (data?.data) setLiveState({ ...scheduleLiveDefaultState(todayKey()), ...data.data });
+      else await saveLiveState(scheduleLiveDefaultState(todayKey()));
+    }
+
+    loadSession();
+
+    const channel = hasSupabaseEnv() && supabase
+      ? supabase.channel('schedule-live-room')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_live_sessions', filter: `id=eq.${SCHEDULE_LIVE_SESSION_ID}` }, payload => {
+          const nextData = payload?.new?.data;
+          if (nextData && !cancelled) setLiveState({ ...scheduleLiveDefaultState(todayKey()), ...nextData });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => reloadEvents?.())
+        .subscribe()
+      : null;
+
+    const heartbeat = window.setInterval(() => {
+      saveLiveState(prev => ({ ...prev }));
+    }, 25000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(heartbeat);
+      if (channel && supabase) supabase.removeChannel(channel);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authEmail]);
+
+  const days = getScheduleLiveDays(liveState.weekStart, liveState.showWeekends);
+  const weekEnd = days[days.length - 1];
+  const weekEvents = (events || []).filter(event => event && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && event.status !== SCHEDULE_LIVE_HOLD_STATUS);
+  const heldEvents = (events || []).filter(event => event && event.status === SCHEDULE_LIVE_HOLD_STATUS && monthKey(event.date) === monthKey(liveState.weekStart));
+  const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+  const capacity = getCapacityTone(weeklyRollouts);
+  const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
+  const progress = getScheduleLiveProgress(events, liveState.weekStart);
+  const activeUsers = Object.values(liveState.activeUsers || {})
+    .filter(user => user?.seenAt && Date.now() - new Date(user.seenAt).getTime() < 120000)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+  const countsByPhotographer = photographers.reduce((map, name) => {
+    map[canonicalPhotographerName(name)] = 0;
+    return map;
+  }, {});
+  weekEvents.forEach(event => uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
+    countsByPhotographer[name] = (countsByPhotographer[name] || 0) + 1;
+  }));
+
+  const changeWeek = (delta) => {
+    if (!canControlWeek) return;
+    saveLiveState(prev => ({ ...prev, weekStart: addDays(getMondayStart(prev.weekStart), delta * 7) }));
+  };
+
+  const assignPhotographer = async (event, photographer) => {
+    if (!canEdit || !photographer) return;
+    const nextPhotographers = Array.from(new Set([...uniqueCanonicalPhotographers(event.photographers || []), canonicalPhotographerName(photographer)]));
+    await onSchedule({ ...event, photographers: nextPhotographers, status: nextPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned' });
+    setSelectedPhotographer('');
+  };
+
+  const removePhotographer = async (event, photographer) => {
+    if (!canEdit) return;
+    const nextPhotographers = uniqueCanonicalPhotographers(event.photographers || []).filter(name => name !== canonicalPhotographerName(photographer));
+    await onSchedule({ ...event, photographers: nextPhotographers, status: nextPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned' });
+  };
+
+  const toggleHold = async (event) => {
+    if (!canEdit) return;
+    const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
+    await onSchedule({ ...event, status: isHeld ? (getAssignedPhotographerCount(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
+  };
+
+  const addCommentary = async () => {
+    const body = commentText.trim();
+    if (!body) return;
+    const entry = { id: `comment-${Date.now()}`, name: currentUserName, email: authEmail || '', text: body, savedAt: new Date().toISOString() };
+    setCommentText('');
+    await saveLiveState(prev => ({ ...prev, commentary: [entry, ...(prev.commentary || [])].slice(0, 40) }));
+  };
+
+  return (
+    <div className="overflow-hidden rounded-[2rem] border border-red-200 bg-gradient-to-br from-zinc-950 via-zinc-900 to-red-950 p-3 text-white shadow-2xl">
+      <div className="rounded-[1.65rem] border border-white/10 bg-white/[0.06] p-4 shadow-inner backdrop-blur">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-red-300/50 bg-red-500/20 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-red-100 shadow-lg shadow-red-950/30">🔴 Schedule Live!</div>
+            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{getScheduleLiveSessionMonthLabel(liveState.weekStart)} Scheduling Session</h2>
+            <p className="mt-1 text-sm font-semibold text-red-100/80">Week of {getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-white/80">
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">Host: {liveState.hostName || 'None yet'}</span>
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{activeUsers.length || 1} user{(activeUsers.length || 1) === 1 ? '' : 's'} connected</span>
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">Production schedule</span>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[520px]">
+            <div className={`rounded-[1.5rem] border p-4 ${capacity.className} bg-white text-zinc-900`}>
+              <div className="text-xs font-black uppercase tracking-wide opacity-70">Weekly Rollouts</div>
+              <div className="mt-1 text-3xl font-black">{weeklyRollouts} / 22</div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200"><div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} /></div>
+              <div className="mt-2 text-xs font-black">{22 - weeklyRollouts >= 0 ? `${22 - weeklyRollouts} remaining` : `${weeklyRollouts - 22} over capacity`} · {capacity.label}</div>
+            </div>
+            <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+              <div className="text-xs font-black uppercase tracking-wide opacity-70">Scheduling Complete</div>
+              <div className="mt-1 text-3xl font-black">{progress.pct}%</div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${progress.pct}%` }} /></div>
+              <div className="mt-2 text-xs font-black">{progress.assigned} of {progress.total} {monthLabel(monthKey(liveState.weekStart))} events assigned</div>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-4">
+              <div className="text-xs font-black uppercase tracking-wide text-white/60">Host Controls</div>
+              {canHost ? (
+                <div className="mt-2 flex flex-col gap-2">
+                  <button type="button" onClick={() => saveLiveState(prev => ({ ...prev, hostEmail: authEmail || '', hostName: currentUserName }))} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30">{isHost ? 'Refresh Host' : 'Become Host'}</button>
+                  {isHost ? <button type="button" onClick={() => saveLiveState(prev => ({ ...prev, hostEmail: '', hostName: '' }))} className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-black text-white">Release Host</button> : null}
+                </div>
+              ) : <div className="mt-2 text-sm font-semibold text-white/70">Admins control the shared week.</div>}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-[220px_1fr_310px]">
+          <aside className="rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-black uppercase tracking-wide text-white">Draft Board</h3>
+              <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">Week</span>
+            </div>
+            <div className="space-y-2">
+              {photographers.map(name => {
+                const canonical = canonicalPhotographerName(name);
+                const count = countsByPhotographer[canonical] || 0;
+                const selected = selectedPhotographer === canonical;
+                return <button key={canonical} type="button" draggable={canEdit} onDragStart={() => setDraggedPhotographer(canonical)} onDragEnd={() => setDraggedPhotographer('')} onClick={() => setSelectedPhotographer(selected ? '' : canonical)} className={`w-full rounded-2xl border px-3 py-3 text-left transition ${selected ? 'border-red-300 bg-red-500 text-white shadow-lg shadow-red-950/30' : 'border-white/10 bg-white/10 text-white hover:bg-white/15'}`}>
+                  <div className="flex items-center justify-between gap-3"><span className="font-black">{canonical}</span><span className="text-2xl font-black tabular-nums">{count}</span></div>
+                  <div className="mt-1 text-[10px] font-bold uppercase tracking-wide opacity-60">rollouts assigned</div>
+                </button>;
+              })}
+            </div>
+            {selectedPhotographer ? <div className="mt-3 rounded-2xl border border-red-300/30 bg-red-500/15 p-3 text-xs font-semibold text-red-50">Selected: <strong>{selectedPhotographer}</strong>. Click any event card name button or drag this photographer onto a card.</div> : null}
+          </aside>
+
+          <section className="min-w-0">
+            <div className="mb-3 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/10 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(-1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronLeft size={18} /></button>
+                <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronRight size={18} /></button>
+                <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-black text-white">{getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</span>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm font-bold text-white/85">
+                <input type="checkbox" checked={Boolean(liveState.showWeekends)} disabled={!canControlWeek} onChange={(e) => saveLiveState(prev => ({ ...prev, showWeekends: e.target.checked }))} />
+                Show weekends
+              </label>
+            </div>
+
+            <div className={`grid gap-3 ${liveState.showWeekends ? 'xl:grid-cols-7' : 'xl:grid-cols-5'}`}>
+              {days.map(date => {
+                const dayEvents = weekEvents.filter(event => isDateInEventRange(event, date)).sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+                return <div key={date} className="min-h-[420px] rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-black text-white">{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}</div>
+                      <div className="text-xs font-semibold text-white/50">{shortDate(date)}</div>
+                    </div>
+                    <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={selectedPhotographer ? [selectedPhotographer] : photographers} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onToggleHold={toggleHold} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
+                  </div>
+                </div>;
+              })}
+            </div>
+          </section>
+
+          <aside className="space-y-4">
+            <section className="rounded-[1.5rem] border border-amber-300/30 bg-amber-300/15 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-black text-amber-50">🟡 Hold! Needs Discussion Later</h3>
+                <span className="rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black text-amber-950">{heldEvents.length}</span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="w-full rounded-2xl border border-amber-200/30 bg-white/10 p-3 text-left text-xs font-bold text-white hover:bg-white/15"><div>{event.title}</div><div className="mt-1 text-white/50">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black text-amber-950">Return to week</span> : null}</button>) : <div className="rounded-2xl border border-dashed border-amber-200/25 bg-white/5 p-4 text-center text-xs font-semibold text-amber-50/60">Nothing on hold.</div>}
+              </div>
+            </section>
+
+            <section className="rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
+              <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
+              <div className="mt-3 flex gap-2">
+                <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-sm text-zinc-900 outline-none" />
+                <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white disabled:opacity-40">Add</button>
+              </div>
+              <div className="mt-3 max-h-[360px] space-y-2 overflow-auto pr-1">
+                {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
+                  <div key={entry.id} className="rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
+                    <div className="text-[11px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
+                    <div className="mt-1 leading-5 text-white/90">{entry.text}</div>
+                  </div>
+                )) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No live commentary yet.</div>}
+              </div>
+            </section>
+
+            {statusMessage ? <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-xs font-semibold text-white/65">{statusMessage}</div> : null}
+          </aside>
+        </div>
       </div>
     </div>
   );
@@ -1303,7 +1673,6 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
   const seasons = ['Spring 2025', 'Fall 2025', 'Spring 2026', 'Fall 2026'];
 
   const addressLine = [school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n');
-  const schoolNoteHistory = getNoteHistory(school.noteAttribution);
 
   return (
     <section className={`${compact ? 'rounded-2xl p-0' : 'rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm'}`}>
@@ -1352,18 +1721,13 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
 
       <div className="mt-3 max-w-4xl rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm font-semibold text-zinc-800">Notes ({schoolNoteHistory.length})</div>
-          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Add Note</button> : null}
+          <div className="text-sm font-semibold text-zinc-800">Notes on School</div>
+          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Edit</button> : null}
         </div>
-        <div className="mt-3">
-          <NoteHistoryList entries={schoolNoteHistory} />
-        </div>
-        {school.notes ? (
-          <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Imported from School Log</div>
-            <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{school.notes}</div>
-          </div>
-        ) : null}
+        <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-1.5 w-full rounded-xl p-1.5 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
+          <div className="whitespace-pre-wrap leading-5">{school.notes || '—'}</div>
+          {school.noteAttribution ? <div className="mt-2"><AttributionPill attribution={school.noteAttribution} /></div> : null}
+        </button>
       </div>
 
       <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-5 grid gap-3 md:grid-cols-4'}`}>
@@ -1414,8 +1778,8 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
                   <span className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-zinc-500">{event.type}</span>
                 </div>
                 <div className="mt-1 text-xs font-medium text-zinc-700">{event.title}</div>
-                <div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>
-                {event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-5 text-zinc-600">{event.notes}</div> : null}
+                <div className="mt-2 whitespace-pre-wrap text-sm leading-5 text-zinc-600">{event.notes}</div>
+                {event.noteAttribution ? <div className="mt-2"><AttributionPill attribution={event.noteAttribution} /></div> : null}
               </button>
             ))}
           </div>
@@ -1571,8 +1935,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   const [selectedPhotographers, setSelectedPhotographers] = useState(initialEvent?.photographers || []);
   const [selectedAssistants, setSelectedAssistants] = useState(initialEvent?.assistants || []);
   const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
-  const [notes] = useState(initialEvent?.notes || '');
-  const [newNote, setNewNote] = useState('');
+  const [notes, setNotes] = useState(initialEvent?.notes || '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -1610,7 +1973,6 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       arrivalTime: arrivalTime || '',
       time: startTime || 'TBD',
       notes: notes || '',
-      newNote: newNote.trim(),
       rainInfo: '',
       history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
@@ -1698,14 +2060,9 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
               </div>
             </section>
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Add New Picture Day Note</div>
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder="Add a new picture day note. Existing note history cannot be edited." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Info</div>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Optional info for this specific event/shoot..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(initialEvent?.noteAttribution).length})</div>
-              <div className="mt-3"><NoteHistoryList entries={getNoteHistory(initialEvent?.noteAttribution)} /></div>
-              {notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{notes}</div> : null}
-            </section>
           </div>
           <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
@@ -2027,7 +2384,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
   const [contactPhone, setContactPhone] = useState(school?.contactPhone || '');
   const [contactEmail, setContactEmail] = useState(school?.contactEmail || '');
   const [contactTitle, setContactTitle] = useState(school?.contactTitle || '');
-  const [newNote, setNewNote] = useState('');
+  const [notes, setNotes] = useState(school?.notes || '');
   const [referenceImages, setReferenceImages] = useState(school?.referenceImages || []);
   const [noFallSchedulingFall2026, setNoFallSchedulingFall2026] = useState(Boolean(school?.noFallSchedulingFall2026));
 
@@ -2042,7 +2399,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setContactPhone(school?.contactPhone || '');
     setContactEmail(school?.contactEmail || '');
     setContactTitle(school?.contactTitle || '');
-    setNewNote('');
+    setNotes(school?.notes || '');
     setReferenceImages(school?.referenceImages || []);
     setNoFallSchedulingFall2026(Boolean(school?.noFallSchedulingFall2026));
   }, [school]);
@@ -2091,8 +2448,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
       contactPhone,
       contactEmail,
       contactTitle,
-      notes: school.notes || '',
-      newNote: newNote.trim(),
+      notes,
       referenceImages,
       noFallSchedulingFall2026
     });
@@ -2143,18 +2499,8 @@ function EditSchoolModal({ school, onClose, onSave }) {
               <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
             </label>
           </div>
-          <section className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
-            <div className="text-sm font-semibold text-zinc-800">Notes ({getNoteHistory(school.noteAttribution).length})</div>
-            <div className="mt-3"><NoteHistoryList entries={getNoteHistory(school.noteAttribution)} /></div>
-            {school.notes ? (
-              <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Imported from School Log</div>
-                <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{school.notes}</div>
-              </div>
-            ) : null}
-          </section>
-          <label className="text-sm font-medium text-zinc-700">Add New Note
-            <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={5} placeholder="Add a new school note. Existing note history cannot be edited." className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
+          <label className="text-sm font-medium text-zinc-700">Notes on School
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={10} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
           </label>
           <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-sm text-zinc-700">
             <input type="checkbox" checked={noFallSchedulingFall2026} onChange={(e) => setNoFallSchedulingFall2026(e.target.checked)} className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900" />
@@ -2475,14 +2821,12 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     }
 
     const previous = (schools || []).find(school => (school.originalName || school.name) === originalName) || {};
-    const newNote = String(values.newNote || '').trim();
-    const { newNote: _discardNewNote, ...cleanValues } = values;
+    const notesChanged = String(previous.notes || '') !== String(values.notes || '');
     const nextSchool = {
       ...previous,
-      ...cleanValues,
+      ...values,
       originalName,
-      notes: previous.notes || cleanValues.notes || '',
-      noteAttribution: newNote ? appendNoteHistory(previous.noteAttribution || cleanValues.noteAttribution, authEmail, newNote) : (previous.noteAttribution || cleanValues.noteAttribution || null)
+      noteAttribution: notesChanged ? makeNoteAttribution(authEmail) : (previous.noteAttribution || values.noteAttribution || null)
     };
     const row = schoolToSupabaseRow(nextSchool);
 
@@ -2968,7 +3312,7 @@ function RemovedEventsModule({ events, onRestore, canRestore = true }) {
 
 function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true, canEdit = true }) {
   return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? (canEdit ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-slate-200 bg-slate-50 text-slate-700">View Only</Pill>) : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
-              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
+              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Info</div><div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes || '—'}</div>{event.noteAttribution ? <div className="mt-3"><AttributionPill attribution={event.noteAttribution} /></div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -3747,14 +4091,10 @@ export default function SchedulerApp() {
       (event.supabaseId && item.supabaseId === event.supabaseId)
     );
     const notesChanged = String(previousEvent?.notes || '') !== String(event?.notes || '');
-    const newNote = String(event?.newNote || '').trim();
     const eventWithId = {
       ...event,
       id: event.id || `custom-${Date.now()}`,
-      notes: event.notes ?? previousEvent?.notes ?? '',
-      noteAttribution: newNote
-        ? appendNoteHistory(previousEvent?.noteAttribution || event.noteAttribution, authEmail, newNote)
-        : notesChanged ? makeNoteAttribution(authEmail) : (event.noteAttribution || previousEvent?.noteAttribution || null)
+      noteAttribution: notesChanged ? makeNoteAttribution(authEmail) : (event.noteAttribution || previousEvent?.noteAttribution || null)
     };
 
     const supabase = createClient();
@@ -3935,11 +4275,12 @@ export default function SchedulerApp() {
   const visibleTabs = useMemo(() => tabs.filter(tab => {
     if (tab === 'Admin') return isAdminUser;
     if (tab === 'Team Members') return !isAssistantUser;
+    if (tab === 'Schedule Live!') return !isAssistantUser;
     return true;
   }), [isAdminUser, isAssistantUser]);
 
   useEffect(() => {
-    if ((!isAdminUser && activeTab === 'Admin') || (isAssistantUser && activeTab === 'Team Members')) setActiveTab('Calendar View');
+    if ((!isAdminUser && activeTab === 'Admin') || (isAssistantUser && ['Team Members', 'Schedule Live!'].includes(activeTab))) setActiveTab('Calendar View');
   }, [isAdminUser, activeTab]);
 
   const overviewPeriodEvents = useMemo(() => {
@@ -3967,6 +4308,11 @@ export default function SchedulerApp() {
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>
+            {canEditScheduler ? (
+              <div className="mb-4 flex justify-end">
+                <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-red-200 transition hover:-translate-y-0.5 hover:bg-red-700">🔴 Schedule Live!</button>
+              </div>
+            ) : null}
             <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
             <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => openAddEvent(selectedDate)} onQuickAssign={(event, mode) => setQuickAssignment({ event, mode })} canEdit={canEditScheduler} />
             <div className="pt-6">
@@ -3976,6 +4322,7 @@ export default function SchedulerApp() {
               <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} canRestore={isAdminUser} />
             </div>
           </>}
+          {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} onClickEvent={setSelected} onSchedule={handleScheduleEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} />}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} />}
