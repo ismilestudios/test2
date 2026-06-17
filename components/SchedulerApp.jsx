@@ -1154,13 +1154,13 @@ function ScheduleLiveEventCard({ event, events, photographers, assistants = [], 
       {isComplete ? <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,transparent_47%,rgba(22,163,74,0.18)_49%,rgba(22,163,74,0.18)_51%,transparent_53%)]" /> : null}
       <div className="pt-1">
         <div className="flex items-start justify-between gap-2">
-          <button type="button" onClick={() => onClickEvent(event)} className="min-w-0 text-left text-[13px] font-black leading-tight text-zinc-950 hover:underline">{event.title}</button>
+          <button type="button" title={event.title} onClick={() => onClickEvent(event)} className="min-w-0 flex-1 truncate text-left text-[13px] font-black leading-tight text-zinc-950 hover:underline">{event.title}</button>
           {getEventIrm(event) ? <Pill className="shrink-0 border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
         </div>
         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
           <span>{event.type}</span>
           <span>{getEventTimeLabel(event)}</span>
-          {event.arrivalTime ? <span>Arrival {event.arrivalTime}</span> : null}
+          
         </div>
       </div>
 
@@ -1203,7 +1203,7 @@ function ScheduleLiveEventCard({ event, events, photographers, assistants = [], 
       ) : null}
 
       {canEdit ? (
-        <div className="mt-2 grid gap-1.5">
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
           <select value="" onChange={(e) => { assign(e.target.value); e.target.value = ''; }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
             <option value="">Assign photographer...</option>
             {photographers.map(name => <option key={name} value={name}>{canonicalPhotographerName(name)}</option>)}
