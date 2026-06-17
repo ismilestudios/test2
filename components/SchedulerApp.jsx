@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '0.99.4';
+const SCHEDULER_VERSION = '1.00';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -1056,17 +1056,27 @@ function getScheduleLiveProgress(events, weekStart) {
 function getScheduleLiveHistoricalRows(event, events) {
   const key = normalizeSchoolLookupKey(event?.canonicalSchool || event?.title || '');
   if (!key) return [];
+  const seen = new Set();
   return (events || [])
     .filter(item => item && item.id !== event.id && item.date && String(item.date).localeCompare(String(event.date || '9999-12-31')) < 0)
+    .filter(item => ['Fall Picture Day', 'Spring Picture Day', 'Makeup Day', 'Sports', 'Seniors'].includes(item.type))
     .filter(item => {
       const itemKey = normalizeSchoolLookupKey(item.canonicalSchool || item.title || '');
       return itemKey && (itemKey.includes(key) || key.includes(itemKey));
     })
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
-    .slice(0, 3)
+    .filter(item => {
+      const names = uniqueCanonicalPhotographers(item.photographers || []).join(', ');
+      const dedupeKey = `${item.date}|${item.type}|${names}`;
+      if (seen.has(dedupeKey)) return false;
+      seen.add(dedupeKey);
+      return true;
+    })
+    .slice(0, 4)
     .map(item => ({
       date: item.date,
       title: item.title,
+      type: item.type,
       photographers: uniqueCanonicalPhotographers(item.photographers || [])
     }));
 }
@@ -1087,10 +1097,13 @@ function getMakeupSourcePictureDay(event, events) {
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0] || null;
 }
 
-function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onAssignPhotographer, onRemovePhotographer, onToggleHold, canEdit = true, draggedPhotographer, setDraggedPhotographer }) {
+function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onAssignPhotographer, onRemovePhotographer, onToggleHold, onUpdateRequirements, canEdit = true, draggedPhotographer, setDraggedPhotographer }) {
   const [expandedInfo, setExpandedInfo] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState(false);
   const assigned = uniqueCanonicalPhotographers(event.photographers || []);
+  const requiredPhotographers = getRequiredPhotographerCount(event);
+  const requiredAssistants = getRequiredAssistantCount(event);
+  const needsMorePhotographers = assigned.length < requiredPhotographers;
   const history = getScheduleLiveHistoricalRows(event, events);
   const makeupSource = getMakeupSourcePictureDay(event, events);
   const makeupPhotographers = uniqueCanonicalPhotographers(makeupSource?.photographers || []);
@@ -1127,12 +1140,30 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
             {name}
             {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
           </span>
-        )) : <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700">Needs Photographer</span>}
+        )) : null}
+        {needsMorePhotographers ? <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700">Needs {requiredPhotographers - assigned.length} Photographer{requiredPhotographers - assigned.length === 1 ? '' : 's'}</span> : null}
       </div>
 
       <div className="mt-2 text-[11px] font-semibold text-zinc-600">
-        Need: {Math.max(1, assigned.length || 1)} photographer{Math.max(1, assigned.length || 1) === 1 ? '' : 's'} · {event.noAssistant ? 'No assistant' : `${event.assistants?.length || 0} assistant${(event.assistants?.length || 0) === 1 ? '' : 's'} noted`}
+        Need: {getRequirementStatusLabel(event)}
       </div>
+
+      {canEdit ? (
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
+          <label className="rounded-xl border border-zinc-200 bg-white px-2 py-1">
+            <div className="text-[9px] font-black uppercase tracking-wide text-zinc-400">Photogs Required</div>
+            <select value={requiredPhotographers} onChange={(e) => onUpdateRequirements?.(event, { requiredPhotographers: Number(e.target.value), requiredAssistants })} className="mt-0.5 w-full bg-transparent text-[11px] font-black text-zinc-800 outline-none">
+              {[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
+            </select>
+          </label>
+          <label className="rounded-xl border border-zinc-200 bg-white px-2 py-1">
+            <div className="text-[9px] font-black uppercase tracking-wide text-zinc-400">Assts Needed</div>
+            <select value={requiredAssistants} onChange={(e) => onUpdateRequirements?.(event, { requiredPhotographers, requiredAssistants: Number(e.target.value) })} className="mt-0.5 w-full bg-transparent text-[11px] font-black text-zinc-800 outline-none">
+              {[0,1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
+            </select>
+          </label>
+        </div>
+      ) : null}
 
       {canEdit ? (
         <select value="" onChange={(e) => { assign(e.target.value); e.target.value = ''; }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
@@ -1158,7 +1189,7 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
       <AnimatePresence>
         {expandedHistory ? (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] text-zinc-700">
-            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-0.5"><span className="font-black">{row.date?.slice(0, 4) || 'Past'}</span> — {row.photographers.length ? row.photographers.join(', ') : 'No photographer listed'}</div>) : <div className="text-zinc-500">No past photographer history found.</div>}
+            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-0.5"><span className="font-black">{row.date ? shortDate(row.date) : 'Past'}</span>{row.type ? <span className="text-zinc-400"> · {row.type}</span> : null} — {row.photographers.length ? row.photographers.join(', ') : 'No photographer listed'}</div>) : <div className="text-zinc-500">No past photographer history found.</div>}
           </motion.div>
         ) : null}
         {expandedInfo ? (
@@ -1291,20 +1322,30 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
   const assignPhotographer = async (event, photographer) => {
     if (!canEdit || !photographer) return;
     const nextPhotographers = Array.from(new Set([...uniqueCanonicalPhotographers(event.photographers || []), canonicalPhotographerName(photographer)]));
-    await onSchedule({ ...event, photographers: nextPhotographers, status: nextPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned' });
+    const nextEvent = { ...event, photographers: nextPhotographers };
+    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
     setSelectedPhotographer('');
   };
 
   const removePhotographer = async (event, photographer) => {
     if (!canEdit) return;
     const nextPhotographers = uniqueCanonicalPhotographers(event.photographers || []).filter(name => name !== canonicalPhotographerName(photographer));
-    await onSchedule({ ...event, photographers: nextPhotographers, status: nextPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned' });
+    const nextEvent = { ...event, photographers: nextPhotographers };
+    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
+  };
+
+  const updateRequirements = async (event, counts = {}) => {
+    if (!canEdit) return;
+    const requiredPhotographers = Math.max(1, Math.min(6, Number(counts.requiredPhotographers ?? getRequiredPhotographerCount(event)) || 1));
+    const requiredAssistants = Math.max(0, Math.min(6, Number(counts.requiredAssistants ?? getRequiredAssistantCount(event)) || 0));
+    const nextEvent = { ...event, requiredPhotographers, requiredAssistants, noAssistant: requiredAssistants === 0 };
+    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
   };
 
   const toggleHold = async (event) => {
     if (!canEdit) return;
     const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
-    await onSchedule({ ...event, status: isHeld ? (getAssignedPhotographerCount(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
+    await onSchedule({ ...event, status: isHeld ? (eventMeetsPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
   };
 
   const addCommentary = async () => {
@@ -1482,7 +1523,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
                     <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
                   </div>
                   <div className="space-y-2">
-                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={photographers} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onToggleHold={toggleHold} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
+                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={photographers} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onToggleHold={toggleHold} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
                   </div>
                 </div>;
               })}
@@ -1523,13 +1564,55 @@ function getAssignedPhotographerCount(event) {
   return uniqueCanonicalPhotographers(event.photographers).length;
 }
 
+function parseRequiredPhotographerCountFromTitle(title = '') {
+  const text = String(title || '').toLowerCase();
+  const match = text.match(/(\d+)\s*(?:photogs?|photographers?|teams?|set-?ups?)/i);
+  if (match) return Math.max(1, Math.min(6, Number(match[1]) || 1));
+  return 1;
+}
+
+function parseRequiredAssistantCountFromTitle(title = '') {
+  const text = String(title || '').toLowerCase();
+  if (/no\s+assist|no\s+asst|no\s+assistant/.test(text)) return 0;
+  const match = text.match(/(\d+)\s*(?:assts?|assistants?)/i);
+  if (match) return Math.max(0, Math.min(6, Number(match[1]) || 0));
+  return 0;
+}
+
+function getRequiredPhotographerCount(event = {}) {
+  const explicit = Number(event.requiredPhotographers ?? event.required_photographers);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.max(1, Math.min(6, explicit));
+  return Math.max(1, parseRequiredPhotographerCountFromTitle(event.title), getAssignedPhotographerCount(event));
+}
+
+function getRequiredAssistantCount(event = {}) {
+  if (event.noAssistant) return 0;
+  const explicit = Number(event.requiredAssistants ?? event.required_assistants);
+  if (Number.isFinite(explicit) && explicit >= 0) return Math.max(0, Math.min(6, explicit));
+  const assigned = Array.isArray(event.assistants) ? event.assistants.filter(Boolean).length : 0;
+  return Math.max(parseRequiredAssistantCountFromTitle(event.title), assigned);
+}
+
+function getRequirementStatusLabel(event = {}) {
+  const assignedPhotogs = getAssignedPhotographerCount(event);
+  const requiredPhotogs = getRequiredPhotographerCount(event);
+  const assignedAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean).length : 0;
+  const requiredAssistants = getRequiredAssistantCount(event);
+  const photogLabel = `${assignedPhotogs}/${requiredPhotogs} photographer${requiredPhotogs === 1 ? '' : 's'}`;
+  const assistantLabel = event.noAssistant ? 'No assistant' : `${assignedAssistants}/${requiredAssistants} assistant${requiredAssistants === 1 ? '' : 's'}`;
+  return `${photogLabel} · ${assistantLabel}`;
+}
+
+function eventMeetsPhotographerRequirement(event = {}) {
+  return getAssignedPhotographerCount(event) >= getRequiredPhotographerCount(event);
+}
+
 function getRolloutCount(event) {
   if (!isRolloutEvent(event)) return 0;
 
-  // Rollouts are intentionally based on assigned photographers, not title parsing.
-  // Event titles use inconsistent wording like "1 Team", "2 Teams", or omit team counts entirely,
-  // so photographer assignment is the operational source of truth. Assistants do not count.
-  return getAssignedPhotographerCount(event);
+  // Rollouts use the required photographer count when it has been set.
+  // This lets Schedule Live show capacity accurately before every specific photographer is assigned.
+  return Math.max(getAssignedPhotographerCount(event), getRequiredPhotographerCount(event));
 }
 
 function getCapacityTone(rollouts) {
@@ -2106,6 +2189,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
   const [startTime, setStartTime] = useState('');
   const [selectedPhotographers, setSelectedPhotographers] = useState([]);
   const [selectedAssistants, setSelectedAssistants] = useState([]);
+  const [requiredPhotographers, setRequiredPhotographers] = useState(1);
+  const [requiredAssistants, setRequiredAssistants] = useState(0);
   const [noAssistant, setNoAssistant] = useState(false);
   const [notes, setNotes] = useState('');
 
@@ -2123,9 +2208,11 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
       title: `${school.name} Fall Picture Day`,
       canonicalSchool: school.name,
       type: 'Fall Picture Day',
-      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      status: selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: noAssistant ? [] : selectedAssistants,
+      requiredPhotographers: Number(requiredPhotographers) || 1,
+      requiredAssistants: noAssistant ? 0 : Number(requiredAssistants) || 0,
       noAssistant,
       features: [],
       irm: school.irm || null,
@@ -2187,6 +2274,25 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
               </div>
             </div>
 
+            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
+              <p className="mt-1 text-xs text-zinc-500">Set how many people this event needs, even if you are not assigning every person yet.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="rounded-2xl border border-zinc-200 bg-white p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Photographers Required</div>
+                  <select value={requiredPhotographers} onChange={(e) => setRequiredPhotographers(Number(e.target.value))} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
+                    {[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
+                  </select>
+                </label>
+                <label className="rounded-2xl border border-zinc-200 bg-white p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants Needed</div>
+                  <select value={noAssistant ? 0 : requiredAssistants} onChange={(e) => { const count = Number(e.target.value); setRequiredAssistants(count); setNoAssistant(count === 0); if (count === 0) setSelectedAssistants([]); }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
+                    {[0,1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
+                  </select>
+                </label>
+              </div>
+            </section>
+
             <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={school.name} />
 
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
@@ -2229,6 +2335,8 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   const [eventType, setEventType] = useState(initialEvent?.type || 'Fall Picture Day');
   const [selectedPhotographers, setSelectedPhotographers] = useState(initialEvent?.photographers || []);
   const [selectedAssistants, setSelectedAssistants] = useState(initialEvent?.assistants || []);
+  const [requiredPhotographers, setRequiredPhotographers] = useState(getRequiredPhotographerCount(initialEvent || { title: initialEvent?.title || '' }));
+  const [requiredAssistants, setRequiredAssistants] = useState(getRequiredAssistantCount(initialEvent || { title: initialEvent?.title || '' }));
   const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
   const [notes, setNotes] = useState(initialEvent?.notes || '');
   const [newNote, setNewNote] = useState('');
@@ -2261,9 +2369,11 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       title: cleanTitle,
       canonicalSchool: cleanName || '',
       type: eventType,
-      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      status: selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: noAssistant ? [] : selectedAssistants,
+      requiredPhotographers: Number(requiredPhotographers) || 1,
+      requiredAssistants: noAssistant ? 0 : Number(requiredAssistants) || 0,
       noAssistant,
       features: [],
       irm: matchedSchool?.irm || null,
@@ -2350,6 +2460,25 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
                 {matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
+            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
+              <p className="mt-1 text-xs text-zinc-500">Set how many people this event needs, even if you are not assigning every person yet.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="rounded-2xl border border-zinc-200 bg-white p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Photographers Required</div>
+                  <select value={requiredPhotographers} onChange={(e) => setRequiredPhotographers(Number(e.target.value))} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
+                    {[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
+                  </select>
+                </label>
+                <label className="rounded-2xl border border-zinc-200 bg-white p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants Needed</div>
+                  <select value={noAssistant ? 0 : requiredAssistants} onChange={(e) => { const count = Number(e.target.value); setRequiredAssistants(count); setNoAssistant(count === 0); if (count === 0) setSelectedAssistants([]); }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
+                    {[0,1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
+                  </select>
+                </label>
+              </div>
+            </section>
+
             <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
@@ -3058,6 +3187,8 @@ function eventToSupabaseRow(event = {}) {
     photographers: event.photographers || [],
     assistants: event.assistants || [],
     no_assistant: Boolean(event.noAssistant),
+    required_photographers: getRequiredPhotographerCount(event),
+    required_assistants: getRequiredAssistantCount(event),
     irm: event.irm === '' || event.irm === undefined || event.irm === null ? null : Number(event.irm),
     rain_info: event.rainInfo || null,
     history: event.history || null,
@@ -3083,6 +3214,8 @@ function supabaseRowToEvent(row = {}) {
     photographers: row.photographers || [],
     assistants: row.assistants || [],
     noAssistant: Boolean(row.no_assistant),
+    requiredPhotographers: row.required_photographers ?? null,
+    requiredAssistants: row.required_assistants ?? null,
     features: [],
     irm: row.irm ?? null,
     time: row.time || 'TBD',
@@ -3228,7 +3361,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         </div>
       ) : null}
       <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
-        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <section className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
           <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
           <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history. Edits now save to Supabase.</p>
           <div className="mt-4">
@@ -3241,7 +3374,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
             />
           </div>
 
-          <div className="mt-3 max-h-[760px] space-y-2 overflow-auto pr-1">
+          <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-auto pr-1 pb-3">
             {filtered.map(school => (
               <button key={school.originalName || school.name} onClick={() => setSelectedName(school.name)} className={`w-full rounded-2xl border p-3 text-left text-sm transition hover:bg-white ${selected?.originalName === school.originalName ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="font-semibold text-zinc-900">{school.name}</div>
@@ -3787,6 +3920,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-zinc-950">{event.title}</div>
                 <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
+                <div className="mt-1 text-xs font-semibold text-zinc-600">Added {formatEventMetaDateTime((getEventAddedMeta(event) || {}).addedAt || event.createdAt) || 'recently'} by {(getEventAddedMeta(event) || {}).name || 'Before We Began Tracking'}</div>
               </div>
               <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
             </div>
@@ -3851,7 +3985,7 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
   );
 }
 
-function RemovedEventsModule({ events, onRestore, canRestore = true }) {
+function RemovedEventsModule({ events, onRestore, onPermanentDelete, canRestore = true, canPermanentDelete = false }) {
   const sortedRemovedEvents = useMemo(() => {
     return [...(events || [])].sort((a, b) => {
       const aTime = new Date(a.updatedAt || a.createdAt || a.date || 0).getTime();
@@ -3882,7 +4016,10 @@ function RemovedEventsModule({ events, onRestore, canRestore = true }) {
                 <div className="mt-2 truncate text-sm font-semibold text-zinc-950">{event.title}</div>
                 <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
               </div>
-              {canRestore ? <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore</button> : null}
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {canRestore ? <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore</button> : null}
+                {canPermanentDelete ? <button type="button" onClick={() => onPermanentDelete?.(event)} className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Permanent Delete</button> : null}
+              </div>
             </div>
           </div>
         )) : (
@@ -5280,6 +5417,32 @@ export default function SchedulerApp() {
     setActiveTab('Calendar View');
   };
 
+  const handlePermanentDeleteEvent = async (event) => {
+    if (!event?.supabaseId || !isAdminUser) return;
+    const ok = window.confirm(`Permanently delete this removed event?\n\n${event.title}\n\nThis cannot be undone. Only use this for true duplicates or junk records.`);
+    if (!ok) return;
+
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setEventsMessage('Supabase is not connected, so this event could not be permanently deleted.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', event.supabaseId)
+      .eq('active', false);
+
+    if (error) {
+      setEventsMessage(`Could not permanently delete event: ${error.message}`);
+      return;
+    }
+
+    setSupabaseEvents(prev => (prev || []).filter(item => item.supabaseId !== event.supabaseId));
+    setEventsMessage('Removed event permanently deleted.');
+  };
+
   const handleQuickAssignmentSave = async (event) => {
     const saved = await handleScheduleEvent(event);
     if (saved) {
@@ -5378,7 +5541,7 @@ export default function SchedulerApp() {
               <RecentlyModifiedEventsModule events={allEvents} onClick={setSelected} />
             </div>
             <div className="pt-3">
-              <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} canRestore={isAdminUser} />
+              <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} onPermanentDelete={handlePermanentDeleteEvent} canRestore={isAdminUser} canPermanentDelete={isAdminUser} />
             </div>
           </>}
           {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} onClickEvent={setSelected} onSchedule={handleScheduleEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
