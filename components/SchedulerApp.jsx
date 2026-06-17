@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.02';
+const SCHEDULER_VERSION = '1.03';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -1704,6 +1704,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     <div>
                       <div className="text-sm font-black text-white">{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}</div>
                       <div className="text-xs font-semibold text-white/50">{shortDate(date)}</div>
+                      {getHolidayLabels(date).length ? <div className="mt-0.5 space-y-0.5 text-[10px] font-semibold italic leading-tight text-emerald-100/75" title={getHolidayLabels(date).join(', ')}>{getHolidayLabels(date).map(label => <div key={label} className="truncate">{label}</div>)}</div> : null}
                     </div>
                     <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
                   </div>
@@ -2500,8 +2501,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Second Date</div>
-                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Two-day' : 'One-day'}</button>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">End Date</div>
+                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Multi-day' : 'One-day'}</button>
                 </div>
                 <input type="date" min="2026-09-01" max="2026-11-30" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
@@ -2666,8 +2667,8 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Second Date</div>
-                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Two-day' : 'One-day'}</button>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">End Date</div>
+                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Multi-day' : 'One-day'}</button>
                 </div>
                 <input type="date" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
@@ -5782,7 +5783,7 @@ export default function SchedulerApp() {
                     <div className="mt-1 text-lg font-black text-zinc-950">Open the live scheduling draft room</div>
                     <div className="mt-1 text-sm font-semibold text-zinc-600">Assign photographers week by week with live rollout counts, host control, Hold, and commentary.</div>
                   </div>
-                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-7 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-red-200 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-red-700">Launch Schedule Live!</button>
+                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/50 bg-gradient-to-b from-emerald-500 to-emerald-700 px-7 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-emerald-200/70 ring-1 ring-emerald-200/40 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:from-emerald-400 hover:to-emerald-700 active:translate-y-0">Launch Schedule Live!</button>
                 </div>
               </div>
             ) : null}
