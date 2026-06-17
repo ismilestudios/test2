@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.01';
+const SCHEDULER_VERSION = '1.02';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -437,6 +437,129 @@ function formatDate(date) {
 
 function shortDate(date) {
   return new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function dateKeyFromParts(year, month, day) {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function nthWeekdayOfMonth(year, month, weekday, occurrence) {
+  const first = new Date(year, month - 1, 1, 12, 0, 0);
+  const firstOffset = (weekday - first.getDay() + 7) % 7;
+  return dateKeyFromParts(year, month, 1 + firstOffset + (occurrence - 1) * 7);
+}
+
+function lastWeekdayOfMonth(year, month, weekday) {
+  const last = new Date(year, month, 0, 12, 0, 0);
+  const offset = (last.getDay() - weekday + 7) % 7;
+  return dateKeyFromParts(year, month, last.getDate() - offset);
+}
+
+function addHolidayDays(dateKey, days) {
+  const date = new Date(`${dateKey}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function easterDateKey(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return dateKeyFromParts(year, month, day);
+}
+
+const MANUAL_HOLIDAYS_BY_YEAR = {
+  2025: {
+    '2025-09-23': ['Rosh Hashanah'],
+    '2025-09-24': ['Rosh Hashanah'],
+    '2025-10-02': ['Yom Kippur']
+  },
+  2026: {
+    '2026-09-12': ['Rosh Hashanah'],
+    '2026-09-13': ['Rosh Hashanah'],
+    '2026-09-21': ['Yom Kippur']
+  },
+  2027: {
+    '2027-10-02': ['Rosh Hashanah'],
+    '2027-10-03': ['Rosh Hashanah'],
+    '2027-10-11': ['Yom Kippur']
+  },
+  2028: {
+    '2028-09-21': ['Rosh Hashanah'],
+    '2028-09-22': ['Rosh Hashanah'],
+    '2028-09-30': ['Yom Kippur']
+  },
+  2029: {
+    '2029-09-10': ['Rosh Hashanah'],
+    '2029-09-11': ['Rosh Hashanah'],
+    '2029-09-19': ['Yom Kippur']
+  }
+};
+
+function pushHoliday(map, dateKey, label) {
+  if (!dateKey || !label) return;
+  const current = map.get(dateKey) || [];
+  if (!current.includes(label)) current.push(label);
+  map.set(dateKey, current);
+}
+
+function getHolidayMapForYear(year) {
+  const map = new Map();
+  pushHoliday(map, dateKeyFromParts(year, 1, 1), "New Year's Day");
+  pushHoliday(map, nthWeekdayOfMonth(year, 1, 1, 3), 'MLK Day');
+  pushHoliday(map, nthWeekdayOfMonth(year, 2, 1, 3), 'Presidents Day');
+  const easter = easterDateKey(year);
+  pushHoliday(map, addHolidayDays(easter, -2), 'Good Friday');
+  pushHoliday(map, easter, 'Easter');
+  pushHoliday(map, lastWeekdayOfMonth(year, 5, 1), 'Memorial Day');
+  pushHoliday(map, dateKeyFromParts(year, 6, 19), 'Juneteenth');
+  pushHoliday(map, dateKeyFromParts(year, 7, 4), 'Independence Day');
+  pushHoliday(map, nthWeekdayOfMonth(year, 9, 1, 1), 'Labor Day');
+  pushHoliday(map, nthWeekdayOfMonth(year, 10, 1, 2), 'Columbus Day / Indigenous Peoples Day');
+  pushHoliday(map, dateKeyFromParts(year, 11, 11), 'Veterans Day');
+  const thanksgiving = nthWeekdayOfMonth(year, 11, 4, 4);
+  pushHoliday(map, thanksgiving, 'Thanksgiving');
+  pushHoliday(map, addHolidayDays(thanksgiving, 1), 'Black Friday');
+  pushHoliday(map, dateKeyFromParts(year, 12, 24), 'Christmas Eve');
+  pushHoliday(map, dateKeyFromParts(year, 12, 25), 'Christmas Day');
+  pushHoliday(map, dateKeyFromParts(year, 12, 31), "New Year's Eve");
+
+  Object.entries(MANUAL_HOLIDAYS_BY_YEAR[year] || {}).forEach(([dateKey, labels]) => {
+    labels.forEach(label => pushHoliday(map, dateKey, label));
+  });
+  return map;
+}
+
+function getHolidayLabels(dateKey) {
+  const year = Number(String(dateKey || '').slice(0, 4));
+  if (!year) return [];
+  return getHolidayMapForYear(year).get(dateKey) || [];
+}
+
+function HolidayText({ date }) {
+  const holidays = getHolidayLabels(date);
+  if (!holidays.length) return null;
+  return (
+    <div className="mb-1 space-y-0.5 text-[10px] font-semibold italic leading-tight text-zinc-500" title={holidays.join(', ')}>
+      {holidays.map(label => <div key={label} className="truncate">{label}</div>)}
+    </div>
+  );
 }
 
 function todayKey() {
@@ -1602,8 +1725,48 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => isDateInEventRange(e, date)); return <div key={date} onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }} title="Double-click to add an event" className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onDoubleClick={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onClick(event); }} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.localBackupOnly ? '⚠ ' : ''}{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
+  return (
+    <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4">
+      <div className="min-w-[760px] sm:min-w-0">
+        <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}
+        </div>
+        <div className="mt-2 grid grid-cols-7 gap-2">
+          {Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}
+          {Array.from({ length: totalDays }, (_, i) => i + 1).map(day => {
+            const date = `${month}-${String(day).padStart(2,'0')}`;
+            const dayEvents = events.filter(e => isDateInEventRange(e, date));
+            return (
+              <div
+                key={date}
+                onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
+                title="Double-click to add an event"
+                className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}
+              >
+                <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button>
+                <HolidayText date={date} />
+                <div className="space-y-1.5">
+                  {dayEvents.map(event => (
+                    <button
+                      key={event.id}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); onClick(event); }}
+                      className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                    >
+                      {event.localBackupOnly ? '⚠ ' : ''}{event.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}
+    </div>
+  );
 }
+
 
 
 const ROLLOUT_EVENT_TYPES = new Set([
@@ -1844,7 +2007,10 @@ function WeekView({ events, selectedDate, onClick }) {
           return (
             <section key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-4 shadow-sm">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-zinc-900">{formatDate(date)}</h3>
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-900">{formatDate(date)}</h3>
+                  <HolidayText date={date} />
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Pill className="border-zinc-200 bg-cream text-zinc-600">{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Pill>
                   {dayRollouts ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{dayRollouts} rollout{dayRollouts === 1 ? '' : 's'}</Pill> : null}
@@ -1891,10 +2057,17 @@ function WeekView({ events, selectedDate, onClick }) {
 
 function DayView({ events, onClick, selectedDate }) {
   const dayEvents = events.filter(event => isDateInEventRange(event, selectedDate));
-  if (!dayEvents.length) return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">No events scheduled for {formatDate(selectedDate)} yet.</div>;
+  if (!dayEvents.length) return (
+    <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">
+      <div className="mb-2 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</div>
+      <HolidayText date={selectedDate} />
+      <div>No events scheduled yet.</div>
+    </div>
+  );
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</h2>
+      <h2 className="mb-1 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</h2>
+      <HolidayText date={selectedDate} />
       <div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div>
     </div>
   );
