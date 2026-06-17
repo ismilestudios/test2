@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '0.99.3';
+const SCHEDULER_VERSION = '0.99.4';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -5323,14 +5323,14 @@ export default function SchedulerApp() {
   const canEditScheduler = isAdminUser || normalizedCurrentUserRole === 'photographer';
   const visibleTabs = useMemo(() => tabs.filter(tab => {
     if (tab === 'Admin') return isAdminUser;
-    if (tab === 'Team Members') return !isAssistantUser;
+    if (tab === 'Team Members') return Boolean(authEmail) && !isAssistantUser;
     if (tab === 'Schedule Live!') return !isAssistantUser;
     return true;
-  }), [isAdminUser, isAssistantUser]);
+  }), [authEmail, isAdminUser, isAssistantUser]);
 
   useEffect(() => {
-    if ((!isAdminUser && activeTab === 'Admin') || (isAssistantUser && ['Team Members', 'Schedule Live!'].includes(activeTab))) setActiveTab('Calendar View');
-  }, [isAdminUser, activeTab]);
+    if ((!isAdminUser && activeTab === 'Admin') || (!authEmail && activeTab === 'Team Members') || (isAssistantUser && ['Team Members', 'Schedule Live!'].includes(activeTab))) setActiveTab('Calendar View');
+  }, [authEmail, isAdminUser, isAssistantUser, activeTab]);
 
   const overviewPeriodEvents = useMemo(() => {
     if (overviewMode === 'Month') return queryFilteredEvents.filter(event => event && monthKey(event.date) <= month && monthKey(event.endDate || event.date) >= month);
@@ -5386,7 +5386,7 @@ export default function SchedulerApp() {
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} />}
-          {activeTab === 'Team Members' && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
+          {activeTab === 'Team Members' && authEmail && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
           {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
