@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.03';
+const SCHEDULER_VERSION = '1.04';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -396,7 +396,8 @@ function CalendarColorKey() {
     ['Rain Date', TYPE_COLORS['Rain Date']],
     ['Seniors', TYPE_COLORS.Seniors],
     ['Call or Meeting', TYPE_COLORS['Call or Meeting']],
-    ['Edit Day', TYPE_COLORS['Edit Day']]
+    ['Edit Day', TYPE_COLORS['Edit Day']],
+    ['Time Off', TYPE_COLORS['Time Off']]
   ];
 
   return (
@@ -1770,6 +1771,11 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
 
 
 
+function isTimeOffEvent(eventOrType = {}) {
+  const type = typeof eventOrType === 'string' ? eventOrType : eventOrType?.type;
+  return String(type || '').trim().toLowerCase() === 'time off';
+}
+
 const ROLLOUT_EVENT_TYPES = new Set([
   'Fall Picture Day',
   'Spring Picture Day',
@@ -1790,6 +1796,7 @@ function isNonRolloutOperationalEvent(event = {}) {
     type === 'call or meeting' ||
     type === 'edit day' ||
     type === 'photo booth' ||
+    type === 'time off' ||
     /\b(call|meeting|huddle|interview|training|edit day|editing day|in-studio|in studio|do not book|hold)\b/.test(title) ||
     /photo\s*booth/.test(title)
   );
@@ -1820,6 +1827,7 @@ function parseRequiredAssistantCountFromTitle(title = '') {
 }
 
 function getRequiredPhotographerCount(event = {}) {
+  if (isTimeOffEvent(event)) return 0;
   const explicit = Number(event.requiredPhotographers ?? event.required_photographers);
   if (Number.isFinite(explicit) && explicit > 0) return Math.max(1, Math.min(6, explicit));
   return Math.max(1, parseRequiredPhotographerCountFromTitle(event.title), getAssignedPhotographerCount(event));
@@ -2596,6 +2604,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
 
   const schoolOptions = useMemo(() => SCHOOLS.map(school => school.name).sort((a, b) => a.localeCompare(b)), []);
   const matchedSchool = useMemo(() => SCHOOLS.find(school => school.name.toLowerCase() === schoolName.trim().toLowerCase()), [schoolName]);
+  const isTimeOff = isTimeOffEvent(eventType);
 
   const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
   const save = async () => {
@@ -2604,36 +2613,41 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
     setError('');
 
     const cleanName = schoolName.trim();
-    const cleanTitle = title.trim() || (cleanName ? `${cleanName} ${eventType}` : eventType);
+    const cleanTitle = title.trim() || (isTimeOff ? 'Time Off' : (cleanName ? `${cleanName} ${eventType}` : eventType));
     const cleanEndDate = isTwoDay ? (endDate || addDays(date, 1)) : '';
     if (isTwoDay && cleanEndDate < date) {
       setError('End date must be the same as or after the first date.');
       setSaving(false);
       return;
     }
+    const cleanPhotographers = isTimeOff ? [] : selectedPhotographers;
+    const cleanAssistants = isTimeOff || noAssistant ? [] : selectedAssistants;
+    const cleanRequiredPhotographers = isTimeOff ? 0 : (Number(requiredPhotographers) || 1);
+    const cleanRequiredAssistants = isTimeOff ? 0 : (noAssistant ? 0 : Number(requiredAssistants) || 0);
+
     const event = {
       id: isDuplicate ? `custom-${Date.now()}` : (initialEvent?.id || `custom-${Date.now()}`),
       supabaseId: isDuplicate ? undefined : initialEvent?.supabaseId,
       date,
       endDate: cleanEndDate || null,
       title: cleanTitle,
-      canonicalSchool: cleanName || '',
+      canonicalSchool: isTimeOff ? '' : (cleanName || ''),
       type: eventType,
-      status: selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned',
-      photographers: selectedPhotographers,
-      assistants: noAssistant ? [] : selectedAssistants,
-      requiredPhotographers: Number(requiredPhotographers) || 1,
-      requiredAssistants: noAssistant ? 0 : Number(requiredAssistants) || 0,
-      noAssistant,
+      status: isTimeOff || cleanPhotographers.length >= Math.max(1, cleanRequiredPhotographers) ? 'Scheduled' : 'Needs Photographers Assigned',
+      photographers: cleanPhotographers,
+      assistants: cleanAssistants,
+      requiredPhotographers: cleanRequiredPhotographers,
+      requiredAssistants: cleanRequiredAssistants,
+      noAssistant: isTimeOff ? true : noAssistant,
       features: [],
-      irm: matchedSchool?.irm || null,
-      arrivalTime: arrivalTime || '',
-      time: startTime || 'TBD',
+      irm: isTimeOff ? null : (matchedSchool?.irm || null),
+      arrivalTime: isTimeOff ? '' : (arrivalTime || ''),
+      time: isTimeOff ? 'TBD' : (startTime || 'TBD'),
       notes: notes || '',
       newNote: newNote.trim(),
       noteAttribution,
       rainInfo: '',
-      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
+      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : isTimeOff ? 'Created as a Time Off event.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
     const result = await onSave(event);
     if (result) {
@@ -2672,16 +2686,18 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
                 </div>
                 <input type="date" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
-                <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                <div className="mt-2 text-xs text-zinc-500">When photographers arrive.</div>
-              </label>
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Start Time</div>
-                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                <div className="mt-2 text-xs text-zinc-500">When photographing starts.</div>
-              </label>
+              {!isTimeOff ? (<>
+                <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
+                  <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                  <div className="mt-2 text-xs text-zinc-500">When photographers arrive.</div>
+                </label>
+                <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Start Time</div>
+                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                  <div className="mt-2 text-xs text-zinc-500">When photographing starts.</div>
+                </label>
+              </>) : null}
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4 md:col-span-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Event Type</div>
                 <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4">
@@ -2690,7 +2706,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
               </label>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              {!isTimeOff ? <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account</div>
                 <input
                   list="school-account-options"
@@ -2703,14 +2719,14 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
                   {schoolOptions.map(name => <option key={name} value={name} />)}
                 </datalist>
                 <div className="mt-2 text-xs text-zinc-500">Optional. If left blank, this event will not appear on a School List page.</div>
-              </label>
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              </label> : null}
+              <label className={`rounded-3xl border border-zinc-200 bg-white/70 p-4 ${isTimeOff ? 'md:col-span-2' : ''}`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills if blank" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                {matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
+                {!isTimeOff && matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+            {!isTimeOff ? <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
               <p className="mt-1 text-xs text-zinc-500">Set how many people this event needs, even if you are not assigning every person yet.</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2727,29 +2743,29 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
                   </select>
                 </label>
               </div>
-            </section>
+            </section> : null}
 
-            <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+            {!isTimeOff ? <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} /> : null}
+            {!isTimeOff ? <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
                 {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
               </div>
-            </section>
+            </section> : null}
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Add New Picture Day Note</div>
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder="Add a new picture day note. Admins can edit prior note entries if details change." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Add Time Off Note' : 'Add New Picture Day Note'}</div>
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder={isTimeOff ? "Optional details for this time off." : "Add a new picture day note. Admins can edit prior note entries if details change."} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(noteAttribution).length})</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Time Off Notes' : 'Picture Day Notes'} ({getNoteHistory(noteAttribution).length})</div>
                 {canEditNotes ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-800">Admin note editing enabled</Pill> : null}
               </div>
               <div className="mt-3"><NoteHistoryList entries={getNoteHistory(noteAttribution)} canEdit={canEditNotes} onEditNote={(noteId, text) => setNoteAttribution(prev => editNoteHistory(prev, noteId, authEmail, text))} /></div>
               {notes ? (
                 <div className="mt-4 rounded-2xl border border-zinc-200 bg-white/70 p-3">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Existing Picture Day Info</div>
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Existing Time Off Info' : 'Existing Picture Day Info'}</div>
                   {canEditNotes ? (
                     <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={8} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
                   ) : (
@@ -4294,7 +4310,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   const createdByLabel = `${addedMeta.name}${addedMeta.addedAt ? ` · ${formatEventMetaDateTime(addedMeta.addedAt)}` : ''}`;
   const editedLabel = editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : '';
 
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-3 grid gap-1 text-xs leading-5 text-zinc-500"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div>{canEditNotes && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1 text-[11px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Edit Picture Day Notes</button> : null}</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-3 grid gap-1 text-xs leading-5 text-zinc-500"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} />{!isTimeOffEvent(event) ? <Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /> : null}</div>{!isTimeOffEvent(event) ? <div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div> : null}<div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />{isTimeOffEvent(event) ? 'Time Off Notes' : 'Picture Day Notes'} ({getNoteHistory(event.noteAttribution).length})</div>{canEditNotes && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1 text-[11px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Edit Picture Day Notes</button> : null}</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -5783,7 +5799,7 @@ export default function SchedulerApp() {
                     <div className="mt-1 text-lg font-black text-zinc-950">Open the live scheduling draft room</div>
                     <div className="mt-1 text-sm font-semibold text-zinc-600">Assign photographers week by week with live rollout counts, host control, Hold, and commentary.</div>
                   </div>
-                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/50 bg-gradient-to-b from-emerald-500 to-emerald-700 px-7 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-emerald-200/70 ring-1 ring-emerald-200/40 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:from-emerald-400 hover:to-emerald-700 active:translate-y-0">Launch Schedule Live!</button>
+                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#AEBB9E] bg-gradient-to-b from-[#EEF5E9] to-[#DDE8D2] px-7 py-3 text-sm font-black uppercase tracking-wide text-zinc-900 shadow-lg shadow-[#DDE8D2]/80 ring-1 ring-white/60 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:from-white hover:to-[#DDE8D2] active:translate-y-0">Launch Schedule Live!</button>
                 </div>
               </div>
             ) : null}
