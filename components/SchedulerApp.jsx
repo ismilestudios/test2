@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.00';
+const SCHEDULER_VERSION = '1.00a';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -99,6 +99,22 @@ function getEventAddedMeta(event = {}) {
       source: 'manual'
     };
   }
+
+  // Some early v1.00 saves recorded the edit metadata but did not yet stamp the
+  // created-by metadata. For manual/app events only, use the first recorded editor
+  // as the best available creator display so brand-new events do not show
+  // "Before We Began Tracking" when the same save path clearly knew the user.
+  const manualSource = ['manual_app', 'app'].includes(String(event.source || '')) || String(event.id || '').startsWith('custom-');
+  if (manualSource) {
+    const editMatches = [...history.matchAll(/\[last_edited_meta name="([^"]*)" email="([^"]*)" at="([^"]*)"\]/g)];
+    if (editMatches.length) {
+      const [, rawName, rawEmail] = editMatches[0];
+      const email = rawEmail || '';
+      const name = rawName || displayNameFromEmail(email || '');
+      return { name: name || 'Before We Began Tracking', email, addedAt: event.createdAt || '', source: 'manual-inferred' };
+    }
+  }
+
   if (event.source === 'google_calendar_import') {
     return { name: 'Google Calendar Import', email: '', addedAt: event.createdAt || '', source: 'import' };
   }
@@ -525,7 +541,9 @@ function displayPhotographerAssignment(event) {
 
 function isNeedsPhotographerAssignment(event) {
   const status = String(event?.status || '').trim().toLowerCase();
-  const photographers = Array.isArray(event?.photographers) ? event.photographers.filter(Boolean) : [];
+  if (status === 'schedule live complete') return false;
+  const assignedCount = getAssignedPhotographerCount(event);
+  const requiredCount = getRequiredPhotographerCount(event);
   const placeholderStatuses = new Set([
     '',
     'needs photographer assigned',
@@ -538,7 +556,7 @@ function isNeedsPhotographerAssignment(event) {
     'photographer unassigned'
   ]);
 
-  return photographers.length === 0 || placeholderStatuses.has(status);
+  return assignedCount < requiredCount || placeholderStatuses.has(status);
 }
 
 function displayAssistants(event) {
@@ -601,6 +619,7 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+            <span className="font-semibold text-zinc-600">{formatDate(event.date)}</span>
             <span>{getEventTimeLabel(event)}</span>
             {event.canonicalSchool ? <span className="truncate">{event.canonicalSchool}</span> : null}
           </div>
@@ -987,6 +1006,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
 
 const SCHEDULE_LIVE_SESSION_ID = 'main';
 const SCHEDULE_LIVE_HOLD_STATUS = 'Hold! Needs Discussion Later';
+const SCHEDULE_LIVE_COMPLETE_STATUS = 'Schedule Live Complete';
 const SCHEDULE_LIVE_COMMENTARY_RETENTION_DAYS = 15;
 
 function getCleanScheduleLiveCommentary(commentary = []) {
@@ -1048,7 +1068,7 @@ function getScheduleLiveMonthEvents(events, weekStart) {
 function getScheduleLiveProgress(events, weekStart) {
   const monthEvents = getScheduleLiveMonthEvents(events, weekStart);
   const total = monthEvents.length;
-  const assigned = monthEvents.filter(event => getAssignedPhotographerCount(event) > 0).length;
+  const assigned = monthEvents.filter(event => event.status === SCHEDULE_LIVE_COMPLETE_STATUS || eventMeetsPhotographerRequirement(event)).length;
   const pct = total ? Math.round((assigned / total) * 100) : 0;
   return { total, assigned, pct };
 }
@@ -1097,10 +1117,11 @@ function getMakeupSourcePictureDay(event, events) {
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0] || null;
 }
 
-function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onAssignPhotographer, onRemovePhotographer, onToggleHold, onUpdateRequirements, canEdit = true, draggedPhotographer, setDraggedPhotographer }) {
+function ScheduleLiveEventCard({ event, events, photographers, assistants = [], onClickEvent, onAssignPhotographer, onRemovePhotographer, onAssignAssistant, onRemoveAssistant, onToggleHold, onToggleComplete, onUpdateRequirements, canEdit = true, draggedPhotographer, setDraggedPhotographer }) {
   const [expandedInfo, setExpandedInfo] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState(false);
   const assigned = uniqueCanonicalPhotographers(event.photographers || []);
+  const assignedAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
   const requiredPhotographers = getRequiredPhotographerCount(event);
   const requiredAssistants = getRequiredAssistantCount(event);
   const needsMorePhotographers = assigned.length < requiredPhotographers;
@@ -1108,10 +1129,18 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
   const makeupSource = getMakeupSourcePictureDay(event, events);
   const makeupPhotographers = uniqueCanonicalPhotographers(makeupSource?.photographers || []);
   const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
+  const isMarkedComplete = event.status === SCHEDULE_LIVE_COMPLETE_STATUS;
+  const isAutoComplete = eventMeetsPhotographerRequirement(event) && requiredAssistants >= 0 && !isHeld;
+  const isComplete = isMarkedComplete || isAutoComplete;
 
   const assign = (name) => {
     if (!canEdit || !name) return;
     onAssignPhotographer(event, canonicalPhotographerName(name));
+  };
+
+  const assignAssistant = (name) => {
+    if (!canEdit || !name) return;
+    onAssignAssistant?.(event, name);
   };
 
   return (
@@ -1119,9 +1148,10 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
       layout
       onDragOver={(e) => { if (canEdit && draggedPhotographer) e.preventDefault(); }}
       onDrop={(e) => { e.preventDefault(); if (draggedPhotographer) assign(draggedPhotographer); setDraggedPhotographer?.(''); }}
-      className={`group relative overflow-hidden rounded-2xl border bg-white p-2 text-left shadow-md shadow-zinc-950/10 transition hover:-translate-y-0.5 hover:shadow-xl ${isHeld ? 'border-yellow-300 ring-2 ring-yellow-300/50' : 'border-white/70'}`}
+      className={`group relative overflow-hidden rounded-2xl border bg-white p-2 text-left shadow-md shadow-zinc-950/10 transition hover:-translate-y-0.5 hover:shadow-xl ${isHeld ? 'border-yellow-300 ring-2 ring-yellow-300/50' : isComplete ? 'border-emerald-200 opacity-60 ring-1 ring-emerald-200/70' : 'border-white/70'}`}
     >
       <div className={`absolute inset-x-0 top-0 h-1 ${TYPE_COLORS[event.type] || 'bg-zinc-200'}`} />
+      {isComplete ? <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,transparent_47%,rgba(22,163,74,0.18)_49%,rgba(22,163,74,0.18)_51%,transparent_53%)]" /> : null}
       <div className="pt-1">
         <div className="flex items-start justify-between gap-2">
           <button type="button" onClick={() => onClickEvent(event)} className="min-w-0 text-left text-[13px] font-black leading-tight text-zinc-950 hover:underline">{event.title}</button>
@@ -1141,7 +1171,14 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
             {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
           </span>
         )) : null}
+        {assignedAssistants.length ? assignedAssistants.map(name => (
+          <span key={`assistant-${name}`} className="inline-flex items-center gap-1 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2 py-1 text-[11px] font-bold text-zinc-800">
+            Asst: {name}
+            {canEdit ? <button type="button" onClick={() => onRemoveAssistant?.(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
+          </span>
+        )) : null}
         {needsMorePhotographers ? <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700">Needs {requiredPhotographers - assigned.length} Photographer{requiredPhotographers - assigned.length === 1 ? '' : 's'}</span> : null}
+        {isComplete ? <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700">Complete</span> : null}
       </div>
 
       <div className="mt-2 text-[11px] font-semibold text-zinc-600">
@@ -1166,10 +1203,16 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
       ) : null}
 
       {canEdit ? (
-        <select value="" onChange={(e) => { assign(e.target.value); e.target.value = ''; }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
-          <option value="">Assign photographer...</option>
-          {photographers.map(name => <option key={name} value={name}>{canonicalPhotographerName(name)}</option>)}
-        </select>
+        <div className="mt-2 grid gap-1.5">
+          <select value="" onChange={(e) => { assign(e.target.value); e.target.value = ''; }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
+            <option value="">Assign photographer...</option>
+            {photographers.map(name => <option key={name} value={name}>{canonicalPhotographerName(name)}</option>)}
+          </select>
+          <select value="" onChange={(e) => { assignAssistant(e.target.value); e.target.value = ''; }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
+            <option value="">Assign assistant optional...</option>
+            {assistants.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </div>
       ) : null}
 
       {makeupPhotographers.length ? (
@@ -1184,6 +1227,7 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
         <button type="button" onClick={() => setExpandedHistory(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold text-zinc-700">Past</button>
         <button type="button" onClick={() => setExpandedInfo(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold text-zinc-700">Info</button>
         {canEdit ? <button type="button" onClick={() => onToggleHold(event)} className={`rounded-full border px-2 py-1 text-[10px] font-black ${isHeld ? 'border-yellow-300 bg-yellow-200 text-yellow-950' : 'border-yellow-300 bg-yellow-100 text-yellow-950'}`}>{isHeld ? 'Return' : 'Hold!'}</button> : null}
+        {canEdit ? <button type="button" onClick={() => onToggleComplete?.(event)} className={`rounded-full border px-2 py-1 text-[10px] font-black ${isMarkedComplete ? 'border-emerald-300 bg-emerald-100 text-emerald-900' : 'border-emerald-200 bg-white text-emerald-700'}`}>{isMarkedComplete ? 'Reopen' : 'Done'}</button> : null}
       </div>
 
       <AnimatePresence>
@@ -1203,7 +1247,7 @@ function ScheduleLiveEventCard({ event, events, photographers, onClickEvent, onA
   );
 }
 
-function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, authEmail, isAdminUser, canEdit = true, reloadEvents }) {
+function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent, onSchedule, authEmail, isAdminUser, canEdit = true, reloadEvents }) {
   const [liveState, setLiveState] = useState(() => scheduleLiveDefaultState(todayKey()));
   const [statusMessage, setStatusMessage] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -1334,6 +1378,18 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
     await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
   };
 
+  const assignAssistant = async (event, assistant) => {
+    if (!canEdit || !assistant) return;
+    const nextAssistants = Array.from(new Set([...(event.assistants || []).filter(Boolean), assistant]));
+    await onSchedule({ ...event, assistants: nextAssistants });
+  };
+
+  const removeAssistant = async (event, assistant) => {
+    if (!canEdit) return;
+    const nextAssistants = (event.assistants || []).filter(name => name !== assistant);
+    await onSchedule({ ...event, assistants: nextAssistants });
+  };
+
   const updateRequirements = async (event, counts = {}) => {
     if (!canEdit) return;
     const requiredPhotographers = Math.max(1, Math.min(6, Number(counts.requiredPhotographers ?? getRequiredPhotographerCount(event)) || 1));
@@ -1346,6 +1402,12 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
     if (!canEdit) return;
     const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
     await onSchedule({ ...event, status: isHeld ? (eventMeetsPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
+  };
+
+  const toggleComplete = async (event) => {
+    if (!canEdit) return;
+    const isComplete = event.status === SCHEDULE_LIVE_COMPLETE_STATUS;
+    await onSchedule({ ...event, status: isComplete ? (eventMeetsPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_COMPLETE_STATUS });
   };
 
   const addCommentary = async () => {
@@ -1523,7 +1585,7 @@ function ScheduleLiveView({ events, photographers, onClickEvent, onSchedule, aut
                     <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
                   </div>
                   <div className="space-y-2">
-                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={photographers} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onToggleHold={toggleHold} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
+                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={photographers} assistants={assistants} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onAssignAssistant={assignAssistant} onRemoveAssistant={removeAssistant} onToggleHold={toggleHold} onToggleComplete={toggleComplete} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
                   </div>
                 </div>;
               })}
@@ -1552,11 +1614,25 @@ const ROLLOUT_EVENT_TYPES = new Set([
   'Makeup Day',
   'Rain Date',
   'Family Photos',
-  'Special Event'
+  'Special Event',
+  'Headshots'
 ]);
 
+function isNonRolloutOperationalEvent(event = {}) {
+  const title = String(event.title || '').toLowerCase();
+  const type = String(event.type || '').toLowerCase();
+  return (
+    type === 'call/meeting' ||
+    type === 'call or meeting' ||
+    type === 'edit day' ||
+    type === 'photo booth' ||
+    /\b(call|meeting|huddle|interview|training|edit day|editing day|in-studio|in studio|do not book|hold)\b/.test(title) ||
+    /photo\s*booth/.test(title)
+  );
+}
+
 function isRolloutEvent(event) {
-  return event && ROLLOUT_EVENT_TYPES.has(event.type);
+  return event && ROLLOUT_EVENT_TYPES.has(event.type) && !isNonRolloutOperationalEvent(event);
 }
 
 function getAssignedPhotographerCount(event) {
@@ -3362,7 +3438,10 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       ) : null}
       <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
         <section className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
-          <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
+            <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filtered.length}</Pill>
+          </div>
           <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history. Edits now save to Supabase.</p>
           <div className="mt-4">
             <input
@@ -3519,7 +3598,8 @@ function MobileView({ events, photographers, selectedDate, setSelectedDate, onCl
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">
           <button type="button" onClick={() => move(-1)} className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-bold">Prev</button>
-          <div className="text-center text-sm font-bold text-zinc-900">{viewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : viewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate)}</div>
+          <button type="button" onClick={() => setSelectedDate(todayKey())} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-2 text-sm font-black text-zinc-900">Today</button>
+          <div className="min-w-0 flex-1 text-center text-sm font-bold text-zinc-900">{viewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : viewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate)}</div>
           <button type="button" onClick={() => move(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-bold">Next</button>
         </div>
         <div className="mt-4 space-y-2">
@@ -3553,7 +3633,8 @@ function MobileView({ events, photographers, selectedDate, setSelectedDate, onCl
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">
           <button type="button" onClick={() => movePlainView(-1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Prev</button>
-          <div className="text-center text-xs font-black text-zinc-900">{plainViewLabel}</div>
+          <button type="button" onClick={() => setSelectedDate(todayKey())} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-1.5 text-xs font-black text-zinc-900">Today</button>
+          <div className="min-w-0 flex-1 text-center text-xs font-black text-zinc-900">{plainViewLabel}</div>
           <button type="button" onClick={() => movePlainView(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Next</button>
         </div>
 
@@ -5544,7 +5625,7 @@ export default function SchedulerApp() {
               <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} onPermanentDelete={handlePermanentDeleteEvent} canRestore={isAdminUser} canPermanentDelete={isAdminUser} />
             </div>
           </>}
-          {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} onClickEvent={setSelected} onSchedule={handleScheduleEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
+          {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} />}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} />}
