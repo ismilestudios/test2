@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.09';
+const SCHEDULER_VERSION = '1.10';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -2649,7 +2649,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 }
 
 
-function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null, authEmail = '', canEditNotes = false }) {
+function AddEventModal({ photographers, assistants, events = [], schools = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null, authEmail = '', canEditNotes = false }) {
   const isDuplicate = Boolean(initialEvent && sourceLabel === 'Duplicate Event' && !initialEvent?.supabaseId);
   const isEditing = Boolean(initialEvent?.supabaseId);
   const [date, setDate] = useState(initialEvent?.date || defaultDate);
@@ -2672,8 +2672,16 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const schoolOptions = useMemo(() => SCHOOLS.map(school => school.name).sort((a, b) => a.localeCompare(b)), []);
-  const matchedSchool = useMemo(() => SCHOOLS.find(school => school.name.toLowerCase() === schoolName.trim().toLowerCase()), [schoolName]);
+  const canonicalSchoolOptions = useMemo(() => {
+    const sourceSchools = (schools && schools.length ? schools : SCHOOLS).filter(Boolean);
+    return sourceSchools
+      .filter(school => school.active !== false && !school.mergedInto)
+      .map(school => school.name)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }, [schools]);
+  const schoolOptions = canonicalSchoolOptions;
+  const matchedSchool = useMemo(() => resolveSchoolListMatch(schoolName, (schools && schools.length ? schools : SCHOOLS)) || null, [schoolName, schools]);
 
   const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
   const save = async () => {
@@ -3149,7 +3157,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
           </div>
         </div>
       ) : null}
-      {canEdit && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
+      {canEdit && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} schools={schoolsList} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
       {canEdit && addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={saveSchool} />}
     </div>
   );
@@ -6055,11 +6063,11 @@ export default function SchedulerApp() {
         </section>
       </div>
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} canAdmin={isAdminUser} />
-      {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} authEmail={authEmail} canEditNotes={isAdminUser} />}
+      {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} authEmail={authEmail} canEditNotes={isAdminUser} />}
       {canEditScheduler && quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
       <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} canEdit={canEditScheduler} canEditNotes={isAdminUser} onViewSchool={(schoolName) => { const matchedSchool = resolveSchoolListMatch(schoolName, schools); setSelectedSchoolName(matchedSchool?.name || schoolName); setActiveTab('School List'); setSelected(null); }} />
-      {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
-      {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
+      {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
+      {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
     </main>
   );
 }
