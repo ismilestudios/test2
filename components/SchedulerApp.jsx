@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.08';
+const SCHEDULER_VERSION = '1.09';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -4351,15 +4351,16 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
       <div className="mt-4 space-y-2">
         {modifiedEvents.length ? modifiedEvents.map(event => {
           const edited = getEventLastEditedMeta(event);
-          const editedName = edited?.name || 'Before We Began Tracking';
           const editedAt = edited?.editedAt || event.updatedAt;
+          const editedName = (edited?.name || '').trim();
+          const shouldShowEditor = editedName && editedName !== 'Before We Began Tracking';
           return (
             <button key={event.supabaseId || event.id} type="button" onClick={() => onClick?.(event)} className="block w-full rounded-2xl border border-zinc-200 bg-cream/75 p-3 text-left transition hover:bg-white hover:shadow-sm">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-zinc-950">{event.title}</div>
                   <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
-                  <div className="mt-1 text-xs font-semibold text-zinc-600">Modified {formatEventMetaDateTime(editedAt) || 'recently'} by {editedName}</div>
+                  <div className="mt-1 text-xs font-semibold text-zinc-600">Modified {formatEventMetaDateTime(editedAt) || 'recently'}{shouldShowEditor ? ` by ${editedName}` : ''}</div>
                 </div>
                 <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
               </div>
