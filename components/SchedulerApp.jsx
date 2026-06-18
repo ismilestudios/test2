@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.05';
+const SCHEDULER_VERSION = '1.05a';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -663,7 +663,12 @@ function displayPhotographerAssignment(event) {
   return event.photographers?.length ? event.photographers.join(', ') : 'Needs Photographers Assigned';
 }
 
+function isTimeOffEvent(event = {}) {
+  return String(event?.type || event?.event_type || '').trim().toLowerCase() === 'time off';
+}
+
 function isNeedsPhotographerAssignment(event) {
+  if (isTimeOffEvent(event)) return false;
   const status = String(event?.status || '').trim().toLowerCase();
   if (status === 'schedule live complete') return false;
   const assignedCount = getAssignedPhotographerCount(event);
@@ -1091,7 +1096,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
     {
       key: 'needs-assistant',
       title: 'Need Assistant(s) Assigned',
-      filter: (event) => event.status === 'Scheduled' && !event.noAssistant && (!event.assistants || event.assistants.length === 0)
+      filter: (event) => !isTimeOffEvent(event) && event.status === 'Scheduled' && !event.noAssistant && getRequiredAssistantCount(event) > 0 && (!event.assistants || event.assistants.length === 0)
     },
     {
       key: 'rain-watch',
@@ -1783,11 +1788,6 @@ const ROLLOUT_EVENT_TYPES = new Set([
   'Headshots'
 ]);
 
-function isTimeOffEvent(eventOrType = {}) {
-  const type = typeof eventOrType === 'string' ? eventOrType : eventOrType?.type;
-  return String(type || '').trim().toLowerCase() === 'time off';
-}
-
 function isNonRolloutOperationalEvent(event = {}) {
   const title = String(event.title || '').toLowerCase();
   const type = String(event.type || '').toLowerCase();
@@ -1803,7 +1803,7 @@ function isNonRolloutOperationalEvent(event = {}) {
 }
 
 function isRolloutEvent(event) {
-  return event && !isTimeOffEvent(event) && ROLLOUT_EVENT_TYPES.has(event.type) && !isNonRolloutOperationalEvent(event);
+  return event && ROLLOUT_EVENT_TYPES.has(event.type) && !isNonRolloutOperationalEvent(event);
 }
 
 function getAssignedPhotographerCount(event) {
@@ -1834,7 +1834,6 @@ function getRequiredPhotographerCount(event = {}) {
 }
 
 function getRequiredAssistantCount(event = {}) {
-  if (isTimeOffEvent(event)) return 0;
   if (event.noAssistant) return 0;
   const explicit = Number(event.requiredAssistants ?? event.required_assistants);
   if (Number.isFinite(explicit) && explicit >= 0) return Math.max(0, Math.min(6, explicit));
@@ -2460,11 +2459,6 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
   };
 
   const saveSchedule = async () => {
-    const cleanPhotographers = isTimeOff ? [] : selectedPhotographers;
-    const cleanAssistants = isTimeOff || noAssistant ? [] : selectedAssistants;
-    const cleanRequiredPhotographers = isTimeOff ? 0 : (Number(requiredPhotographers) || 1);
-    const cleanRequiredAssistants = isTimeOff ? 0 : (noAssistant ? 0 : Number(requiredAssistants) || 0);
-
     const event = {
       id: `2026-${school.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
       date,
@@ -2538,7 +2532,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
               </div>
             </div>
 
-            {!isTimeOff ? <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
               <p className="mt-1 text-xs text-zinc-500">Set how many people this event needs, even if you are not assigning every person yet.</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2555,9 +2549,9 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
                   </select>
                 </label>
               </div>
-            </section> : null}
+            </section>
 
-            {!isTimeOff ? <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={school.name} />
+            <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={school.name} />
 
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
@@ -2597,6 +2591,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
   const [title, setTitle] = useState(initialEvent?.title || '');
   const [schoolName, setSchoolName] = useState(initialEvent?.canonicalSchool || '');
   const [eventType, setEventType] = useState(initialEvent?.type || 'Fall Picture Day');
+  const isTimeOff = eventType === 'Time Off';
   const [selectedPhotographers, setSelectedPhotographers] = useState(initialEvent?.photographers || []);
   const [selectedAssistants, setSelectedAssistants] = useState(initialEvent?.assistants || []);
   const [requiredPhotographers, setRequiredPhotographers] = useState(getRequiredPhotographerCount(initialEvent || { title: initialEvent?.title || '' }));
@@ -2610,7 +2605,6 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
 
   const schoolOptions = useMemo(() => SCHOOLS.map(school => school.name).sort((a, b) => a.localeCompare(b)), []);
   const matchedSchool = useMemo(() => SCHOOLS.find(school => school.name.toLowerCase() === schoolName.trim().toLowerCase()), [schoolName]);
-  const isTimeOff = isTimeOffEvent(eventType);
 
   const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
   const save = async () => {
@@ -2618,32 +2612,27 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
     setSaving(true);
     setError('');
 
-    const cleanName = schoolName.trim();
-    const cleanTitle = title.trim() || (isTimeOff ? 'Time Off' : (cleanName ? `${cleanName} ${eventType}` : eventType));
+    const cleanName = isTimeOff ? '' : schoolName.trim();
+    const cleanTitle = title.trim() || (cleanName ? `${cleanName} ${eventType}` : eventType);
     const cleanEndDate = isTwoDay ? (endDate || addDays(date, 1)) : '';
     if (isTwoDay && cleanEndDate < date) {
       setError('End date must be the same as or after the first date.');
       setSaving(false);
       return;
     }
-    const cleanPhotographers = isTimeOff ? [] : selectedPhotographers;
-    const cleanAssistants = isTimeOff || noAssistant ? [] : selectedAssistants;
-    const cleanRequiredPhotographers = isTimeOff ? 0 : (Number(requiredPhotographers) || 1);
-    const cleanRequiredAssistants = isTimeOff ? 0 : (noAssistant ? 0 : Number(requiredAssistants) || 0);
-
     const event = {
       id: isDuplicate ? `custom-${Date.now()}` : (initialEvent?.id || `custom-${Date.now()}`),
       supabaseId: isDuplicate ? undefined : initialEvent?.supabaseId,
       date,
       endDate: cleanEndDate || null,
       title: cleanTitle,
-      canonicalSchool: isTimeOff ? '' : (cleanName || ''),
+      canonicalSchool: cleanName || '',
       type: eventType,
-      status: isTimeOff || cleanPhotographers.length >= Math.max(1, cleanRequiredPhotographers) ? 'Scheduled' : 'Needs Photographers Assigned',
-      photographers: cleanPhotographers,
-      assistants: cleanAssistants,
-      requiredPhotographers: cleanRequiredPhotographers,
-      requiredAssistants: cleanRequiredAssistants,
+      status: isTimeOff ? 'Scheduled' : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned'),
+      photographers: isTimeOff ? [] : selectedPhotographers,
+      assistants: isTimeOff || noAssistant ? [] : selectedAssistants,
+      requiredPhotographers: isTimeOff ? 0 : (Number(requiredPhotographers) || 1),
+      requiredAssistants: isTimeOff || noAssistant ? 0 : (Number(requiredAssistants) || 0),
       noAssistant: isTimeOff ? true : noAssistant,
       features: [],
       irm: isTimeOff ? null : (matchedSchool?.irm || null),
@@ -2653,7 +2642,7 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
       newNote: newNote.trim(),
       noteAttribution,
       rainInfo: '',
-      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : isTimeOff ? 'Created as a Time Off event.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
+      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : isTimeOff ? 'Created from Add Event as Time Off.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
     const result = await onSave(event);
     if (result) {
@@ -2692,18 +2681,20 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
                 </div>
                 <input type="date" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
-              {!isTimeOff ? (<>
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
-                <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                <div className="mt-2 text-xs text-zinc-500">When photographers arrive.</div>
-              </label>
-              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Start Time</div>
-                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                <div className="mt-2 text-xs text-zinc-500">When photographing starts.</div>
-              </label>
-              </>) : null}
+              {!isTimeOff ? (
+                <>
+                  <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
+                    <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                    <div className="mt-2 text-xs text-zinc-500">When photographers arrive.</div>
+                  </label>
+                  <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Start Time</div>
+                    <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                    <div className="mt-2 text-xs text-zinc-500">When photographing starts.</div>
+                  </label>
+                </>
+              ) : null}
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4 md:col-span-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Event Type</div>
                 <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4">
@@ -2712,66 +2703,72 @@ function AddEventModal({ photographers, assistants, events = [], onClose, onSave
               </label>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {!isTimeOff ? <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account</div>
-                <input
-                  list="school-account-options"
-                  value={schoolName}
-                  onChange={(e) => { setSchoolName(e.target.value); setError(''); }}
-                  placeholder="Optional — select or type school/account name"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4"
-                />
-                <datalist id="school-account-options">
-                  {schoolOptions.map(name => <option key={name} value={name} />)}
-                </datalist>
-                <div className="mt-2 text-xs text-zinc-500">Optional. If left blank, this event will not appear on a School List page.</div>
-              </label> : null}
+              {!isTimeOff ? (
+                <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account</div>
+                  <input
+                    list="school-account-options"
+                    value={schoolName}
+                    onChange={(e) => { setSchoolName(e.target.value); setError(''); }}
+                    placeholder="Optional — select or type school/account name"
+                    className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4"
+                  />
+                  <datalist id="school-account-options">
+                    {schoolOptions.map(name => <option key={name} value={name} />)}
+                  </datalist>
+                  <div className="mt-2 text-xs text-zinc-500">Optional. If left blank, this event will not appear on a School List page.</div>
+                </label>
+              ) : null}
               <label className={`rounded-3xl border border-zinc-200 bg-white/70 p-4 ${isTimeOff ? 'md:col-span-2' : ''}`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills if blank" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTimeOff ? "Example: Beth PTO" : "Optional — auto-fills if blank"} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
                 {!isTimeOff && matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
-            {!isTimeOff ? <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
-              <p className="mt-1 text-xs text-zinc-500">Set how many people this event needs, even if you are not assigning every person yet.</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="rounded-2xl border border-zinc-200 bg-white p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Photographers Required</div>
-                  <select value={requiredPhotographers} onChange={(e) => setRequiredPhotographers(Number(e.target.value))} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
-                    {[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
-                  </select>
-                </label>
-                <label className="rounded-2xl border border-zinc-200 bg-white p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants Needed</div>
-                  <select value={noAssistant ? 0 : requiredAssistants} onChange={(e) => { const count = Number(e.target.value); setRequiredAssistants(count); setNoAssistant(count === 0); if (count === 0) setSelectedAssistants([]); }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
-                    {[0,1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
-                  </select>
-                </label>
-              </div>
-            </section> : null}
+            {!isTimeOff ? (
+              <>
+                <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                  <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
+                  <p className="mt-1 text-xs text-zinc-500">Set how many people this event needs, even if you are not assigning every person yet.</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="rounded-2xl border border-zinc-200 bg-white p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Photographers Required</div>
+                      <select value={requiredPhotographers} onChange={(e) => setRequiredPhotographers(Number(e.target.value))} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
+                        {[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
+                      </select>
+                    </label>
+                    <label className="rounded-2xl border border-zinc-200 bg-white p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants Needed</div>
+                      <select value={noAssistant ? 0 : requiredAssistants} onChange={(e) => { const count = Number(e.target.value); setRequiredAssistants(count); setNoAssistant(count === 0); if (count === 0) setSelectedAssistants([]); }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
+                        {[0,1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                </section>
 
-            {!isTimeOff ? <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} /> : null}
-            {!isTimeOff ? <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
-                {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
-              </div>
-            </section> : null}
+                <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
+                <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                  <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
+                    {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
+                  </div>
+                </section>
+              </>
+            ) : null}
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Add Time Off Note' : 'Add New Picture Day Note'}</div>
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder={isTimeOff ? "Optional details for this time off." : "Add a new picture day note. Admins can edit prior note entries if details change."} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Time Off Notes' : 'Add New Picture Day Note'}</div>
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder={isTimeOff ? 'Optional details about this time off.' : 'Add a new picture day note. Admins can edit prior note entries if details change.'} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Time Off Notes' : 'Picture Day Notes'} ({getNoteHistory(noteAttribution).length})</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(noteAttribution).length})</div>
                 {canEditNotes ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-800">Admin note editing enabled</Pill> : null}
               </div>
               <div className="mt-3"><NoteHistoryList entries={getNoteHistory(noteAttribution)} canEdit={canEditNotes} onEditNote={(noteId, text) => setNoteAttribution(prev => editNoteHistory(prev, noteId, authEmail, text))} /></div>
               {notes ? (
                 <div className="mt-4 rounded-2xl border border-zinc-200 bg-white/70 p-3">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Existing Time Off Info' : 'Existing Picture Day Info'}</div>
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Existing Picture Day Info</div>
                   {canEditNotes ? (
                     <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={8} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
                   ) : (
@@ -4309,7 +4306,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   const createdByLabel = `${addedMeta.name}${addedMeta.addedAt ? ` · ${formatEventMetaDateTime(addedMeta.addedAt)}` : ''}`;
   const editedLabel = editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : '';
 
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-3 grid gap-1 text-xs leading-5 text-zinc-500"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} />{!isTimeOffEvent(event) ? <Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /> : null}</div>{!isTimeOffEvent(event) ? <div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div> : null}<div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />{isTimeOffEvent(event) ? 'Time Off Notes' : 'Picture Day Notes'} ({getNoteHistory(event.noteAttribution).length})</div>{canEditNotes && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1 text-[11px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Edit Picture Day Notes</button> : null}</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-3 grid gap-1 text-xs leading-5 text-zinc-500"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div>{canEditNotes && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1 text-[11px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Edit Picture Day Notes</button> : null}</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -5737,7 +5734,7 @@ export default function SchedulerApp() {
       id: `custom-${Date.now()}`,
       supabaseId: undefined,
       source: 'manual_app',
-      status: isTimeOffEvent(event) || event.photographers?.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      status: event.photographers?.length ? 'Scheduled' : 'Needs Photographers Assigned',
       history: [event.history, `Duplicated from ${event.title || 'event'} on ${formatDate(todayKey())}.`].filter(Boolean).join('\n\n')
     };
     setDuplicatingEvent(duplicate);
