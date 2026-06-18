@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.06b';
+const SCHEDULER_VERSION = '1.07';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -711,6 +711,63 @@ function normalizeSchoolLookupKey(value = '') {
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+function normalizeSchoolMatchKey(value = '') {
+  return normalizeSchoolLookupKey(value)
+    .replace(/\bmiddle school and high school\b/g, 'ms hs')
+    .replace(/\bmiddle and high school\b/g, 'ms hs')
+    .replace(/\bmiddle school high school\b/g, 'ms hs')
+    .replace(/\bmiddle high school\b/g, 'ms hs')
+    .replace(/\bmiddle school\b/g, 'ms')
+    .replace(/\bhigh school\b/g, 'hs')
+    .replace(/\belementary school\b/g, 'elem')
+    .replace(/\belementary\b/g, 'elem')
+    .replace(/\band\b/g, '')
+    .replace(/\bschool\b/g, '')
+    .replace(/\bdistrict\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resolveSchoolListMatch(schoolName = '', schools = []) {
+  const target = normalizeSchoolMatchKey(schoolName);
+  if (!target) return null;
+
+  const activeSchools = (schools || []).filter(school => school && school.active !== false && !school.mergedInto);
+  const exact = activeSchools.find(school =>
+    normalizeSchoolLookupKey(school.name) === normalizeSchoolLookupKey(schoolName) ||
+    normalizeSchoolLookupKey(school.originalName || '') === normalizeSchoolLookupKey(schoolName)
+  );
+  if (exact) return exact;
+
+  const normalizedExact = activeSchools.find(school => {
+    const keys = [school.name, school.originalName, ...(school.mergedFrom || [])].filter(Boolean).map(normalizeSchoolMatchKey);
+    return keys.includes(target);
+  });
+  if (normalizedExact) return normalizedExact;
+
+  const candidates = activeSchools
+    .map(school => {
+      const keys = [school.name, school.originalName, ...(school.mergedFrom || [])].filter(Boolean).map(normalizeSchoolMatchKey);
+      const bestScore = keys.reduce((score, key) => {
+        if (!key) return score;
+        if (key === target) return Math.max(score, 100);
+        if (key.includes(target) || target.includes(key)) return Math.max(score, Math.min(key.length, target.length));
+        const targetParts = target.split(' ').filter(Boolean);
+        const keyParts = key.split(' ').filter(Boolean);
+        const overlap = targetParts.filter(part => keyParts.includes(part)).length;
+        return Math.max(score, overlap);
+      }, 0);
+      return { school, score: bestScore };
+    })
+    .filter(item => item.score >= 2)
+    .sort((a, b) => b.score - a.score || a.school.name.localeCompare(b.school.name));
+
+  if (!candidates.length) return null;
+  const [best, second] = candidates;
+  if (!second || best.score > second.score) return best.school;
+  return best.school;
 }
 
 const SCHOOL_IRM_LOOKUP = new Map(
@@ -3575,7 +3632,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     .sort((a, b) => a.name.localeCompare(b.name)), [events, schools, mergedSourcesByTarget]);
 
   const filtered = q ? activeSchools.filter(school => [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : activeSchools;
-  const selected = activeSchools.find(school => school.name === selectedName || school.originalName === selectedName) || filtered[0] || null;
+  const selected = activeSchools.find(school => school.name === selectedName || school.originalName === selectedName) || resolveSchoolListMatch(selectedName, activeSchools) || filtered[0] || null;
 
   const saveSchool = async (originalName, values) => {
     const supabase = createClient();
@@ -5890,7 +5947,7 @@ export default function SchedulerApp() {
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} canAdmin={isAdminUser} />
       {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} authEmail={authEmail} canEditNotes={isAdminUser} />}
       {canEditScheduler && quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
-      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} canEdit={canEditScheduler} canEditNotes={isAdminUser} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
+      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} canEdit={canEditScheduler} canEditNotes={isAdminUser} onViewSchool={(schoolName) => { const matchedSchool = resolveSchoolListMatch(schoolName, schools); setSelectedSchoolName(matchedSchool?.name || schoolName); setActiveTab('School List'); setSelected(null); }} />
       {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
       {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
     </main>
