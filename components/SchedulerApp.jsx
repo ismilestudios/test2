@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.06';
+const SCHEDULER_VERSION = '1.06a';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -3111,6 +3111,8 @@ function EditSchoolModal({ school, onClose, onSave }) {
   const [contactEmail, setContactEmail] = useState(school?.contactEmail || '');
   const [contactTitle, setContactTitle] = useState(school?.contactTitle || '');
   const [newNote, setNewNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
   const [referenceImages, setReferenceImages] = useState(school?.referenceImages || []);
   const [noFallSchedulingFall2026, setNoFallSchedulingFall2026] = useState(Boolean(school?.noFallSchedulingFall2026));
 
@@ -3126,6 +3128,8 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setContactEmail(school?.contactEmail || '');
     setContactTitle(school?.contactTitle || '');
     setNewNote('');
+    setSaveStatus('');
+    setSaving(false);
     setReferenceImages(school?.referenceImages || []);
     setNoFallSchedulingFall2026(Boolean(school?.noFallSchedulingFall2026));
   }, [school]);
@@ -3160,25 +3164,42 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setReferenceImages(prev => prev.filter(image => image.id !== id));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const cleanName = name.trim();
-    if (!cleanName) return;
-    onSave(school.originalName || school.name, {
-      name: cleanName,
-      irm: irm === '' ? null : Number(irm),
-      address,
-      city,
-      stateZip,
-      contactFirst,
-      contactLast,
-      contactPhone,
-      contactEmail,
-      contactTitle,
-      notes: school.notes || '',
-      newNote: newNote.trim(),
-      referenceImages,
-      noFallSchedulingFall2026
-    });
+    if (!cleanName || saving) return;
+    setSaving(true);
+    setSaveStatus('Saving school changes…');
+    try {
+      const result = await onSave(school.originalName || school.name, {
+        id: school.id,
+        originalName: school.originalName || school.name,
+        name: cleanName,
+        irm: irm === '' ? null : Number(irm),
+        address,
+        city,
+        stateZip,
+        contactFirst,
+        contactLast,
+        contactPhone,
+        contactEmail,
+        contactTitle,
+        notes: school.notes || '',
+        newNote: newNote.trim(),
+        referenceImages,
+        noFallSchedulingFall2026
+      });
+      if (result === false) {
+        setSaveStatus('Save failed. Check the message on the School List page.');
+        setSaving(false);
+        return;
+      }
+      setSaveStatus('Saved.');
+    } catch (error) {
+      const message = error?.message || 'Unknown save error.';
+      setSaveStatus(`Save failed: ${message}`);
+      if (typeof window !== 'undefined') window.alert(`Could not save school: ${message}`);
+      setSaving(false);
+    }
   };
 
   return (
@@ -3270,9 +3291,10 @@ function EditSchoolModal({ school, onClose, onSave }) {
             ) : <div className="mt-3 text-xs text-zinc-400">No reference images yet.</div>}
           </div>
         </div>
+        {saveStatus ? <div className="mt-4 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/50 px-3 py-2 text-sm font-semibold text-zinc-800">{saveStatus}</div> : null}
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">Cancel</button>
-          <button onClick={handleSave} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">Save Changes</button>
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+          <button type="button" onClick={handleSave} disabled={saving} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : 'Save Changes'}</button>
         </div>
       </motion.div>
     </motion.div>
@@ -3551,11 +3573,17 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   const saveSchool = async (originalName, values) => {
     const supabase = createClient();
     if (!hasSupabaseEnv() || !supabase) {
-      setMessage('Supabase is not connected yet. School edits cannot be saved.');
-      return;
+      const msg = 'Supabase is not connected yet. School edits cannot be saved.';
+      setMessage(msg);
+      if (typeof window !== 'undefined') window.alert(msg);
+      return false;
     }
 
-    const previous = (schools || []).find(school => (school.originalName || school.name) === originalName) || {};
+    try {
+      const previous = (schools || []).find(school =>
+        (values?.id && school.id === values.id) ||
+        (school.originalName || school.name) === originalName
+      ) || {};
     const newNote = String(values.newNote || '').trim();
     const { newNote: _discardNewNote, ...cleanValues } = values;
     const nextSchool = {
@@ -3583,18 +3611,30 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     const { data, error } = result;
 
     if (error) {
-      setMessage(`Could not save school: ${error.message}`);
-      return;
+      const msg = `Could not save school: ${error.message}`;
+      setMessage(msg);
+      if (typeof window !== 'undefined') window.alert(msg);
+      return false;
     }
 
     const savedSchool = supabaseRowToSchool(data);
     setSchools(prev => {
-      const without = (prev || []).filter(school => (school.originalName || school.name) !== originalName);
+      const without = (prev || []).filter(school => {
+        if (savedSchool.id && school.id) return school.id !== savedSchool.id;
+        return (school.originalName || school.name) !== originalName;
+      });
       return [...without, savedSchool].sort((a, b) => a.name.localeCompare(b.name));
     });
     setSelectedName(savedSchool.name || originalName);
     setEditingSchool(null);
     setMessage('School changes saved to Supabase.');
+    return true;
+    } catch (error) {
+      const msg = `Could not save school: ${error?.message || 'Unknown error'}`;
+      setMessage(msg);
+      if (typeof window !== 'undefined') window.alert(msg);
+      return false;
+    }
   };
 
   const mergeSchool = async (sourceOriginalName, targetOriginalName) => {
