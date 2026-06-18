@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.05a';
+const SCHEDULER_VERSION = '1.06';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -250,6 +250,18 @@ function appendNoteHistory(attribution, email, text) {
     savedAt: now.toISOString()
   };
   return { ...previous, history: [entry, ...history] };
+}
+
+
+function appendPlainSchoolNote(existingNotes, email, text) {
+  const cleanText = String(text || '').trim();
+  const existing = String(existingNotes || '').trim();
+  if (!cleanText) return existing;
+  const now = new Date();
+  const who = displayNameFromEmail(email);
+  const stamp = `${who} • ${formatAttributionTime(now.toISOString())} ${formatShortAttributionDate(now.toISOString())}`.trim();
+  const block = `[${stamp}]\n${cleanText}`;
+  return [existing, block].filter(Boolean).join('\n\n');
 }
 
 function editNoteHistory(attribution, noteId, email, text) {
@@ -3219,7 +3231,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
             <div className="mt-3"><NoteHistoryList entries={getNoteHistory(school.noteAttribution)} /></div>
             {school.notes ? (
               <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Imported from School Log</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Stored School Notes</div>
                 <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{school.notes}</div>
               </div>
             ) : null}
@@ -3550,7 +3562,10 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       ...previous,
       ...cleanValues,
       originalName,
-      notes: previous.notes || cleanValues.notes || '',
+      // v1.06: School List notes now persist to the existing Supabase `notes` column.
+      // This preserves any imported School Log notes and appends new user notes instead of
+      // relying only on noteAttribution, which made notes vulnerable to appearing missing.
+      notes: newNote ? appendPlainSchoolNote(previous.notes || cleanValues.notes || '', authEmail, newNote) : (cleanValues.notes ?? previous.notes ?? ''),
       noteAttribution: newNote ? appendNoteHistory(previous.noteAttribution || cleanValues.noteAttribution, authEmail, newNote) : (previous.noteAttribution || cleanValues.noteAttribution || null)
     };
     const row = schoolToSupabaseRow(nextSchool);
