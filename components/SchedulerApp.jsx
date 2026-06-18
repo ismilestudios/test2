@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.06a';
+const SCHEDULER_VERSION = '1.06b';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -3357,23 +3357,30 @@ function joinStateZip(state, zip, fallback = '') {
 }
 
 function schoolToSupabaseRow(school = {}) {
-  const stateZip = school.stateZip || joinStateZip(school.state, school.zip) || null;
+  const parsedStateZip = splitStateZip(school.stateZip || joinStateZip(school.state, school.zip));
+  const state = school.state || parsedStateZip.state || null;
+  const zip = school.zip || parsedStateZip.zip || null;
   return {
-    originalName: school.originalName || school.original_name || school.name,
+    original_name: school.originalName || school.original_name || school.name,
     name: school.name || school.originalName || school.original_name,
     district: school.district || null,
     irm: school.irm === '' || school.irm === undefined || school.irm === null ? null : Number(school.irm),
     address: school.address || null,
     city: school.city || null,
-    stateZip,
+    state,
+    zip,
+    state_zip: school.stateZip || joinStateZip(state, zip) || null,
     notes: school.notes || null,
-    noteAttribution: school.noteAttribution || school.school_notes_attribution || school.note_attribution || null,
-    contactFirst: school.contactFirst || null,
-    contactLast: school.contactLast || null,
-    contactPhone: school.contactPhone || null,
-    contactEmail: school.contactEmail || null,
-    mergedInto: school.mergedInto || null,
-    active: school.active !== false
+    school_notes_attribution: school.noteAttribution || school.school_notes_attribution || school.note_attribution || null,
+    contact_first: school.contactFirst || null,
+    contact_last: school.contactLast || null,
+    contact_phone: school.contactPhone || null,
+    contact_email: school.contactEmail || null,
+    contact_title: school.contactTitle || null,
+    reference_images: school.referenceImages || school.reference_images || [],
+    merged_into: school.mergedInto || null,
+    active: school.active !== false,
+    no_fall_scheduling_fall_2026: Boolean(school.noFallSchedulingFall2026 || school.no_fall_scheduling_fall_2026)
   };
 }
 
