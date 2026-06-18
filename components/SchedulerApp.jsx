@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.07';
+const SCHEDULER_VERSION = '1.08';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -3545,6 +3545,7 @@ function eventToSupabaseRow(event = {}) {
     picture_day_info: event.notes || null,
     picture_day_info_attribution: event.noteAttribution || event.picture_day_info_attribution || null,
     canonical_school: event.canonicalSchool || null,
+    school_id: event.schoolId || event.school_id || null,
     photographers: event.photographers || [],
     assistants: event.assistants || [],
     no_assistant: Boolean(event.noAssistant),
@@ -3570,6 +3571,7 @@ function supabaseRowToEvent(row = {}) {
     endDate: row.end_date || null,
     title: row.title,
     canonicalSchool: normalizeImportedCanonicalSchool(row),
+    schoolId: row.school_id || null,
     type: normalizeImportedEventType(row),
     status: row.status || 'Scheduled',
     photographers: row.photographers || [],
@@ -4734,8 +4736,8 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
   const googleImported = activeEvents.filter(event => event.source === 'google_calendar_import');
   const manualEvents = activeEvents.filter(event => event.source !== 'google_calendar_import');
   const fall2026 = activeEvents.filter(event => event.date >= '2026-09-01' && event.date <= '2026-11-30');
-  const schoolLinked = activeEvents.filter(event => event.canonicalSchool);
-  const unlinked = activeEvents.filter(event => !event.canonicalSchool);
+  const schoolLinked = activeEvents.filter(event => event.schoolId);
+  const unlinked = activeEvents.filter(event => !event.schoolId && event.supabaseId);
   const activeSchools = (schools || []).filter(school => school.active !== false);
   const inactiveSchools = (schools || []).filter(school => school.active === false || school.mergedInto);
   const [adminUsers, setAdminUsers] = useState([]);
@@ -4745,8 +4747,75 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
   const [staffSaving, setStaffSaving] = useState(false);
   const [staffMessage, setStaffMessage] = useState('');
   const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '', roles: ['photographer'] });
+  const [unlinkedSearch, setUnlinkedSearch] = useState('');
+  const [manualSchoolSelections, setManualSchoolSelections] = useState({});
+  const [linkingEventId, setLinkingEventId] = useState('');
+  const [unlinkedMessage, setUnlinkedMessage] = useState('');
 
   const activeStaffMembers = useMemo(() => groupStaffMembers(staffMembers?.length ? staffMembers : builtInStaffMembers()), [staffMembers]);
+
+  const activeVisibleSchools = useMemo(() => (schools || []).filter(school => school && school.active !== false && !school.mergedInto), [schools]);
+
+  const unlinkedEventCandidates = useMemo(() => {
+    const search = unlinkedSearch.trim().toLowerCase();
+    const seen = new Set();
+    return (unlinked || [])
+      .filter(event => event && event.supabaseId && event.active !== false)
+      .filter(event => {
+        if (!search) return true;
+        const text = [event.title, event.canonicalSchool, event.type, event.date].filter(Boolean).join(' ').toLowerCase();
+        return text.includes(search);
+      })
+      .map(event => {
+        const suggestion = resolveSchoolListMatch(event.canonicalSchool || event.title || '', activeVisibleSchools) || resolveSchoolListMatch(event.title || '', activeVisibleSchools);
+        return { event, suggestion };
+      })
+      .filter(({ event }) => {
+        const key = `${event.date || ''}|${event.title || ''}|${event.canonicalSchool || ''}`.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => String(b.event.date || '').localeCompare(String(a.event.date || '')) || String(a.event.title || '').localeCompare(String(b.event.title || '')))
+      .slice(0, 75);
+  }, [unlinked, activeVisibleSchools, unlinkedSearch]);
+
+  const linkUnlinkedEventToSchool = async (event, schoolId) => {
+    const selectedSchool = activeVisibleSchools.find(school => school.id === schoolId);
+    if (!event?.supabaseId || !selectedSchool?.id) {
+      setUnlinkedMessage('Choose a school before linking this event.');
+      return;
+    }
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setUnlinkedMessage('Supabase is not connected yet, so this event could not be linked.');
+      return;
+    }
+    const ok = window.confirm(`Link this event to ${selectedSchool.name}?\n\n${event.title}\n${formatDate(event.date)}\n\nThis only updates this event record. It does not rename or delete anything.`);
+    if (!ok) return;
+    setLinkingEventId(event.supabaseId);
+    setUnlinkedMessage('Linking event...');
+    const { error } = await supabase
+      .from('events')
+      .update({
+        school_id: selectedSchool.id,
+        canonical_school: selectedSchool.name,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', event.supabaseId);
+    setLinkingEventId('');
+    if (error) {
+      setUnlinkedMessage(`Could not link event: ${error.message}`);
+      return;
+    }
+    setManualSchoolSelections(prev => {
+      const next = { ...prev };
+      delete next[event.supabaseId];
+      return next;
+    });
+    await reloadEvents?.();
+    setUnlinkedMessage(`Linked ${event.title} to ${selectedSchool.name}.`);
+  };
 
   const saveStaffMember = async (event) => {
     event?.preventDefault?.();
@@ -5137,6 +5206,46 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
             <div className="mt-2 text-2xl font-black text-zinc-950">{value}</div>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h3 className="font-semibold text-zinc-950">Unlinked Events</h3>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">Admin-only repair tool for events that do not have a true School List link yet. Suggestions use name matching; linking only updates the selected event record.</p>
+          </div>
+          <input value={unlinkedSearch} onChange={event => setUnlinkedSearch(event.target.value)} placeholder="Search unlinked events..." className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] md:w-72" />
+        </div>
+        {unlinkedMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-2 text-sm text-zinc-700">{unlinkedMessage}</p> : null}
+        <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80">
+          <div className="max-h-[420px] overflow-auto">
+            <table className="w-full min-w-[900px] text-left">
+              <thead className="sticky top-0 z-10 bg-zinc-50 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                <tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Event</th><th className="px-3 py-2">Suggested School</th><th className="px-3 py-2">Link To</th><th className="px-3 py-2 text-right">Action</th></tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {unlinkedEventCandidates.length ? unlinkedEventCandidates.map(({ event, suggestion }) => {
+                  const selectedSchoolId = manualSchoolSelections[event.supabaseId] || suggestion?.id || '';
+                  return (
+                    <tr key={event.supabaseId || event.id} className="text-zinc-900">
+                      <td className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-zinc-700">{formatDate(event.date)}</td>
+                      <td className="px-3 py-2"><div className="text-sm font-semibold text-zinc-950">{event.title}</div><div className="mt-0.5 text-xs text-zinc-500">{event.type || 'Event'}{event.canonicalSchool ? ` · Current text: ${event.canonicalSchool}` : ''}</div></td>
+                      <td className="px-3 py-2 text-sm text-zinc-700">{suggestion ? suggestion.name : <span className="text-zinc-400">No clear suggestion</span>}</td>
+                      <td className="px-3 py-2">
+                        <select value={selectedSchoolId} onChange={changeEvent => setManualSchoolSelections(prev => ({ ...prev, [event.supabaseId]: changeEvent.target.value }))} className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]">
+                          <option value="">Choose school...</option>
+                          {activeVisibleSchools.map(school => <option key={school.id || school.name} value={school.id}>{school.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2 text-right"><button type="button" disabled={!selectedSchoolId || linkingEventId === event.supabaseId} onClick={() => linkUnlinkedEventToSchool(event, selectedSchoolId)} className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-zinc-800 disabled:bg-zinc-300">{linkingEventId === event.supabaseId ? 'Linking...' : 'Link Event'}</button></td>
+                    </tr>
+                  );
+                }) : <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-zinc-500">No unlinked events match this search.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">Showing up to 75 unique unlinked event/date combinations. This tool does not delete, rename, or bulk-link duplicate rows.</p>
       </div>
 
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
