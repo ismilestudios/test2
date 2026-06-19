@@ -264,6 +264,23 @@ function appendPlainSchoolNote(existingNotes, email, text) {
   return [existing, block].filter(Boolean).join('\n\n');
 }
 
+
+function getPlainSchoolNoteLabel(notes) {
+  const text = String(notes || '').trim();
+  if (!text) return 'School Notes';
+  // Notes created inside Scheduler are stored as stamped plain text for backward-compatible persistence.
+  // Imported legacy School Log notes usually do not have this Scheduler attribution stamp.
+  const hasSchedulerStamp = /^\[[^\]]+•[^\]]+\]\s*\n/.test(text);
+  return hasSchedulerStamp ? 'Saved School Note' : 'Imported from School Log';
+}
+
+function countPlainSchoolNoteBlocks(notes) {
+  const text = String(notes || '').trim();
+  if (!text) return 0;
+  const stampedBlocks = text.match(/^\[[^\]]+•[^\]]+\]/gm);
+  return stampedBlocks?.length || 1;
+}
+
 function editNoteHistory(attribution, noteId, email, text) {
   const cleanText = String(text || '').trim();
   if (!cleanText || !noteId) return normalizeAttribution(attribution);
@@ -2400,6 +2417,8 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
 
   const addressLine = [school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n');
   const schoolNoteHistory = getNoteHistory(school.noteAttribution);
+  const plainSchoolNoteCount = countPlainSchoolNoteBlocks(school.notes);
+  const totalSchoolNoteCount = schoolNoteHistory.length + plainSchoolNoteCount;
 
   return (
     <section className={`${compact ? 'rounded-2xl p-0' : 'rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm'}`}>
@@ -2448,7 +2467,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
 
       <div className="mt-3 max-w-4xl rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm font-semibold text-zinc-800">School Notes ({schoolNoteHistory.length})</div>
+          <div className="text-sm font-semibold text-zinc-800">School Notes ({totalSchoolNoteCount})</div>
           {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Add Note</button> : null}
         </div>
         <div className="mt-3">
@@ -2456,7 +2475,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         </div>
         {school.notes ? (
           <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Imported from School Log</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{getPlainSchoolNoteLabel(school.notes)}</div>
             <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{school.notes}</div>
           </div>
         ) : null}
