@@ -6,10 +6,10 @@ import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoun
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
+import { SCHEDULER_VERSION } from '../lib/schedulerVersion';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.12a';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {

@@ -1,10 +1,8 @@
 import './globals.css';
-import packageJson from '../package.json';
-
-const schedulerDisplayVersion = packageJson.schedulerDisplayVersion || packageJson.version;
+import { SCHEDULER_VERSION } from '../lib/schedulerVersion';
 
 export const metadata = {
-  title: `Scheduler v${schedulerDisplayVersion}`,
+  title: `Scheduler v${SCHEDULER_VERSION}`,
   description: 'Internal workspace for school picture days, staffing, notes, and historical reference.',
   icons: {
     icon: [
