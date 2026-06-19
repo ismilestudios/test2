@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.12';
+const SCHEDULER_VERSION = '1.12a';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -4370,19 +4370,26 @@ function RecentlyAddedEventsModule({ events, onClick }) {
 }
 
 
+function getRecentlyModifiedSortTime(event = {}) {
+  const edited = getEventLastEditedMeta(event);
+  const modifiedValue = edited?.editedAt || event.updatedAt || '';
+  const modifiedTime = new Date(modifiedValue).getTime();
+  return Number.isFinite(modifiedTime) ? modifiedTime : 0;
+}
+
 function RecentlyModifiedEventsModule({ events, onClick }) {
   const modifiedEvents = useMemo(() => {
     const cutoff = Date.now() - (96 * 60 * 60 * 1000);
     return (events || [])
       .filter(event => {
-        if (!event?.updatedAt || event.active === false) return false;
-        const updatedTime = new Date(event.updatedAt).getTime();
+        if (event.active === false) return false;
+        const modifiedTime = getRecentlyModifiedSortTime(event);
         const createdTime = event.createdAt ? new Date(event.createdAt).getTime() : 0;
-        const isRecent = Number.isFinite(updatedTime) && updatedTime >= cutoff;
-        const notJustCreated = !Number.isFinite(createdTime) || Math.abs(updatedTime - createdTime) > 60000;
+        const isRecent = modifiedTime >= cutoff;
+        const notJustCreated = !Number.isFinite(createdTime) || Math.abs(modifiedTime - createdTime) > 60000;
         return isRecent && notJustCreated;
       })
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .sort((a, b) => getRecentlyModifiedSortTime(b) - getRecentlyModifiedSortTime(a))
       ;
   }, [events]);
 
