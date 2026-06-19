@@ -1,6 +1,6 @@
 {
   "name": "ismile-scheduler",
-  "version": "1.0.11",
+  "version": "1.11.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -28,5 +28,5 @@
   "engines": {
     "node": "20.x"
   },
-  "schedulerDisplayVersion": "1.11"
+  "schedulerDisplayVersion": "1.11a"
 }

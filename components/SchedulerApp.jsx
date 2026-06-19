@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.11';
+const SCHEDULER_VERSION = '1.11a';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -2159,12 +2159,21 @@ function schoolKey(value = '') {
 }
 
 function schoolMatchesEvent(schoolName, event) {
-  const school = schoolKey(schoolName);
-  const canonical = schoolKey(event.canonicalSchool || '');
-  const title = schoolKey(event.title || '');
-  if (!school) return false;
-  if (canonical && (canonical === school || canonical.includes(school) || school.includes(canonical))) return true;
-  if (title && title.includes(school)) return true;
+  const school = normalizeSchoolMatchKey(schoolName);
+  const canonical = normalizeSchoolMatchKey(event?.canonicalSchool || '');
+  const title = schoolKey(event?.title || '');
+  const looseSchool = schoolKey(schoolName);
+  if (!school && !looseSchool) return false;
+
+  // Canonical school names are intentional. If an event already has a canonical
+  // school label, only show it under that exact School List match/alias. This
+  // prevents broad pages like "Duanesburg" from continuing to show events that
+  // were reassigned to "Duanesburg MS/HS" or "Duanesburg Elementary".
+  if (canonical) return canonical === school;
+
+  // Older imported/unlinked events may not have a canonical school yet. For those
+  // legacy records only, keep using the loose title fallback so history is not lost.
+  if (title && looseSchool && title.includes(looseSchool)) return true;
   return false;
 }
 
