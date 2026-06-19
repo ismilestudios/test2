@@ -274,11 +274,19 @@ function getPlainSchoolNoteLabel(notes) {
   return hasSchedulerStamp ? 'Saved School Note' : 'Imported from School Log';
 }
 
-function countPlainSchoolNoteBlocks(notes) {
+
+function getVisiblePlainSchoolNotes(notes) {
   const text = String(notes || '').trim();
+  if (!text) return '';
+  const blocks = text.split(/\n{2,}/).map(block => block.trim()).filter(Boolean);
+  const visibleBlocks = blocks.filter(block => !/^\[[^\]]+•[^\]]+\]\s*\n/.test(block));
+  return visibleBlocks.join('\n\n');
+}
+
+function countPlainSchoolNoteBlocks(notes) {
+  const text = getVisiblePlainSchoolNotes(notes);
   if (!text) return 0;
-  const stampedBlocks = text.match(/^\[[^\]]+•[^\]]+\]/gm);
-  return stampedBlocks?.length || 1;
+  return text.split(/\n{2,}/).map(block => block.trim()).filter(Boolean).length || 0;
 }
 
 function editNoteHistory(attribution, noteId, email, text) {
@@ -2417,7 +2425,8 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
 
   const addressLine = [school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n');
   const schoolNoteHistory = getNoteHistory(school.noteAttribution);
-  const plainSchoolNoteCount = countPlainSchoolNoteBlocks(school.notes);
+  const visiblePlainSchoolNotes = getVisiblePlainSchoolNotes(school.notes);
+  const plainSchoolNoteCount = countPlainSchoolNoteBlocks(visiblePlainSchoolNotes);
   const totalSchoolNoteCount = schoolNoteHistory.length + plainSchoolNoteCount;
 
   return (
@@ -2473,10 +2482,10 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         <div className="mt-3">
           <NoteHistoryList entries={schoolNoteHistory} />
         </div>
-        {school.notes ? (
+        {visiblePlainSchoolNotes ? (
           <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{getPlainSchoolNoteLabel(school.notes)}</div>
-            <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{school.notes}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{getPlainSchoolNoteLabel(visiblePlainSchoolNotes)}</div>
+            <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{visiblePlainSchoolNotes}</div>
           </div>
         ) : null}
       </div>
