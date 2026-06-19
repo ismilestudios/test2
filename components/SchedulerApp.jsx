@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.10';
+const SCHEDULER_VERSION = '1.11';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -2177,7 +2177,25 @@ function getSchoolHistory(schoolName, events = EVENTS) {
 function getSchoolHistoryForNames(schoolNames = [], events = EVENTS) {
   const names = schoolNames.filter(Boolean);
   return events
-    .filter(event => names.some(name => schoolMatchesEvent(name, event)))
+    .filter(event => {
+      // If an event has a true school_id link, do not let loose title/name matching
+      // keep it attached to an old/generic school history after it is reassigned.
+      if (event?.schoolId) return false;
+      return names.some(name => schoolMatchesEvent(name, event));
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getSchoolHistoryForSchool(school = {}, mergedSourceSchools = [], events = EVENTS) {
+  const linkedIds = new Set([school?.id, ...(mergedSourceSchools || []).map(item => item?.id)].filter(Boolean));
+  const names = [school?.name, school?.originalName, ...(mergedSourceSchools || []).flatMap(item => [item?.name, item?.originalName])].filter(Boolean);
+  return events
+    .filter(event => {
+      // True school links are authoritative. Once an event is linked to a canonical
+      // school, it should move out of the old/generic school history immediately.
+      if (event?.schoolId) return linkedIds.has(event.schoolId);
+      return names.some(name => schoolMatchesEvent(name, event));
+    })
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -2703,7 +2721,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       date,
       endDate: cleanEndDate || null,
       title: cleanTitle,
-      canonicalSchool: cleanName || '',
+      canonicalSchool: matchedSchool?.name || cleanName || '',
+      schoolId: isTimeOff ? null : (matchedSchool?.id || null),
       type: eventType,
       status: isTimeOff ? 'Scheduled' : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned'),
       photographers: isTimeOff ? [] : selectedPhotographers,
@@ -3636,7 +3655,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         notes,
         referenceImages: [...(school.referenceImages || []), ...mergedImages],
         mergedFrom: mergedSourceSchools.map(item => item.name),
-        history: getSchoolHistoryForNames([school.name, school.originalName, ...mergedFrom].filter(Boolean), events)
+        history: getSchoolHistoryForSchool(school, mergedSourceSchools, events)
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name)), [events, schools, mergedSourcesByTarget]);
