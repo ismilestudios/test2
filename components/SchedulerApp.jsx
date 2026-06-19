@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.11b';
+const SCHEDULER_VERSION = '1.12';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -4326,7 +4326,7 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
 
 function RecentlyAddedEventsModule({ events, onClick }) {
   const recentEvents = useMemo(() => {
-    const cutoff = Date.now() - (72 * 60 * 60 * 1000);
+    const cutoff = Date.now() - (96 * 60 * 60 * 1000);
     return (events || [])
       .filter(event => {
         if (!event?.createdAt) return false;
@@ -4336,7 +4336,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
         return isRecent && isManual && event.active !== false;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 8);
+      ;
   }, [events]);
 
   return (
@@ -4344,12 +4344,12 @@ function RecentlyAddedEventsModule({ events, onClick }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Recently Added Events</h2>
-          <p className="mt-1 text-sm text-zinc-600">Manual events added to the calendar in the last 72 hours.</p>
+          <p className="mt-1 text-sm text-zinc-600">Manual events added to the calendar in the last 96 hours.</p>
         </div>
         <Pill className="border-zinc-200 bg-white text-zinc-600">{recentEvents.length} recent</Pill>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 max-h-[504px] space-y-2 overflow-y-auto pr-1">
         {recentEvents.length ? recentEvents.map(event => (
           <button key={event.supabaseId || event.id} type="button" onClick={() => onClick?.(event)} className="block w-full rounded-2xl border border-zinc-200 bg-cream/75 p-3 text-left transition hover:bg-white hover:shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -4362,7 +4362,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
             </div>
           </button>
         )) : (
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No manual events added in the last 72 hours.</div>
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No manual events added in the last 96 hours.</div>
         )}
       </div>
     </section>
@@ -4372,7 +4372,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
 
 function RecentlyModifiedEventsModule({ events, onClick }) {
   const modifiedEvents = useMemo(() => {
-    const cutoff = Date.now() - (72 * 60 * 60 * 1000);
+    const cutoff = Date.now() - (96 * 60 * 60 * 1000);
     return (events || [])
       .filter(event => {
         if (!event?.updatedAt || event.active === false) return false;
@@ -4383,7 +4383,7 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
         return isRecent && notJustCreated;
       })
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .slice(0, 8);
+      ;
   }, [events]);
 
   return (
@@ -4391,12 +4391,12 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Recently Modified Events</h2>
-          <p className="mt-1 text-sm text-zinc-600">Events changed in the last 72 hours. Use this to confirm edits hit the live Scheduler.</p>
+          <p className="mt-1 text-sm text-zinc-600">Events changed in the last 96 hours. Use this to confirm edits hit the live Scheduler.</p>
         </div>
         <Pill className="border-zinc-200 bg-white text-zinc-600">{modifiedEvents.length} modified</Pill>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 max-h-[504px] space-y-2 overflow-y-auto pr-1">
         {modifiedEvents.length ? modifiedEvents.map(event => {
           const edited = getEventLastEditedMeta(event);
           const editedAt = edited?.editedAt || event.updatedAt;
@@ -4415,7 +4415,7 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
             </button>
           );
         }) : (
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events modified in the last 72 hours.</div>
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events modified in the last 96 hours.</div>
         )}
       </div>
     </section>
