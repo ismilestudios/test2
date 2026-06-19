@@ -9,7 +9,7 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
-const SCHEDULER_VERSION = '1.11a';
+const SCHEDULER_VERSION = '1.11b';
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -3076,7 +3076,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
     const saveQuery = supabase.from('schools');
     const result = schoolValues?.id
       ? await saveQuery.update(row).eq('id', schoolValues.id).select().single()
-      : await saveQuery.upsert(row, { onConflict: 'originalName' }).select().single();
+      : await saveQuery.upsert(row, { onConflict: 'original_name' }).select().single();
 
     const { data, error } = result;
 
@@ -3637,6 +3637,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   const q = (schoolListQuery || query).trim().toLowerCase();
   const [editingSchool, setEditingSchool] = useState(null);
   const [mergingSchool, setMergingSchool] = useState(null);
+  const [addingSchool, setAddingSchool] = useState(false);
   const [message, setMessage] = useState('');
 
   const mergedSourcesByTarget = useMemo(() => {
@@ -3708,7 +3709,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     const saveQuery = supabase.from('schools');
     const result = previous.id
       ? await saveQuery.update(row).eq('id', previous.id).select().single()
-      : await saveQuery.upsert(row, { onConflict: 'originalName' }).select().single();
+      : await saveQuery.upsert(row, { onConflict: 'original_name' }).select().single();
 
     const { data, error } = result;
 
@@ -3752,7 +3753,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       return;
     }
 
-    const mergePayload = { mergedInto: targetOriginalName };
+    const mergePayload = { merged_into: targetOriginalName, updated_at: new Date().toISOString() };
     const mergeQuery = supabase.from('schools').update(mergePayload);
     const { data, error } = source.id
       ? await mergeQuery.eq('id', source.id).select().single()
@@ -3783,7 +3784,14 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         <section className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
-            <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filtered.length}</Pill>
+            <div className="flex items-center gap-2">
+              {canEditSchools ? (
+                <button type="button" onClick={() => setAddingSchool(true)} className="inline-flex items-center justify-center gap-1 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-1.5 text-xs font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">
+                  <Plus size={14} /> Add School
+                </button>
+              ) : null}
+              <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filtered.length}</Pill>
+            </div>
           </div>
           <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history. Edits now save to Supabase.</p>
           <div className="mt-4">
@@ -3808,6 +3816,10 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={canEditSchools ? setEditingSchool : null} onMerge={canMergeSchools ? setMergingSchool : null} />
         <AnimatePresence>
           {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
+          {addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={async (schoolValues) => {
+            const saved = await saveSchool(schoolValues.originalName || schoolValues.name, schoolValues);
+            if (saved !== false) setAddingSchool(false);
+          }} />}
           {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={activeSchools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
         </AnimatePresence>
       </div>
@@ -5617,7 +5629,7 @@ export default function SchedulerApp() {
       const seedRows = SCHOOLS.map(school => schoolToSupabaseRow({ ...school, originalName: school.name, active: true }));
       const { data: seeded, error: seedError } = await supabase
         .from('schools')
-        .upsert(seedRows, { onConflict: 'originalName' })
+        .upsert(seedRows, { onConflict: 'original_name' })
         .select();
 
       if (seedError) {
