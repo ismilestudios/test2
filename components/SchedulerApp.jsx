@@ -100,7 +100,17 @@ function getEventAddedMeta(event = {}) {
     };
   }
 
-  // Do not infer the creator from the editor history. Older events may only have
+  // If a brand-new Scheduler-created event was saved before added_by_meta existed
+  // but has a same-moment edit marker, use that marker for the creator display.
+  // This fixes recent manual additions without making old later edits look like authors.
+  const edited = getEventLastEditedMeta(event);
+  const sourceText = String(event.source || '').toLowerCase();
+  const createdEditedMinutes = minutesBetweenDates(event.createdAt, edited?.editedAt);
+  if (edited?.name && !sourceText.includes('import') && event.createdAt && createdEditedMinutes <= 10) {
+    return { name: edited.name, email: edited.email || '', addedAt: event.createdAt || edited.editedAt || '', source: 'manual-inferred' };
+  }
+
+  // Do not otherwise infer the creator from the editor history. Older events may only have
   // last-edited metadata, and using that as Created By makes the latest editor
   // look like the original author. New Scheduler-created events receive an
   // explicit added_by_meta line when they are first saved.
@@ -151,6 +161,13 @@ function formatEventMetaDateTime(value) {
   const datePart = `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
   const timePart = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   return `${datePart} ${timePart}`;
+}
+
+function minutesBetweenDates(a, b) {
+  const aTime = new Date(a || 0).getTime();
+  const bTime = new Date(b || 0).getTime();
+  if (!Number.isFinite(aTime) || !Number.isFinite(bTime)) return Infinity;
+  return Math.abs(aTime - bTime) / 60000;
 }
 
 function stripInternalEventMeta(history = '') {
@@ -3889,7 +3906,6 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   const [selectedStaff, setSelectedStaff] = useState('Stephanie');
   const [viewMode, setViewMode] = useState('Day');
   const [plainViewMode, setPlainViewMode] = useState('Week');
-  const [mobileCalendarMonth, setMobileCalendarMonth] = useState(monthKey(selectedDate || todayKey()));
 
   const today = todayKey();
   const productionEvents = useMemo(() => (events || [])
@@ -3957,34 +3973,12 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   }, [sortedPlainViewEvents]);
 
   const plainViewLabel = plainViewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : plainViewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate);
-  const mobileMonthDays = useMemo(() => {
-    const start = `${mobileCalendarMonth}-01`;
-    const js = new Date(`${start}T00:00:00`);
-    const firstOffset = js.getDay();
-    const cells = [];
-    for (let i = 0; i < 42; i++) cells.push(addDays(start, i - firstOffset));
-    return cells;
-  }, [mobileCalendarMonth]);
-  const eventsByDay = useMemo(() => {
-    const map = new Map();
-    productionEvents.forEach(event => {
-      mobileMonthDays.forEach(day => {
-        if (isDateInEventRange(event, day)) {
-          if (!map.has(day)) map.set(day, []);
-          map.get(day).push(event);
-        }
-      });
-    });
-    map.forEach(dayEvents => dayEvents.sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || ''))));
-    return map;
-  }, [productionEvents, mobileMonthDays]);
-
   return (
     <div className="mx-auto max-w-md space-y-3 sm:max-w-2xl">
       <section className="rounded-[1.5rem] border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 shadow-sm sm:rounded-[2rem] sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-600">WWPT</div>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-600">What We're Photographing Today</div>
             <div className="mt-0.5 text-sm font-black text-zinc-950 sm:text-lg">{formatDate(today)}</div>
           </div>
           <div className="rounded-full border border-white/80 bg-white/70 px-2.5 py-1 text-[11px] font-black text-zinc-600">{todayEvents.length}</div>
@@ -3997,42 +3991,6 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
               <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">{compactCrewList(event).join(', ') || 'Staff TBD'}</div>
             </button>
           )) : <div className="rounded-xl border border-dashed border-white/80 bg-white/60 p-3 text-sm text-zinc-500">Nothing scheduled for today.</div>}
-        </div>
-      </section>
-
-      <section className="rounded-[1.5rem] border border-zinc-200 bg-white/90 p-3 shadow-sm sm:rounded-[2rem]">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">All Events Calendar</div>
-            <div className="mt-1 text-sm font-black text-zinc-950">{monthLabel(mobileCalendarMonth)}</div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => setMobileCalendarMonth(addMonths(mobileCalendarMonth, -1))} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Prev</button>
-            <button type="button" onClick={() => setMobileCalendarMonth(monthKey(todayKey()))} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-1.5 text-xs font-black text-zinc-900">Today</button>
-            <button type="button" onClick={() => setMobileCalendarMonth(addMonths(mobileCalendarMonth, 1))} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Next</button>
-          </div>
-        </div>
-        <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-black uppercase text-zinc-400">
-          {['S','M','T','W','T','F','S'].map((day, index) => <div key={`${day}-${index}`}>{day}</div>)}
-        </div>
-        <div className="mt-1 grid grid-cols-7 gap-1">
-          {mobileMonthDays.map(day => {
-            const dayEvents = eventsByDay.get(day) || [];
-            const inMonth = monthKey(day) === mobileCalendarMonth;
-            return (
-              <div key={day} className={`min-h-[78px] rounded-xl border p-1 ${day === today ? 'border-zinc-900 bg-[#DDE8D2]/70' : 'border-zinc-100 bg-white/80'} ${inMonth ? '' : 'opacity-35'}`}>
-                <button type="button" onClick={() => setSelectedDate(day)} className="mb-1 text-left text-[11px] font-black text-zinc-800">{Number(day.slice(8, 10))}</button>
-                <div className="space-y-1">
-                  {dayEvents.slice(0, 2).map(event => (
-                    <button key={`${day}-${event.id}`} type="button" onClick={() => onClick(event)} className="block w-full truncate rounded-md border border-[#AEBB9E]/40 bg-[#DDE8D2]/70 px-1 py-0.5 text-left text-[10px] font-black leading-tight text-zinc-800">
-                      {event.title}
-                    </button>
-                  ))}
-                  {dayEvents.length > 2 ? <div className="px-1 text-[10px] font-black text-zinc-500">+{dayEvents.length - 2}</div> : null}
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
 
