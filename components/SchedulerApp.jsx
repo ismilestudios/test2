@@ -2797,7 +2797,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       newNote: newNote.trim(),
       noteAttribution,
       rainInfo: '',
-      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : isTimeOff ? 'Created from Add Event as Time Off.' : isPersonalAppointment ? 'Created from Add Event as Personal Appointment.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
+      history: isDuplicate ? [stripInternalEventMeta(initialEvent?.history || ''), `Duplicated from ${initialEvent?.title || 'event'} on ${formatDate(todayKey())}.`].filter(Boolean).join('\n\n') : isTimeOff ? 'Created from Add Event as Time Off.' : isPersonalAppointment ? 'Created from Add Event as Personal Appointment.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.',
+      duplicatedFromEventId: isDuplicate ? (initialEvent?.supabaseId || initialEvent?.id || null) : null
     };
     const result = await onSave(event);
     if (result) {
@@ -5948,9 +5949,11 @@ export default function SchedulerApp() {
     const newNote = String(event?.newNote || '').trim();
     const isNewEvent = !event?.supabaseId && !previousEvent?.supabaseId;
     const existingHistory = event.history || previousEvent?.history || '';
-    const historyWithCreator = isNewEvent && !/\[added_by_meta/.test(String(existingHistory || ''))
-      ? [stripInternalEventMeta(existingHistory), makeEventAddedHistoryLine(authEmail)].filter(Boolean).join('\n')
-      : existingHistory;
+    const isDuplicatedNewEvent = Boolean(event?.duplicatedFromEventId) && isNewEvent;
+    const cleanExistingHistory = isDuplicatedNewEvent ? stripInternalEventMeta(existingHistory) : existingHistory;
+    const historyWithCreator = isNewEvent && (isDuplicatedNewEvent || !/\[added_by_meta/.test(String(cleanExistingHistory || '')))
+      ? [stripInternalEventMeta(cleanExistingHistory), makeEventAddedHistoryLine(authEmail)].filter(Boolean).join('\n')
+      : cleanExistingHistory;
     const historyWithEdit = !isNewEvent
       ? [historyWithCreator, makeEventEditedHistoryLine(authEmail)].filter(Boolean).join('\n')
       : historyWithCreator;
@@ -6151,7 +6154,10 @@ export default function SchedulerApp() {
       status: 'Needs Photographers Assigned',
       photographers: [],
       assistants: [],
-      history: [event.history, `Duplicated from ${event.title || 'event'} on ${formatDate(todayKey())}.`].filter(Boolean).join('\n\n')
+      createdAt: null,
+      updatedAt: null,
+      duplicatedFromEventId: event.supabaseId || event.id || null,
+      history: [stripInternalEventMeta(event.history || ''), `Duplicated from ${event.title || 'event'} on ${formatDate(todayKey())}.`].filter(Boolean).join('\n\n')
     };
     setDuplicatingEvent(duplicate);
     setSelected(null);
