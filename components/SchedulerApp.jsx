@@ -705,7 +705,11 @@ function displayStatus(status) {
 }
 
 function displayPhotographerAssignment(event) {
-  return event.photographers?.length ? event.photographers.join(', ') : 'Needs Photographers Assigned';
+  if (isTimeOffEvent(event)) return '—';
+  const assigned = uniqueCanonicalPhotographers(event?.photographers || []);
+  if (assigned.length) return assigned.join(', ');
+  const required = Math.max(1, getRequiredPhotographerCount(event));
+  return `Needs ${required} photographer${required === 1 ? '' : 's'} assigned`;
 }
 
 function isTimeOffEvent(event = {}) {
@@ -735,8 +739,13 @@ function isNeedsPhotographerAssignment(event) {
 }
 
 function displayAssistants(event) {
+  if (isTimeOffEvent(event)) return '—';
   if (event?.noAssistant) return 'No Assistant';
-  return event?.assistants?.length ? event.assistants.join(', ') : '—';
+  const assigned = Array.isArray(event?.assistants) ? event.assistants.filter(Boolean) : [];
+  if (assigned.length) return assigned.join(', ');
+  const required = Math.max(0, getRequiredAssistantCount(event));
+  if (required > 0) return `Needs ${required} assistant${required === 1 ? '' : 's'} assigned`;
+  return '—';
 }
 
 function normalizeSchoolLookupKey(value = '') {
@@ -2729,8 +2738,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
   const isTimeOff = eventType === 'Time Off';
   const isPersonalAppointment = eventType === 'Personal Appointment';
   const isInternalBlockingEvent = isTimeOff || isPersonalAppointment;
-  const [selectedPhotographers, setSelectedPhotographers] = useState(initialEvent?.photographers || []);
-  const [selectedAssistants, setSelectedAssistants] = useState(initialEvent?.assistants || []);
+  const [selectedPhotographers, setSelectedPhotographers] = useState(isDuplicate ? [] : (initialEvent?.photographers || []));
+  const [selectedAssistants, setSelectedAssistants] = useState(isDuplicate ? [] : (initialEvent?.assistants || []));
   const [requiredPhotographers, setRequiredPhotographers] = useState(getRequiredPhotographerCount(initialEvent || { title: initialEvent?.title || '' }));
   const [requiredAssistants, setRequiredAssistants] = useState(getRequiredAssistantCount(initialEvent || { title: initialEvent?.title || '' }));
   const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
@@ -6074,7 +6083,9 @@ export default function SchedulerApp() {
       id: `custom-${Date.now()}`,
       supabaseId: undefined,
       source: 'manual_app',
-      status: event.photographers?.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      status: 'Needs Photographers Assigned',
+      photographers: [],
+      assistants: [],
       history: [event.history, `Duplicated from ${event.title || 'event'} on ${formatDate(todayKey())}.`].filter(Boolean).join('\n\n')
     };
     setDuplicatingEvent(duplicate);
