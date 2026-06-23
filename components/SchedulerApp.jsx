@@ -3123,10 +3123,12 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
     }
 
     const row = schoolToSupabaseRow(schoolValues);
-    const saveQuery = supabase.from('schools');
-    const result = schoolValues?.id
-      ? await saveQuery.update(row).eq('id', schoolValues.id).select().single()
-      : await saveQuery.upsert(row, { onConflict: 'original_name' }).select().single();
+    const result = await runSchoolMutationWithColumnFallback(
+      async (payload) => schoolValues?.id
+        ? await supabase.from('schools').update(payload).eq('id', schoolValues.id).select().single()
+        : await supabase.from('schools').upsert(payload, { onConflict: 'original_name' }).select().single(),
+      row
+    );
 
     const { data, error } = result;
 
@@ -3523,6 +3525,7 @@ function schoolToSupabaseRow(school = {}) {
     reference_images: school.referenceImages || school.reference_images || [],
     merged_into: school.mergedInto || null,
     active: school.active !== false,
+    updated_at: new Date().toISOString(),
     no_fall_scheduling_fall_2026: Boolean(school.noFallSchedulingFall2026 || school.no_fall_scheduling_fall_2026)
   };
 }
@@ -3549,8 +3552,68 @@ function supabaseRowToSchool(row = {}) {
     referenceImages: row.referenceImages || row.reference_images || [],
     mergedInto: row.mergedInto || row.merged_into || null,
     active: row.active !== false,
-    noFallSchedulingFall2026: Boolean(row.noFallSchedulingFall2026 || row.no_fall_scheduling_fall_2026)
+    noFallSchedulingFall2026: Boolean(row.noFallSchedulingFall2026 || row.no_fall_scheduling_fall_2026),
+    createdAt: row.createdAt || row.created_at || '',
+    updatedAt: row.updatedAt || row.updated_at || ''
   };
+}
+
+
+function getMissingSupabaseColumn(error) {
+  const message = String(error?.message || '');
+  const match = message.match(/Could not find the '([^']+)' column/i) || message.match(/column ["']?([^"'\s]+)["']? .*does not exist/i);
+  return match?.[1] || null;
+}
+
+function getSchoolCompletenessScore(school = {}) {
+  return [school.name, school.address, school.city, school.stateZip, school.notes, school.contactFirst, school.contactLast, school.contactPhone, school.contactEmail, school.contactTitle]
+    .reduce((score, value) => score + (String(value || '').trim() ? 1 : 0), 0);
+}
+
+function schoolSortTimestamp(school = {}) {
+  const raw = school.updatedAt || school.updated_at || school.createdAt || school.created_at || '';
+  const value = Date.parse(raw);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function dedupeLoadedSchools(rows = []) {
+  const byKey = new Map();
+  (rows || []).map(supabaseRowToSchool).forEach((school) => {
+    const key = normalizeSchoolMatchKey(school.originalName || school.name);
+    if (!key) return;
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, school);
+      return;
+    }
+    const schoolTime = schoolSortTimestamp(school);
+    const currentTime = schoolSortTimestamp(current);
+    const schoolScore = getSchoolCompletenessScore(school);
+    const currentScore = getSchoolCompletenessScore(current);
+    if (schoolTime > currentTime || (schoolTime === currentTime && schoolScore >= currentScore)) {
+      byKey.set(key, school);
+    }
+  });
+  return Array.from(byKey.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function runSchoolMutationWithColumnFallback(buildMutation, row, maxRetries = 6) {
+  let payload = { ...(row || {}) };
+  const removedColumns = [];
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const result = await buildMutation(payload);
+    if (!result?.error) {
+      return { ...result, removedColumns };
+    }
+    const missingColumn = getMissingSupabaseColumn(result.error);
+    if (!missingColumn || !(missingColumn in payload)) {
+      return { ...result, removedColumns };
+    }
+    removedColumns.push(missingColumn);
+    const { [missingColumn]: _discard, ...nextPayload } = payload;
+    payload = nextPayload;
+  }
+  return { data: null, error: { message: `Could not save school after removing unavailable columns: ${removedColumns.join(', ')}` }, removedColumns };
 }
 
 
@@ -3752,16 +3815,16 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     const row = schoolToSupabaseRow(nextSchool);
 
     // Save School List edits back to the exact Supabase row when an id exists.
-    // Earlier builds used only upsert(originalName). If an older school row had
-    // a blank originalName, saving School Notes could create/update a second
-    // school record, making the note look like it disappeared when the original
-    // record was shown again.
-    const saveQuery = supabase.from('schools');
-    const result = previous.id
-      ? await saveQuery.update(row).eq('id', previous.id).select().single()
-      : await saveQuery.upsert(row, { onConflict: 'original_name' }).select().single();
+    // This is intentionally id-first so renamed schools keep updating the same
+    // canonical row instead of creating a duplicate with the old imported name.
+    const result = await runSchoolMutationWithColumnFallback(
+      async (payload) => previous.id
+        ? await supabase.from('schools').update(payload).eq('id', previous.id).select().single()
+        : await supabase.from('schools').upsert(payload, { onConflict: 'original_name' }).select().single(),
+      row
+    );
 
-    const { data, error } = result;
+    const { data, error, removedColumns } = result;
 
     if (error) {
       const msg = `Could not save school: ${error.message}`;
@@ -3780,7 +3843,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     });
     setSelectedName(savedSchool.name || originalName);
     setEditingSchool(null);
-    setMessage('School changes saved to Supabase.');
+    setMessage(removedColumns?.length ? `School changes saved to Supabase. Skipped unavailable column${removedColumns.length === 1 ? '' : 's'}: ${removedColumns.join(', ')}.` : 'School changes saved to Supabase.');
     return true;
     } catch (error) {
       const msg = `Could not save school: ${error?.message || 'Unknown error'}`;
@@ -3803,11 +3866,13 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       return;
     }
 
-    const mergePayload = { merged_into: targetOriginalName, updated_at: new Date().toISOString() };
-    const mergeQuery = supabase.from('schools').update(mergePayload);
-    const { data, error } = source.id
-      ? await mergeQuery.eq('id', source.id).select().single()
-      : await mergeQuery.eq('originalName', sourceOriginalName).select().single();
+    const mergePayload = { merged_into: targetOriginalName, active: false, updated_at: new Date().toISOString() };
+    const { data, error, removedColumns } = await runSchoolMutationWithColumnFallback(
+      async (payload) => source.id
+        ? await supabase.from('schools').update(payload).eq('id', source.id).select().single()
+        : await supabase.from('schools').update(payload).eq('original_name', sourceOriginalName).select().single(),
+      mergePayload
+    );
 
     if (error) {
       setMessage(`Could not merge school: ${error.message}`);
@@ -3819,7 +3884,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     const target = activeSchools.find(school => (school.originalName || school.name) === targetOriginalName);
     setSelectedName(target?.name || targetOriginalName);
     setMergingSchool(null);
-    setMessage(`${source.name} merged into ${target?.name || targetOriginalName}.`);
+    setMessage(`${source.name} merged into ${target?.name || targetOriginalName}.${removedColumns?.length ? ` Skipped unavailable column${removedColumns.length === 1 ? '' : 's'}: ${removedColumns.join(', ')}.` : ''}`);
   };
 
   return (
@@ -5710,13 +5775,13 @@ export default function SchedulerApp() {
         return;
       }
 
-      const seededSchools = (seeded || []).map(supabaseRowToSchool).sort((a, b) => a.name.localeCompare(b.name));
+      const seededSchools = dedupeLoadedSchools(seeded || []);
       setSchools(seededSchools.length ? seededSchools : SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
       setSchoolsMessage('Seeded the starter School List into Supabase.');
       return;
     }
 
-    const loadedSchools = data.map(supabaseRowToSchool).sort((a, b) => a.name.localeCompare(b.name));
+    const loadedSchools = dedupeLoadedSchools(data || []);
     setSchools(loadedSchools);
     setSchoolsMessage('School List is loading from Supabase.');
   };
