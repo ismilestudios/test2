@@ -2801,9 +2801,9 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
-          <div className="border-b border-zinc-200 p-5">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-950/30 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="my-2 flex max-h-[calc(100vh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:my-8 sm:max-h-[calc(100vh-4rem)]">
+          <div className="shrink-0 border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{isDuplicate ? "Duplicate Event" : isEditing ? "Edit Event" : "Add Event"}</Pill>
@@ -2813,7 +2813,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
             </div>
           </div>
-          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pb-28">
             {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
@@ -2924,7 +2924,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               ) : null}
             </section>
           </div>
-          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
+          <div className="sticky bottom-0 z-10 flex shrink-0 justify-end gap-2 border-t border-zinc-200 bg-cream/95 p-4 shadow-[0_-10px_25px_rgba(0,0,0,0.06)] backdrop-blur sm:p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
             <button type="button" onClick={save} disabled={saving} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : (isDuplicate ? "Save Duplicate" : isEditing ? "Save Changes" : "Save Event")}</button>
           </div>
