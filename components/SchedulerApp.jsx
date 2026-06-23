@@ -1,15 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2 } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
-import { SCHEDULER_VERSION } from '../lib/schedulerVersion';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
-const WEEKLY_ROLLOUT_CAPACITY = 21;
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -84,122 +82,11 @@ function displayNameFromEmail(email = '') {
     .join(' ') || 'User';
 }
 
-
-function getEventAddedMeta(event = {}) {
-  const history = String(event.history || '');
-  const match = history.match(/\[added_by_meta name="([^"]*)" email="([^"]*)" at="([^"]*)"\]/);
-  if (match) {
-    const [, rawName, rawEmail, rawAt] = match;
-    const email = rawEmail || '';
-    const name = rawName || displayNameFromEmail(email || '');
-    return {
-      name: name || 'Before We Began Tracking',
-      email,
-      addedAt: rawAt || event.createdAt || '',
-      source: 'manual'
-    };
-  }
-
-  // If a brand-new Scheduler-created event was saved before added_by_meta existed
-  // but has a same-moment edit marker, use that marker for the creator display.
-  // This fixes recent manual additions without making old later edits look like authors.
-  const edited = getEventLastEditedMeta(event);
-  const sourceText = String(event.source || '').toLowerCase();
-  const createdEditedMinutes = minutesBetweenDates(event.createdAt, edited?.editedAt);
-  if (edited?.name && !sourceText.includes('import') && event.createdAt && createdEditedMinutes <= 10) {
-    return { name: edited.name, email: edited.email || '', addedAt: event.createdAt || edited.editedAt || '', source: 'manual-inferred' };
-  }
-
-  // Do not otherwise infer the creator from the editor history. Older events may only have
-  // last-edited metadata, and using that as Created By makes the latest editor
-  // look like the original author. New Scheduler-created events receive an
-  // explicit added_by_meta line when they are first saved.
-
-  if (event.source === 'google_calendar_import') {
-    return { name: 'Google Calendar Import', email: '', addedAt: event.createdAt || '', source: 'import' };
-  }
-  if (event.source && String(event.source).includes('import')) {
-    return { name: 'Google Calendar Import', email: '', addedAt: event.createdAt || '', source: 'import' };
-  }
-  return { name: 'Before We Began Tracking', email: '', addedAt: event.createdAt || '', source: 'legacy' };
-}
-
-function makeEventAddedHistoryLine(authEmail = '') {
-  const email = String(authEmail || '').trim();
-  const name = displayNameFromEmail(email || 'User');
-  const at = new Date().toISOString();
-  return `[added_by_meta name="${name.replace(/"/g, "'")}" email="${email.replace(/"/g, '')}" at="${at}"]`;
-}
-
-function makeEventEditedHistoryLine(authEmail = '') {
-  const email = String(authEmail || '').trim();
-  const name = displayNameFromEmail(email || 'User');
-  const at = new Date().toISOString();
-  return `[last_edited_meta name="${name.replace(/"/g, "'")}" email="${email.replace(/"/g, '')}" at="${at}"]`;
-}
-
-function getEventLastEditedMeta(event = {}) {
-  const history = String(event.history || '');
-  const matches = [...history.matchAll(/\[last_edited_meta name="([^"]*)" email="([^"]*)" at="([^"]*)"\]/g)];
-  if (matches.length) {
-    const match = matches[matches.length - 1];
-    const [, rawName, rawEmail, rawAt] = match;
-    const email = rawEmail || '';
-    const name = rawName || displayNameFromEmail(email || '');
-    return { name: name || displayNameFromEmail(email || '') || 'Unknown Editor', email, editedAt: rawAt || event.updatedAt || '', source: 'manual' };
-  }
-  // Do not infer Last Edited from updatedAt alone. Creation can set updatedAt, and older/imported
-  // rows do not reliably know who edited them. Only show Last Edited after the app records
-  // an explicit last_edited_meta line.
-  return null;
-}
-
-function formatEventMetaDateTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  const datePart = `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
-  const timePart = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return `${datePart} ${timePart}`;
-}
-
-function minutesBetweenDates(a, b) {
-  const aTime = new Date(a || 0).getTime();
-  const bTime = new Date(b || 0).getTime();
-  if (!Number.isFinite(aTime) || !Number.isFinite(bTime)) return Infinity;
-  return Math.abs(aTime - bTime) / 60000;
-}
-
-function stripInternalEventMeta(history = '') {
-  return String(history || '')
-    .replace(/\n?\[added_by_meta[^\]]*\]/g, '')
-    .replace(/\n?\[last_edited_meta[^\]]*\]/g, '')
-    .trim();
-}
-
 function formatShortAttributionDate(value) {
   if (!value) return '';
-  const raw = String(value);
-  const hasTime = raw.includes('T');
-  const date = new Date(hasTime ? raw : `${raw.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return raw;
+  const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return String(value);
   return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
-}
-
-function formatAttributionTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function formatAttributionLabel(attribution) {
-  const clean = normalizeAttribution(attribution);
-  if (!clean?.name && !clean?.email) return '';
-  const savedAt = clean.savedAt || clean.createdAt || clean.date;
-  const time = formatAttributionTime(savedAt);
-  const date = formatShortAttributionDate(savedAt || clean.date);
-  return `${clean.name || displayNameFromEmail(clean.email)}${time ? ` • ${time}` : ''}${date ? ` ${date}` : ''}`;
 }
 
 function makeNoteAttribution(email) {
@@ -218,146 +105,18 @@ function normalizeAttribution(value) {
   if (typeof value === 'string') {
     try { return JSON.parse(value); } catch { return null; }
   }
-  if (Array.isArray(value)) return { history: value };
   if (typeof value === 'object') return value;
   return null;
-}
-
-function getNoteHistory(attribution) {
-  const clean = normalizeAttribution(attribution);
-  const rawHistory = Array.isArray(clean?.history) ? clean.history : Array.isArray(clean?.notes) ? clean.notes : [];
-  return rawHistory
-    .map((entry, index) => ({
-      id: entry.id || `${entry.savedAt || entry.createdAt || entry.date || 'note'}-${index}`,
-      name: entry.name || displayNameFromEmail(entry.email || ''),
-      email: entry.email || '',
-      savedAt: entry.savedAt || entry.createdAt || entry.date || '',
-      date: entry.date || (entry.savedAt ? String(entry.savedAt).slice(0, 10) : ''),
-      text: String(entry.text || entry.note || entry.content || '').trim(),
-      editedName: entry.editedName || entry.edited_by_name || entry.editedByName || '',
-      editedEmail: entry.editedEmail || entry.edited_by_email || entry.editedByEmail || '',
-      editedAt: entry.editedAt || entry.edited_at || entry.updatedAt || ''
-    }))
-    .filter(entry => entry.text)
-    .sort((a, b) => new Date(b.savedAt || b.date || 0).getTime() - new Date(a.savedAt || a.date || 0).getTime());
-}
-
-function appendNoteHistory(attribution, email, text) {
-  const cleanText = String(text || '').trim();
-  if (!cleanText) return normalizeAttribution(attribution);
-  const now = new Date();
-  const previous = normalizeAttribution(attribution) || {};
-  const history = getNoteHistory(previous);
-  const entry = {
-    id: `note-${now.getTime()}`,
-    name: displayNameFromEmail(email),
-    email: email || '',
-    text: cleanText,
-    date: now.toISOString().slice(0, 10),
-    savedAt: now.toISOString()
-  };
-  return { ...previous, history: [entry, ...history] };
-}
-
-
-function appendPlainSchoolNote(existingNotes, email, text) {
-  const cleanText = String(text || '').trim();
-  const existing = String(existingNotes || '').trim();
-  if (!cleanText) return existing;
-  const now = new Date();
-  const who = displayNameFromEmail(email);
-  const stamp = `${who} • ${formatAttributionTime(now.toISOString())} ${formatShortAttributionDate(now.toISOString())}`.trim();
-  const block = `[${stamp}]\n${cleanText}`;
-  return [existing, block].filter(Boolean).join('\n\n');
-}
-
-
-function getPlainSchoolNoteLabel(notes) {
-  const text = String(notes || '').trim();
-  if (!text) return 'School Notes';
-  // Notes created inside Scheduler are stored as stamped plain text for backward-compatible persistence.
-  // Imported legacy School Log notes usually do not have this Scheduler attribution stamp.
-  const hasSchedulerStamp = /^\[[^\]]+•[^\]]+\]\s*\n/.test(text);
-  return hasSchedulerStamp ? 'Saved School Note' : 'Imported from School Log';
-}
-
-
-function getVisiblePlainSchoolNotes(notes) {
-  const text = String(notes || '').trim();
-  if (!text) return '';
-  const blocks = text.split(/\n{2,}/).map(block => block.trim()).filter(Boolean);
-  const visibleBlocks = blocks.filter(block => !/^\[[^\]]+•[^\]]+\]\s*\n/.test(block));
-  return visibleBlocks.join('\n\n');
-}
-
-function countPlainSchoolNoteBlocks(notes) {
-  const text = getVisiblePlainSchoolNotes(notes);
-  if (!text) return 0;
-  return text.split(/\n{2,}/).map(block => block.trim()).filter(Boolean).length || 0;
-}
-
-function editNoteHistory(attribution, noteId, email, text) {
-  const cleanText = String(text || '').trim();
-  if (!cleanText || !noteId) return normalizeAttribution(attribution);
-  const now = new Date();
-  const previous = normalizeAttribution(attribution) || {};
-  const history = getNoteHistory(previous).map(entry => {
-    if (entry.id !== noteId) return entry;
-    return {
-      ...entry,
-      text: cleanText,
-      editedName: displayNameFromEmail(email),
-      editedEmail: email || '',
-      editedAt: now.toISOString()
-    };
-  });
-  return { ...previous, history };
 }
 
 function AttributionPill({ attribution }) {
   const clean = normalizeAttribution(attribution);
   if (!clean?.name && !clean?.email) return null;
-  const label = formatAttributionLabel(clean);
+  const label = `${clean.name || displayNameFromEmail(clean.email)} • ${formatShortAttributionDate(clean.date || clean.savedAt)}`;
   return (
     <span title={clean.email ? `Saved by ${clean.email}` : 'Automatically generated note attribution'} className="inline-flex select-none items-center rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-2.5 py-1 text-[11px] font-semibold text-zinc-800 shadow-sm">
       {label}
     </span>
-  );
-}
-
-function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.', canEdit = false, onEditNote = null }) {
-  const [editingId, setEditingId] = useState(null);
-  const [draftText, setDraftText] = useState('');
-  if (!entries.length) return null;
-  return (
-    <div className="space-y-4">
-      {entries.map(entry => {
-        const isEditing = editingId === entry.id;
-        const editedLabel = entry.editedAt ? `Edited by ${entry.editedName || displayNameFromEmail(entry.editedEmail || '')} • ${formatAttributionTime(entry.editedAt)} ${formatShortAttributionDate(entry.editedAt)}` : '';
-        return (
-          <div key={entry.id} className={isEditing ? 'rounded-2xl border border-[#AEBB9E] bg-white/80 p-3' : ''}>
-            <div className="flex items-center justify-between gap-3">
-              <AttributionPill attribution={entry} />
-              {canEdit && onEditNote ? (
-                <button type="button" onClick={() => { setEditingId(entry.id); setDraftText(entry.text); }} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-600 transition hover:bg-zinc-50">Edit</button>
-              ) : null}
-            </div>
-            {editedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{editedLabel}</div> : null}
-            {isEditing ? (
-              <div className="mt-3 space-y-2">
-                <textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} rows={4} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => { setEditingId(null); setDraftText(''); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button>
-                  <button type="button" onClick={() => { onEditNote(entry.id, draftText); setEditingId(null); setDraftText(''); }} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white">Save Note Edit</button>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{entry.text}</div>
-            )}
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
@@ -440,9 +199,7 @@ function CalendarColorKey() {
     ['Rain Date', TYPE_COLORS['Rain Date']],
     ['Seniors', TYPE_COLORS.Seniors],
     ['Call or Meeting', TYPE_COLORS['Call or Meeting']],
-    ['Edit Day', TYPE_COLORS['Edit Day']],
-    ['Time Off', TYPE_COLORS['Time Off']],
-    ['Personal Appointment', TYPE_COLORS['Personal Appointment']]
+    ['Edit Day', TYPE_COLORS['Edit Day']]
   ];
 
   return (
@@ -483,129 +240,6 @@ function formatDate(date) {
 
 function shortDate(date) {
   return new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-
-function pad2(value) {
-  return String(value).padStart(2, '0');
-}
-
-function dateKeyFromParts(year, month, day) {
-  return `${year}-${pad2(month)}-${pad2(day)}`;
-}
-
-function nthWeekdayOfMonth(year, month, weekday, occurrence) {
-  const first = new Date(year, month - 1, 1, 12, 0, 0);
-  const firstOffset = (weekday - first.getDay() + 7) % 7;
-  return dateKeyFromParts(year, month, 1 + firstOffset + (occurrence - 1) * 7);
-}
-
-function lastWeekdayOfMonth(year, month, weekday) {
-  const last = new Date(year, month, 0, 12, 0, 0);
-  const offset = (last.getDay() - weekday + 7) % 7;
-  return dateKeyFromParts(year, month, last.getDate() - offset);
-}
-
-function addHolidayDays(dateKey, days) {
-  const date = new Date(`${dateKey}T12:00:00`);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function easterDateKey(year) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return dateKeyFromParts(year, month, day);
-}
-
-const MANUAL_HOLIDAYS_BY_YEAR = {
-  2025: {
-    '2025-09-23': ['Rosh Hashanah'],
-    '2025-09-24': ['Rosh Hashanah'],
-    '2025-10-02': ['Yom Kippur']
-  },
-  2026: {
-    '2026-09-12': ['Rosh Hashanah'],
-    '2026-09-13': ['Rosh Hashanah'],
-    '2026-09-21': ['Yom Kippur']
-  },
-  2027: {
-    '2027-10-02': ['Rosh Hashanah'],
-    '2027-10-03': ['Rosh Hashanah'],
-    '2027-10-11': ['Yom Kippur']
-  },
-  2028: {
-    '2028-09-21': ['Rosh Hashanah'],
-    '2028-09-22': ['Rosh Hashanah'],
-    '2028-09-30': ['Yom Kippur']
-  },
-  2029: {
-    '2029-09-10': ['Rosh Hashanah'],
-    '2029-09-11': ['Rosh Hashanah'],
-    '2029-09-19': ['Yom Kippur']
-  }
-};
-
-function pushHoliday(map, dateKey, label) {
-  if (!dateKey || !label) return;
-  const current = map.get(dateKey) || [];
-  if (!current.includes(label)) current.push(label);
-  map.set(dateKey, current);
-}
-
-function getHolidayMapForYear(year) {
-  const map = new Map();
-  pushHoliday(map, dateKeyFromParts(year, 1, 1), "New Year's Day");
-  pushHoliday(map, nthWeekdayOfMonth(year, 1, 1, 3), 'MLK Day');
-  pushHoliday(map, nthWeekdayOfMonth(year, 2, 1, 3), 'Presidents Day');
-  const easter = easterDateKey(year);
-  pushHoliday(map, addHolidayDays(easter, -2), 'Good Friday');
-  pushHoliday(map, easter, 'Easter');
-  pushHoliday(map, lastWeekdayOfMonth(year, 5, 1), 'Memorial Day');
-  pushHoliday(map, dateKeyFromParts(year, 6, 19), 'Juneteenth');
-  pushHoliday(map, dateKeyFromParts(year, 7, 4), 'Independence Day');
-  pushHoliday(map, nthWeekdayOfMonth(year, 9, 1, 1), 'Labor Day');
-  pushHoliday(map, nthWeekdayOfMonth(year, 10, 1, 2), 'Columbus Day / Indigenous Peoples Day');
-  pushHoliday(map, dateKeyFromParts(year, 11, 11), 'Veterans Day');
-  const thanksgiving = nthWeekdayOfMonth(year, 11, 4, 4);
-  pushHoliday(map, thanksgiving, 'Thanksgiving');
-  pushHoliday(map, addHolidayDays(thanksgiving, 1), 'Black Friday');
-  pushHoliday(map, dateKeyFromParts(year, 12, 24), 'Christmas Eve');
-  pushHoliday(map, dateKeyFromParts(year, 12, 25), 'Christmas Day');
-  pushHoliday(map, dateKeyFromParts(year, 12, 31), "New Year's Eve");
-
-  Object.entries(MANUAL_HOLIDAYS_BY_YEAR[year] || {}).forEach(([dateKey, labels]) => {
-    labels.forEach(label => pushHoliday(map, dateKey, label));
-  });
-  return map;
-}
-
-function getHolidayLabels(dateKey) {
-  const year = Number(String(dateKey || '').slice(0, 4));
-  if (!year) return [];
-  return getHolidayMapForYear(year).get(dateKey) || [];
-}
-
-function HolidayText({ date }) {
-  const holidays = getHolidayLabels(date);
-  if (!holidays.length) return null;
-  return (
-    <div className="mb-1 space-y-0.5 text-[10px] font-semibold italic leading-tight text-zinc-500" title={holidays.join(', ')}>
-      {holidays.map(label => <div key={label} className="truncate">{label}</div>)}
-    </div>
-  );
 }
 
 function todayKey() {
@@ -704,42 +338,13 @@ function displayStatus(status) {
   return status === 'Needs Photographers Assigned' ? 'Needs Photographers Assigned' : status;
 }
 
-function getAssignedPhotographerNames(event = {}) {
-  return uniqueCanonicalPhotographers(Array.isArray(event?.photographers) ? event.photographers : []);
-}
-
-function getAssignedAssistantNames(event = {}) {
-  return Array.from(new Set((Array.isArray(event?.assistants) ? event.assistants : [])
-    .map(name => String(name || '').trim())
-    .filter(Boolean)
-    .filter(name => !/^tbd$/i.test(name) && !/^unassigned$/i.test(name))));
-}
-
-function formatMissingAssignmentLabel(count, singularLabel) {
-  const cleanCount = Math.max(1, Number(count) || 1);
-  return `Needs ${cleanCount} ${singularLabel}${cleanCount === 1 ? '' : 's'} assigned`;
-}
-
 function displayPhotographerAssignment(event) {
-  const assigned = getAssignedPhotographerNames(event);
-  const required = getRequiredPhotographerCount(event);
-  const status = String(event?.status || '').trim().toLowerCase();
-  const explicitlyNeedsPhotographer = status.includes('need') && status.includes('photographer');
-  if (!assigned.length || explicitlyNeedsPhotographer) return formatMissingAssignmentLabel(required, 'photographer');
-  return assigned.join(', ');
-}
-
-function isTimeOffEvent(event = {}) {
-  const type = String(event?.type || event?.event_type || '').trim().toLowerCase();
-  return type === 'time off' || type === 'personal appointment';
+  return event.photographers?.length ? event.photographers.join(', ') : 'Needs Photographers Assigned';
 }
 
 function isNeedsPhotographerAssignment(event) {
-  if (isTimeOffEvent(event)) return false;
   const status = String(event?.status || '').trim().toLowerCase();
-  if (status === 'schedule live complete') return false;
-  const assignedCount = getAssignedPhotographerCount(event);
-  const requiredCount = getRequiredPhotographerCount(event);
+  const photographers = Array.isArray(event?.photographers) ? event.photographers.filter(Boolean) : [];
   const placeholderStatuses = new Set([
     '',
     'needs photographer assigned',
@@ -752,15 +357,12 @@ function isNeedsPhotographerAssignment(event) {
     'photographer unassigned'
   ]);
 
-  return assignedCount < requiredCount || placeholderStatuses.has(status);
+  return photographers.length === 0 || placeholderStatuses.has(status);
 }
 
 function displayAssistants(event) {
   if (event?.noAssistant) return 'No Assistant';
-  const assigned = getAssignedAssistantNames(event);
-  const required = getRequiredAssistantCount(event);
-  if (!assigned.length && required > 0) return formatMissingAssignmentLabel(required, 'assistant');
-  return assigned.length ? assigned.join(', ') : '—';
+  return event?.assistants?.length ? event.assistants.join(', ') : '—';
 }
 
 function normalizeSchoolLookupKey(value = '') {
@@ -769,63 +371,6 @@ function normalizeSchoolLookupKey(value = '') {
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-}
-
-function normalizeSchoolMatchKey(value = '') {
-  return normalizeSchoolLookupKey(value)
-    .replace(/\bmiddle school and high school\b/g, 'ms hs')
-    .replace(/\bmiddle and high school\b/g, 'ms hs')
-    .replace(/\bmiddle school high school\b/g, 'ms hs')
-    .replace(/\bmiddle high school\b/g, 'ms hs')
-    .replace(/\bmiddle school\b/g, 'ms')
-    .replace(/\bhigh school\b/g, 'hs')
-    .replace(/\belementary school\b/g, 'elem')
-    .replace(/\belementary\b/g, 'elem')
-    .replace(/\band\b/g, '')
-    .replace(/\bschool\b/g, '')
-    .replace(/\bdistrict\b/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function resolveSchoolListMatch(schoolName = '', schools = []) {
-  const target = normalizeSchoolMatchKey(schoolName);
-  if (!target) return null;
-
-  const activeSchools = (schools || []).filter(school => school && school.active !== false && !school.mergedInto);
-  const exact = activeSchools.find(school =>
-    normalizeSchoolLookupKey(school.name) === normalizeSchoolLookupKey(schoolName) ||
-    normalizeSchoolLookupKey(school.originalName || '') === normalizeSchoolLookupKey(schoolName)
-  );
-  if (exact) return exact;
-
-  const normalizedExact = activeSchools.find(school => {
-    const keys = [school.name, school.originalName, ...(school.mergedFrom || [])].filter(Boolean).map(normalizeSchoolMatchKey);
-    return keys.includes(target);
-  });
-  if (normalizedExact) return normalizedExact;
-
-  const candidates = activeSchools
-    .map(school => {
-      const keys = [school.name, school.originalName, ...(school.mergedFrom || [])].filter(Boolean).map(normalizeSchoolMatchKey);
-      const bestScore = keys.reduce((score, key) => {
-        if (!key) return score;
-        if (key === target) return Math.max(score, 100);
-        if (key.includes(target) || target.includes(key)) return Math.max(score, Math.min(key.length, target.length));
-        const targetParts = target.split(' ').filter(Boolean);
-        const keyParts = key.split(' ').filter(Boolean);
-        const overlap = targetParts.filter(part => keyParts.includes(part)).length;
-        return Math.max(score, overlap);
-      }, 0);
-      return { school, score: bestScore };
-    })
-    .filter(item => item.score >= 2)
-    .sort((a, b) => b.score - a.score || a.school.name.localeCompare(b.school.name));
-
-  if (!candidates.length) return null;
-  const [best, second] = candidates;
-  if (!second || best.score > second.score) return best.school;
-  return best.school;
 }
 
 const SCHOOL_IRM_LOOKUP = new Map(
@@ -875,7 +420,6 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
-            <span className="font-semibold text-zinc-600">{formatDate(event.date)}</span>
             <span>{getEventTimeLabel(event)}</span>
             {event.canonicalSchool ? <span className="truncate">{event.canonicalSchool}</span> : null}
           </div>
@@ -907,17 +451,16 @@ function addMonths(key, delta) {
 }
 
 function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }) {
-  const mobileViewCompact = activeTab === 'Mobile View';
   return (
-    <header className={`sticky top-0 z-20 border-b border-zinc-200/70 bg-cream/90 backdrop-blur-xl ${mobileViewCompact ? 'sm:py-0' : ''}`}>
-      <div className={`mx-auto max-w-7xl px-4 sm:px-6 ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-4'}`}>
-        <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-4'}`}>
+    <header className="sticky top-0 z-20 border-b border-zinc-200/70 bg-cream/90 backdrop-blur-xl">
+      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
-            <p className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} mt-1 max-w-2xl text-sm text-zinc-600`}>A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">iSmile Scheduler v0.92</h1>
+            <p className="mt-1 max-w-2xl text-sm text-zinc-600">A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
-          <div className={`flex w-full flex-col lg:w-auto lg:min-w-[560px] ${mobileViewCompact ? 'gap-2 sm:gap-3' : 'gap-3'}`}>
-            <label className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} relative`}>
+          <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[560px]">
+            <label className="relative block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
               <input
                 value={query}
@@ -926,10 +469,10 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
                 className="w-full rounded-2xl border border-zinc-200 bg-white/80 py-3 pl-10 pr-4 text-sm outline-none ring-sage/30 transition focus:ring-4"
               />
             </label>
-            <div className={`${mobileViewCompact ? 'hidden sm:flex' : 'flex'} justify-end`}><AuthStatus /></div>
-            <nav className="hidden justify-end gap-2 sm:flex sm:flex-wrap">
+            <div className="flex justify-end"><AuthStatus /></div>
+            <nav className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-7">
               {visibleTabs.map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
+                <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
                 </button>
               ))}
@@ -994,52 +537,19 @@ function MonthNavigator({ month, setMonth }) {
   );
 }
 
-
-function compactCrewList(event = {}) {
-  return [
-    ...uniqueCanonicalPhotographers(event.photographers || []),
-    ...(event.assistants || []).filter(Boolean)
-  ].filter(Boolean);
-}
-
-function buildDayCopyText(title, dayEvents) {
-  const label = title.includes('Tomorrow') ? "Schools We're Photographing Tomorrow" : "Schools We're Photographing Today";
-  if (!dayEvents.length) return `${label}: Nothing scheduled.`;
-  const items = dayEvents.map(event => {
-    const crew = compactCrewList(event);
-    return `${event.canonicalSchool || event.title}${crew.length ? ` (${crew.join(', ')})` : ''}`;
-  });
-  return `${label}: ${items.join(', ')}.`;
-}
-
 function TodayTomorrowList({ title, date, events, onClickEvent }) {
-  const [copied, setCopied] = useState(false);
   const dayEvents = events
     .filter(event => isDateInEventRange(event, date) && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
     .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
-  const copyDay = async () => {
-    const text = buildDayCopyText(title, dayEvents);
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch (error) {
-      window.prompt('Copy this text:', text);
-    }
-  };
-
   return (
     <div className="rounded-3xl border border-zinc-200/80 bg-white/75 p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</div>
           <div className="mt-1 text-sm font-medium text-zinc-900">{formatDate(date)}</div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button type="button" onClick={copyDay} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-xs font-black text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">{copied ? 'Copied' : 'Copy'}</button>
-          <Pill className="border-zinc-200 bg-cream text-zinc-700">{dayEvents.length}</Pill>
-        </div>
+        <Pill className="border-zinc-200 bg-cream text-zinc-700">{dayEvents.length}</Pill>
       </div>
       <div className="mt-3 space-y-2">
         {dayEvents.length ? dayEvents.slice(0, 4).map(event => (
@@ -1051,7 +561,7 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
           >
             <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
             <div className="mt-1 truncate text-xs text-zinc-500">
-              {compactCrewList(event).length ? <>Crew: {compactCrewList(event).join(', ')}</> : <>Needs photographers assigned</>}
+              {event.photographers?.length ? <>Assigned: {event.photographers.join(', ')}</> : <>Needs photographers assigned</>}
             </div>
           </button>
         )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-400">Nothing currently scheduled.</div>}
@@ -1067,7 +577,7 @@ function CurrentWeeklyRolloutCard({ events }) {
   const weekEvents = events.filter(event => event && event.date >= start && event.date <= end);
   const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
+  const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
   const photographerSummary = Array.from(
     weekEvents.reduce((counts, event) => {
       if (!isRolloutEvent(event)) return counts;
@@ -1087,7 +597,7 @@ function CurrentWeeklyRolloutCard({ events }) {
         </div>
         <Pill className={`border-current bg-white/60 ${capacity.className}`}>{capacity.label}</Pill>
       </div>
-      <div className="mt-5 text-3xl font-semibold">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
+      <div className="mt-5 text-3xl font-semibold">{weeklyRollouts} / 22</div>
       <div className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-75">Photographer rollouts</div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/70">
         <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
@@ -1224,7 +734,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
     {
       key: 'needs-assistant',
       title: 'Need Assistant(s) Assigned',
-      filter: (event) => !isTimeOffEvent(event) && event.status === 'Scheduled' && !event.noAssistant && getRequiredAssistantCount(event) > 0 && (!event.assistants || event.assistants.length === 0)
+      filter: (event) => event.status === 'Scheduled' && !event.noAssistant && (!event.assistants || event.assistants.length === 0)
     },
     {
       key: 'rain-watch',
@@ -1249,7 +759,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
               <h2 className="text-sm font-semibold text-zinc-800">{column.title}</h2>
               <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
             </div>
-            <div className="space-y-2">{columnEvents.map(event => {
+            <div className="space-y-3">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
               return <EventCard key={event.id} event={event} onClick={onClick} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
             })}</div>
@@ -1261,647 +771,11 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
   );
 }
 
-const SCHEDULE_LIVE_SESSION_ID = 'main';
-const SCHEDULE_LIVE_HOLD_STATUS = 'Hold! Needs Discussion Later';
-const SCHEDULE_LIVE_COMPLETE_STATUS = 'Schedule Live Complete';
-const SCHEDULE_LIVE_COMMENTARY_RETENTION_DAYS = 15;
-
-function getCleanScheduleLiveCommentary(commentary = []) {
-  const cutoff = Date.now() - SCHEDULE_LIVE_COMMENTARY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-  return (Array.isArray(commentary) ? commentary : [])
-    .filter(entry => {
-      const savedAt = entry?.savedAt ? new Date(entry.savedAt).getTime() : 0;
-      return savedAt && savedAt >= cutoff;
-    })
-    .slice(0, 40);
-}
-
-function cleanScheduleLiveState(state = {}) {
-  return {
-    ...state,
-    commentary: getCleanScheduleLiveCommentary(state.commentary)
-  };
-}
-
-function getMondayStart(date = todayKey()) {
-  const d = new Date(`${date}T12:00:00`);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function scheduleLiveDefaultState(date = todayKey()) {
-  return {
-    weekStart: getMondayStart(date),
-    showWeekends: false,
-    hostEmail: '',
-    hostName: '',
-    commentary: [],
-    activeUsers: {}
-  };
-}
-
-function getScheduleLiveSessionMonthLabel(weekStart) {
-  return monthLabel(monthKey(weekStart || todayKey()));
-}
-
-function getScheduleLiveDays(weekStart, showWeekends) {
-  const start = getMondayStart(weekStart || todayKey());
-  const count = showWeekends ? 7 : 5;
-  return Array.from({ length: count }, (_, index) => addDays(start, index));
-}
-
-function getScheduleLiveWeekLabel(weekStart, showWeekends) {
-  const days = getScheduleLiveDays(weekStart, showWeekends);
-  return `${shortDate(days[0])} – ${shortDate(days[days.length - 1])}`;
-}
-
-function getScheduleLiveMonthEvents(events, weekStart) {
-  const targetMonth = monthKey(weekStart || todayKey());
-  return (events || []).filter(event => event && event.active !== false && monthKey(event.date) === targetMonth && isRolloutEvent(event));
-}
-
-function getScheduleLiveProgress(events, weekStart) {
-  const monthEvents = getScheduleLiveMonthEvents(events, weekStart);
-  const total = monthEvents.length;
-  const assigned = monthEvents.filter(event => event.status === SCHEDULE_LIVE_COMPLETE_STATUS || eventMeetsPhotographerRequirement(event)).length;
-  const pct = total ? Math.round((assigned / total) * 100) : 0;
-  return { total, assigned, pct };
-}
-
-function getScheduleLiveHistoricalRows(event, events) {
-  const key = normalizeSchoolLookupKey(event?.canonicalSchool || event?.title || '');
-  if (!key) return [];
-  const seen = new Set();
-  return (events || [])
-    .filter(item => item && item.id !== event.id && item.date && String(item.date).localeCompare(String(event.date || '9999-12-31')) < 0)
-    .filter(item => ['Fall Picture Day', 'Spring Picture Day', 'Makeup Day', 'Sports', 'Seniors'].includes(item.type))
-    .filter(item => {
-      const itemKey = normalizeSchoolLookupKey(item.canonicalSchool || item.title || '');
-      return itemKey && (itemKey.includes(key) || key.includes(itemKey));
-    })
-    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
-    .filter(item => {
-      const names = uniqueCanonicalPhotographers(item.photographers || []).join(', ');
-      const dedupeKey = `${item.date}|${item.type}|${names}`;
-      if (seen.has(dedupeKey)) return false;
-      seen.add(dedupeKey);
-      return true;
-    })
-    .slice(0, 4)
-    .map(item => ({
-      date: item.date,
-      title: item.title,
-      type: item.type,
-      photographers: uniqueCanonicalPhotographers(item.photographers || [])
-    }));
-}
-
-function getMakeupSourcePictureDay(event, events) {
-  if (event?.type !== 'Makeup Day') return null;
-  const key = normalizeSchoolLookupKey(event?.canonicalSchool || event?.title || '');
-  const year = String(event?.date || '').slice(0, 4);
-  if (!key || !year) return null;
-  return (events || [])
-    .filter(item => item && item.id !== event.id && String(item.date || '').startsWith(year))
-    .filter(item => ['Fall Picture Day', 'Spring Picture Day'].includes(item.type))
-    .filter(item => String(item.date || '').localeCompare(String(event.date || '9999-12-31')) <= 0)
-    .filter(item => {
-      const itemKey = normalizeSchoolLookupKey(item.canonicalSchool || item.title || '');
-      return itemKey && (itemKey.includes(key) || key.includes(itemKey));
-    })
-    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0] || null;
-}
-
-function ScheduleLiveEventCard({ event, events, photographers, assistants = [], onClickEvent, onAssignPhotographer, onRemovePhotographer, onAssignAssistant, onRemoveAssistant, onToggleHold, onToggleComplete, onUpdateRequirements, canEdit = true, draggedPhotographer, setDraggedPhotographer }) {
-  const [expandedInfo, setExpandedInfo] = useState(false);
-  const [expandedHistory, setExpandedHistory] = useState(false);
-  const assigned = uniqueCanonicalPhotographers(event.photographers || []);
-  const assignedAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
-  const requiredPhotographers = getRequiredPhotographerCount(event);
-  const requiredAssistants = getRequiredAssistantCount(event);
-  const needsMorePhotographers = assigned.length < requiredPhotographers;
-  const history = getScheduleLiveHistoricalRows(event, events);
-  const makeupSource = getMakeupSourcePictureDay(event, events);
-  const makeupPhotographers = uniqueCanonicalPhotographers(makeupSource?.photographers || []);
-  const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
-  const isMarkedComplete = event.status === SCHEDULE_LIVE_COMPLETE_STATUS;
-  const isAutoComplete = eventMeetsPhotographerRequirement(event) && requiredAssistants >= 0 && !isHeld;
-  const isComplete = isMarkedComplete || isAutoComplete;
-
-  const assign = (name) => {
-    if (!canEdit || !name) return;
-    onAssignPhotographer(event, canonicalPhotographerName(name));
-  };
-
-  const assignAssistant = (name) => {
-    if (!canEdit || !name) return;
-    onAssignAssistant?.(event, name);
-  };
-
-  return (
-    <motion.article
-      layout
-      onDragOver={(e) => { if (canEdit && draggedPhotographer) e.preventDefault(); }}
-      onDrop={(e) => { e.preventDefault(); if (draggedPhotographer) assign(draggedPhotographer); setDraggedPhotographer?.(''); }}
-      className={`group relative overflow-hidden rounded-2xl border bg-white p-2 text-left shadow-md shadow-zinc-950/10 transition hover:-translate-y-0.5 hover:shadow-xl ${isHeld ? 'border-yellow-300 ring-2 ring-yellow-300/50' : isComplete ? 'border-emerald-200 opacity-60 ring-1 ring-emerald-200/70' : 'border-white/70'}`}
-    >
-      <div className={`absolute inset-x-0 top-0 h-1 ${TYPE_COLORS[event.type] || 'bg-zinc-200'}`} />
-      {isComplete ? <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,transparent_47%,rgba(22,163,74,0.18)_49%,rgba(22,163,74,0.18)_51%,transparent_53%)]" /> : null}
-      <div className="pt-1">
-        <div className="flex items-start justify-between gap-2">
-          <button type="button" title={event.title} onClick={() => onClickEvent(event)} className="min-w-0 flex-1 truncate text-left text-[13px] font-black leading-tight text-zinc-950 hover:underline">{event.title}</button>
-          {getEventIrm(event) ? <Pill className="shrink-0 border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
-        </div>
-        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
-          <span>{event.type}</span>
-          <span>{getEventTimeLabel(event)}</span>
-          
-        </div>
-      </div>
-
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {assigned.length ? assigned.map(name => (
-          <span key={name} className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2 py-1 text-[11px] font-bold text-zinc-800">
-            {name}
-            {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
-          </span>
-        )) : null}
-        {assignedAssistants.length ? assignedAssistants.map(name => (
-          <span key={`assistant-${name}`} className="inline-flex items-center gap-1 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2 py-1 text-[11px] font-bold text-zinc-800">
-            Asst: {name}
-            {canEdit ? <button type="button" onClick={() => onRemoveAssistant?.(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
-          </span>
-        )) : null}
-        {needsMorePhotographers ? <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700">Needs {requiredPhotographers - assigned.length} Photographer{requiredPhotographers - assigned.length === 1 ? '' : 's'}</span> : null}
-        {isComplete ? <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700">Complete</span> : null}
-      </div>
-
-      <div className="mt-2 text-[11px] font-semibold text-zinc-600">
-        Need: {getRequirementStatusLabel(event)}
-      </div>
-
-      {canEdit ? (
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          <label className="rounded-xl border border-zinc-200 bg-white px-2 py-1">
-            <div className="text-[9px] font-black uppercase tracking-wide text-zinc-400">Photogs Required</div>
-            <select value={requiredPhotographers} onChange={(e) => onUpdateRequirements?.(event, { requiredPhotographers: Number(e.target.value), requiredAssistants })} className="mt-0.5 w-full bg-transparent text-[11px] font-black text-zinc-800 outline-none">
-              {[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
-            </select>
-          </label>
-          <label className="rounded-xl border border-zinc-200 bg-white px-2 py-1">
-            <div className="text-[9px] font-black uppercase tracking-wide text-zinc-400">Assts Needed</div>
-            <select value={requiredAssistants} onChange={(e) => onUpdateRequirements?.(event, { requiredPhotographers, requiredAssistants: Number(e.target.value) })} className="mt-0.5 w-full bg-transparent text-[11px] font-black text-zinc-800 outline-none">
-              {[0,1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
-            </select>
-          </label>
-        </div>
-      ) : null}
-
-      {canEdit ? (
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          <select value="" onChange={(e) => { assign(e.target.value); e.target.value = ''; }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
-            <option value="">Assign photographer...</option>
-            {photographers.map(name => <option key={name} value={name}>{canonicalPhotographerName(name)}</option>)}
-          </select>
-          <select value="" onChange={(e) => { assignAssistant(e.target.value); e.target.value = ''; }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
-            <option value="">Assign assistant optional...</option>
-            {assistants.map(name => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </div>
-      ) : null}
-
-      {makeupPhotographers.length ? (
-        <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50/80 p-2 text-[11px] text-rose-900">
-          <div className="font-black uppercase tracking-wide">Makeup shortcut</div>
-          <div className="mt-1">Picture Day crew: {makeupPhotographers.join(', ')}</div>
-          {canEdit ? <button type="button" onClick={() => makeupPhotographers.forEach(assign)} className="mt-2 rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white shadow-sm">Use same</button> : null}
-        </div>
-      ) : null}
-
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <button type="button" onClick={() => setExpandedHistory(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold text-zinc-700">Past</button>
-        <button type="button" onClick={() => setExpandedInfo(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold text-zinc-700">Info</button>
-        {canEdit ? <button type="button" onClick={() => onToggleHold(event)} className={`rounded-full border px-2 py-1 text-[10px] font-black ${isHeld ? 'border-yellow-300 bg-yellow-200 text-yellow-950' : 'border-yellow-300 bg-yellow-100 text-yellow-950'}`}>{isHeld ? 'Return' : 'Hold!'}</button> : null}
-        {canEdit ? <button type="button" onClick={() => onToggleComplete?.(event)} className={`rounded-full border px-2 py-1 text-[10px] font-black ${isMarkedComplete ? 'border-emerald-300 bg-emerald-100 text-emerald-900' : 'border-emerald-200 bg-white text-emerald-700'}`}>{isMarkedComplete ? 'Reopen' : 'Done'}</button> : null}
-      </div>
-
-      <AnimatePresence>
-        {expandedHistory ? (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] text-zinc-700">
-            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-0.5"><span className="font-black">{row.date ? shortDate(row.date) : 'Past'}</span>{row.type ? <span className="text-zinc-400"> · {row.type}</span> : null} — {row.photographers.length ? row.photographers.join(', ') : 'No photographer listed'}</div>) : <div className="text-zinc-500">No past photographer history found.</div>}
-          </motion.div>
-        ) : null}
-        {expandedInfo ? (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] leading-5 text-zinc-700">
-            {event.notes ? <div className="whitespace-pre-wrap">{event.notes}</div> : <div className="text-zinc-500">No Picture Day Info entered.</div>}
-            {stripInternalEventMeta(event.history) ? <div className="mt-2 whitespace-pre-wrap border-t border-zinc-100 pt-2 text-zinc-500">{stripInternalEventMeta(event.history)}</div> : null}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </motion.article>
-  );
-}
-
-function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent, onSchedule, authEmail, isAdminUser, canEdit = true, reloadEvents }) {
-  const [liveState, setLiveState] = useState(() => scheduleLiveDefaultState(todayKey()));
-  const [statusMessage, setStatusMessage] = useState('');
-  const [commentText, setCommentText] = useState('');
-  const [draggedPhotographer, setDraggedPhotographer] = useState('');
-  const [selectedPhotographer, setSelectedPhotographer] = useState('');
-  const liveStateRef = useRef(liveState);
-
-  useEffect(() => {
-    liveStateRef.current = liveState;
-  }, [liveState]);
-
-  const currentUserName = displayNameFromEmail(authEmail || '');
-  const isHost = liveState.hostEmail && authEmail && liveState.hostEmail === authEmail;
-  const canHost = isAdminUser;
-  const canControlWeek = isHost || (!liveState.hostEmail && canHost);
-
-  const saveLiveState = async (updater) => {
-    const baseState = liveStateRef.current || liveState;
-    const rawNext = typeof updater === 'function' ? updater(baseState) : { ...baseState, ...updater };
-    const next = cleanScheduleLiveState(rawNext);
-    const activeUsers = {
-      ...(next.activeUsers || {}),
-      ...(authEmail ? { [authEmail]: { name: currentUserName, email: authEmail, seenAt: new Date().toISOString() } } : {})
-    };
-    const cleanNext = { ...next, activeUsers };
-    liveStateRef.current = cleanNext;
-    setLiveState(cleanNext);
-
-    const supabase = createClient();
-    if (!hasSupabaseEnv() || !supabase) {
-      setStatusMessage('Schedule Live is running locally because Supabase is not connected.');
-      return cleanNext;
-    }
-
-    const { error } = await supabase
-      .from('schedule_live_sessions')
-      .upsert({ id: SCHEDULE_LIVE_SESSION_ID, data: cleanNext, updated_at: new Date().toISOString() }, { onConflict: 'id' });
-
-    if (error) {
-      setStatusMessage(`Schedule Live shared session needs setup: ${error.message}. Assignments still save to events.`);
-    } else {
-      setStatusMessage('Schedule Live session synced.');
-    }
-    return cleanNext;
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    const supabase = createClient();
-
-    async function loadSession() {
-      if (!hasSupabaseEnv() || !supabase) return;
-      const { data, error } = await supabase
-        .from('schedule_live_sessions')
-        .select('data')
-        .eq('id', SCHEDULE_LIVE_SESSION_ID)
-        .maybeSingle();
-      if (cancelled) return;
-      if (error) {
-        setStatusMessage(`Run the Schedule Live SQL setup to share host/commentary: ${error.message}`);
-        return;
-      }
-      if (data?.data) { const incoming = cleanScheduleLiveState({ ...scheduleLiveDefaultState(todayKey()), ...data.data }); liveStateRef.current = incoming; setLiveState(incoming); }
-      else await saveLiveState(scheduleLiveDefaultState(todayKey()));
-    }
-
-    loadSession();
-
-    const channel = hasSupabaseEnv() && supabase
-      ? supabase.channel('schedule-live-room')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_live_sessions', filter: `id=eq.${SCHEDULE_LIVE_SESSION_ID}` }, payload => {
-          const nextData = payload?.new?.data;
-          if (nextData && !cancelled) { const incoming = cleanScheduleLiveState({ ...scheduleLiveDefaultState(todayKey()), ...nextData }); liveStateRef.current = incoming; setLiveState(incoming); }
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => reloadEvents?.())
-        .subscribe()
-      : null;
-
-    const heartbeat = window.setInterval(() => {
-      saveLiveState(prev => ({ ...prev }));
-    }, 25000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(heartbeat);
-      if (channel && supabase) supabase.removeChannel(channel);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authEmail]);
-
-  const days = getScheduleLiveDays(liveState.weekStart, liveState.showWeekends);
-  const weekEnd = days[days.length - 1];
-  const weekEvents = (events || []).filter(event => event && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && event.status !== SCHEDULE_LIVE_HOLD_STATUS);
-  const heldEvents = (events || []).filter(event => event && event.status === SCHEDULE_LIVE_HOLD_STATUS && monthKey(event.date) === monthKey(liveState.weekStart));
-  const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
-  const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
-  const progress = getScheduleLiveProgress(events, liveState.weekStart);
-  const activeUsers = Object.values(liveState.activeUsers || {})
-    .filter(user => user?.seenAt && Date.now() - new Date(user.seenAt).getTime() < 120000)
-    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
-
-  const countsByPhotographer = photographers.reduce((map, name) => {
-    map[canonicalPhotographerName(name)] = 0;
-    return map;
-  }, {});
-  weekEvents.forEach(event => uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
-    countsByPhotographer[name] = (countsByPhotographer[name] || 0) + 1;
-  }));
-
-  const changeWeek = (delta) => {
-    if (!canControlWeek) return;
-    saveLiveState(prev => ({ ...prev, weekStart: addDays(getMondayStart(prev.weekStart), delta * 7) }));
-  };
-
-  const assignPhotographer = async (event, photographer) => {
-    if (!canEdit || !photographer) return;
-    const nextPhotographers = Array.from(new Set([...uniqueCanonicalPhotographers(event.photographers || []), canonicalPhotographerName(photographer)]));
-    const nextEvent = { ...event, photographers: nextPhotographers };
-    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
-    setSelectedPhotographer('');
-  };
-
-  const removePhotographer = async (event, photographer) => {
-    if (!canEdit) return;
-    const nextPhotographers = uniqueCanonicalPhotographers(event.photographers || []).filter(name => name !== canonicalPhotographerName(photographer));
-    const nextEvent = { ...event, photographers: nextPhotographers };
-    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
-  };
-
-  const assignAssistant = async (event, assistant) => {
-    if (!canEdit || !assistant) return;
-    const nextAssistants = Array.from(new Set([...(event.assistants || []).filter(Boolean), assistant]));
-    await onSchedule({ ...event, assistants: nextAssistants });
-  };
-
-  const removeAssistant = async (event, assistant) => {
-    if (!canEdit) return;
-    const nextAssistants = (event.assistants || []).filter(name => name !== assistant);
-    await onSchedule({ ...event, assistants: nextAssistants });
-  };
-
-  const updateRequirements = async (event, counts = {}) => {
-    if (!canEdit) return;
-    const requiredPhotographers = Math.max(1, Math.min(6, Number(counts.requiredPhotographers ?? getRequiredPhotographerCount(event)) || 1));
-    const requiredAssistants = Math.max(0, Math.min(6, Number(counts.requiredAssistants ?? getRequiredAssistantCount(event)) || 0));
-    const nextEvent = { ...event, requiredPhotographers, requiredAssistants, noAssistant: requiredAssistants === 0 };
-    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
-  };
-
-  const toggleHold = async (event) => {
-    if (!canEdit) return;
-    const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
-    await onSchedule({ ...event, status: isHeld ? (eventMeetsPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
-  };
-
-  const toggleComplete = async (event) => {
-    if (!canEdit) return;
-    const isComplete = event.status === SCHEDULE_LIVE_COMPLETE_STATUS;
-    await onSchedule({ ...event, status: isComplete ? (eventMeetsPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_COMPLETE_STATUS });
-  };
-
-  const addCommentary = async () => {
-    const body = commentText.trim();
-    if (!body) return;
-    const entry = { id: `comment-${Date.now()}`, name: currentUserName, email: authEmail || '', text: body, savedAt: new Date().toISOString() };
-    setCommentText('');
-    await saveLiveState(prev => ({ ...prev, commentary: [entry, ...getCleanScheduleLiveCommentary(prev.commentary)].slice(0, 40) }));
-  };
-
-  const clearCommentary = async () => {
-    if (!isHost) return;
-    const ok = window.confirm('Clear all commentary messages?\n\nThis cannot be undone.');
-    if (!ok) return;
-    await saveLiveState(prev => ({ ...prev, commentary: [] }));
-  };
-
-  return (
-    <div className="schedule-live-stage overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#000604] via-[#00120c] to-[#031b13] p-3 text-white shadow-2xl">
-      <style jsx global>{`
-        @keyframes scheduleLiveShimmer {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        @keyframes scheduleLivePulse {
-          0%, 100% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.38), 0 0 0 rgba(239, 68, 68, 0.20); transform: scale(1); }
-          50% { box-shadow: 0 0 32px rgba(239, 68, 68, 0.70), 0 0 18px rgba(248, 113, 113, 0.35); transform: scale(1.035); }
-        }
-        @keyframes scheduleLiveGlow {
-          0%, 100% { box-shadow: 0 0 18px rgba(255, 255, 255, 0.08), 0 0 20px rgba(255, 214, 10, 0.08); }
-          50% { box-shadow: 0 0 26px rgba(255, 255, 255, 0.13), 0 0 30px rgba(255, 214, 10, 0.18); }
-        }
-        @keyframes scheduleLiveCommentIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes scheduleLivePresencePulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.40); }
-          50% { box-shadow: 0 0 0 5px rgba(52, 211, 153, 0.00); }
-        }
-        .schedule-live-stage {
-          background-size: 230% 230%;
-          animation: scheduleLiveShimmer 18s ease-in-out infinite;
-          position: relative;
-        }
-        .schedule-live-stage::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: radial-gradient(circle at 18% 12%, rgba(255, 214, 10, 0.12), transparent 24%), radial-gradient(circle at 88% 18%, rgba(239, 68, 68, 0.12), transparent 22%), radial-gradient(circle at 50% 105%, rgba(16, 185, 129, 0.12), transparent 32%);
-        }
-        .schedule-live-live-badge { animation: scheduleLivePulse 2.1s ease-in-out infinite; }
-        .schedule-live-premium-glow { animation: scheduleLiveGlow 4.2s ease-in-out infinite; }
-        .schedule-live-comment-card { animation: scheduleLiveCommentIn 260ms ease-out both; }
-        .schedule-live-presence-dot { animation: scheduleLivePresencePulse 2.2s ease-in-out infinite; }
-        @media (prefers-reduced-motion: reduce) {
-          .schedule-live-stage, .schedule-live-live-badge, .schedule-live-premium-glow, .schedule-live-comment-card, .schedule-live-presence-dot { animation: none !important; }
-        }
-      `}</style>
-      <div className="relative rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-inner backdrop-blur">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <div className="schedule-live-live-badge inline-flex items-center gap-2 rounded-full border border-red-200/70 bg-red-500/30 px-3 py-1 text-xs font-black uppercase tracking-[0.22em] text-red-50 shadow-[0_0_26px_rgba(239,68,68,0.45)]"><span className="animate-pulse">🔴</span> Schedule Live!</div>
-            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{getScheduleLiveSessionMonthLabel(liveState.weekStart)} Scheduling Session</h2>
-            <p className="mt-1 text-sm font-semibold text-red-100/80">Week of {getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-white/80">
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">Host: {liveState.hostName || 'None yet'}</span>
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">Production schedule</span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {(activeUsers.length ? activeUsers : [{ name: currentUserName || 'You', email: authEmail || 'local', seenAt: new Date().toISOString() }]).map(user => {
-                  const hostMatch = liveState.hostEmail && user.email && String(user.email).toLowerCase() === String(liveState.hostEmail).toLowerCase();
-                  return (
-                    <span key={user.email || user.name} className="inline-flex items-center gap-1 rounded-full border border-emerald-200/25 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-black text-emerald-50">
-                      <span className="schedule-live-presence-dot h-2 w-2 rounded-full bg-emerald-300" />
-                      {user.name || displayNameFromEmail(user.email || '') || 'User'}{hostMatch ? ' 👑' : ''}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[760px]">
-            <div className={`schedule-live-premium-glow rounded-[1.5rem] border p-4 ${capacity.className} bg-white text-zinc-900`}>
-              <div className="text-xs font-black uppercase tracking-wide opacity-70">Weekly Rollouts</div>
-              <div className="mt-1 text-3xl font-black">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200"><div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} /></div>
-              <div className="mt-2 text-xs font-black">{WEEKLY_ROLLOUT_CAPACITY - weeklyRollouts >= 0 ? `${WEEKLY_ROLLOUT_CAPACITY - weeklyRollouts} remaining` : `${weeklyRollouts - WEEKLY_ROLLOUT_CAPACITY} over capacity`} · {capacity.label}</div>
-              <div className="mt-3 border-t border-zinc-200/70 pt-2">
-                <div className="mb-1 text-[10px] font-black uppercase tracking-wide opacity-60">Weekly Rollouts</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {photographers.map(name => {
-                    const canonical = canonicalPhotographerName(name);
-                    const count = countsByPhotographer[canonical] || 0;
-                    const selected = selectedPhotographer === canonical;
-                    return <button key={canonical} type="button" draggable={canEdit} onDragStart={() => setDraggedPhotographer(canonical)} onDragEnd={() => setDraggedPhotographer('')} onClick={() => setSelectedPhotographer(selected ? '' : canonical)} className={`rounded-full border px-2.5 py-1 text-[11px] font-black transition ${selected ? 'border-red-500 bg-red-500 text-white shadow-sm' : 'border-zinc-200 bg-white text-zinc-800 hover:border-[#AEBB9E] hover:bg-[#DDE8D2]'}`}>
-                      {canonical} <span className="tabular-nums">{count}</span>
-                    </button>;
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="schedule-live-premium-glow rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
-              <div className="text-xs font-black uppercase tracking-wide opacity-70">Scheduling Complete</div>
-              <div className="mt-1 text-3xl font-black">{progress.pct}%</div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${progress.pct}%` }} /></div>
-              <div className="mt-2 text-xs font-black">{progress.assigned} of {progress.total} {monthLabel(monthKey(liveState.weekStart))} events assigned</div>
-            </div>
-            <div className="schedule-live-premium-glow rounded-[1.5rem] border border-white/15 bg-white/10 p-4">
-              <div className="text-xs font-black uppercase tracking-wide text-white/60">Host Controls</div>
-              {canHost ? (
-                <div className="mt-2 flex flex-col gap-2">
-                  <button type="button" onClick={() => saveLiveState(prev => ({ ...prev, hostEmail: authEmail || '', hostName: currentUserName }))} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30">{isHost ? 'Refresh Host' : 'Become Host'}</button>
-                  {isHost ? <button type="button" onClick={() => saveLiveState(prev => ({ ...prev, hostEmail: '', hostName: '' }))} className="rounded-2xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-black text-white">Release Host</button> : null}
-                  {isHost ? <button type="button" onClick={clearCommentary} className="rounded-2xl border border-red-200/35 bg-red-950/35 px-3 py-2 text-sm font-black text-red-100 hover:bg-red-600 hover:text-white">🗑 Clear Commentary</button> : null}
-                </div>
-              ) : <div className="mt-2 text-sm font-semibold text-white/70">Admins control the shared week.</div>}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr]">
-          <section className="schedule-live-premium-glow rounded-[1.5rem] border border-[#FFEA00] bg-[#FFEA00] p-3 text-zinc-950 shadow-lg shadow-yellow-950/20">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-black text-zinc-950">🟡 Hold! Needs Discussion Later</h3>
-              <span className="rounded-full bg-zinc-950 px-2 py-1 text-[10px] font-black text-[#FFEA00]">{heldEvents.length}</span>
-            </div>
-            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-              {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="min-w-[220px] rounded-2xl border border-zinc-950/10 bg-white/85 p-3 text-left text-xs font-bold text-zinc-950 shadow-sm hover:bg-white"><div>{event.title}</div><div className="mt-1 text-zinc-700">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">Return to week</span> : null}</button>) : <div className="w-full rounded-2xl border border-dashed border-zinc-950/20 bg-white/35 p-4 text-center text-xs font-black text-zinc-800">Nothing on hold.</div>}
-            </div>
-          </section>
-
-          <section className="schedule-live-premium-glow min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
-            <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
-            <div className="mt-2 flex gap-2">
-              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-sm text-zinc-900 outline-none" />
-              <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
-            </div>
-            <div className="mt-2 flex max-h-[96px] max-w-full min-w-0 gap-2 overflow-x-auto overflow-y-auto pb-1 pr-1">
-              {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
-                <div key={entry.id} className="schedule-live-comment-card w-[240px] min-w-[220px] max-w-[280px] shrink-0 rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
-                  <div className="text-[10px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
-                  <div className="mt-1 max-h-10 overflow-hidden break-words text-xs leading-4 text-white/90 [overflow-wrap:anywhere]">{entry.text}</div>
-                </div>
-              )) : <div className="w-full rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No live commentary yet.</div>}
-            </div>
-          </section>
-        </div>
-
-        <div className="mt-4">
-          <section className="min-w-0">
-            <div className="mb-3 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/10 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(-1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronLeft size={18} /></button>
-                <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronRight size={18} /></button>
-                <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-black text-white">{getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</span>
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm font-bold text-white/85">
-                <input type="checkbox" checked={Boolean(liveState.showWeekends)} disabled={!canControlWeek} onChange={(e) => saveLiveState(prev => ({ ...prev, showWeekends: e.target.checked }))} />
-                Show weekends
-              </label>
-            </div>
-
-            <div className={`grid gap-3 ${liveState.showWeekends ? 'xl:grid-cols-7' : 'xl:grid-cols-5'}`}>
-              {days.map(date => {
-                const dayEvents = weekEvents.filter(event => isDateInEventRange(event, date)).sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
-                return <div key={date} className="min-h-[260px] rounded-[1.35rem] border border-white/10 bg-white/10 p-2">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-black text-white">{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}</div>
-                      <div className="text-xs font-semibold text-white/50">{shortDate(date)}</div>
-                      {getHolidayLabels(date).length ? <div className="mt-0.5 space-y-0.5 text-[10px] font-semibold italic leading-tight text-emerald-100/75" title={getHolidayLabels(date).join(', ')}>{getHolidayLabels(date).map(label => <div key={label} className="truncate">{label}</div>)}</div> : null}
-                    </div>
-                    <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={photographers} assistants={assistants} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onAssignAssistant={assignAssistant} onRemoveAssistant={removeAssistant} onToggleHold={toggleHold} onToggleComplete={toggleComplete} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
-                  </div>
-                </div>;
-              })}
-            </div>
-          </section>
-
-          {statusMessage ? <div className="mt-4 rounded-2xl border border-white/10 bg-white/10 p-3 text-xs font-semibold text-white/65">{statusMessage}</div> : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
-  return (
-    <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4">
-      <div className="min-w-[760px] sm:min-w-0">
-        <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}
-        </div>
-        <div className="mt-2 grid grid-cols-7 gap-2">
-          {Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}
-          {Array.from({ length: totalDays }, (_, i) => i + 1).map(day => {
-            const date = `${month}-${String(day).padStart(2,'0')}`;
-            const dayEvents = events.filter(e => isDateInEventRange(e, date));
-            return (
-              <div
-                key={date}
-                onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
-                title="Double-click to add an event"
-                className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}
-              >
-                <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button>
-                <HolidayText date={date} />
-                <div className="space-y-1.5">
-                  {dayEvents.map(event => (
-                    <button
-                      key={event.id}
-                      onDoubleClick={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); onClick(event); }}
-                      className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
-                    >
-                      {event.localBackupOnly ? '⚠ ' : ''}{event.title}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      {events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}
-    </div>
-  );
+  return <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4"><div className="min-w-[760px] sm:min-w-0"><div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}</div><div className="mt-2 grid grid-cols-7 gap-2">{Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}{Array.from({ length: totalDays }, (_, i) => i + 1).map(day => { const date = `${month}-${String(day).padStart(2,'0')}`; const dayEvents = events.filter(e => isDateInEventRange(e, date)); return <div key={date} onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }} title="Double-click to add an event" className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}><button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-2 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button><div className="space-y-1.5">{dayEvents.map(event => <button key={event.id} onDoubleClick={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onClick(event); }} className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.localBackupOnly ? '⚠ ' : ''}{event.title}</button>)}</div></div>})}</div></div>{events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}</div>;
 }
-
 
 
 const ROLLOUT_EVENT_TYPES = new Set([
@@ -1912,27 +786,11 @@ const ROLLOUT_EVENT_TYPES = new Set([
   'Makeup Day',
   'Rain Date',
   'Family Photos',
-  'Special Event',
-  'Headshots'
+  'Special Event'
 ]);
 
-function isNonRolloutOperationalEvent(event = {}) {
-  const title = String(event.title || '').toLowerCase();
-  const type = String(event.type || '').toLowerCase();
-  return (
-    type === 'call/meeting' ||
-    type === 'call or meeting' ||
-    type === 'edit day' ||
-    type === 'photo booth' ||
-    type === 'time off' ||
-    type === 'personal appointment' ||
-    /\b(call|meeting|huddle|interview|training|edit day|editing day|in-studio|in studio|do not book|hold)\b/.test(title) ||
-    /photo\s*booth/.test(title)
-  );
-}
-
 function isRolloutEvent(event) {
-  return event && ROLLOUT_EVENT_TYPES.has(event.type) && !isNonRolloutOperationalEvent(event);
+  return event && ROLLOUT_EVENT_TYPES.has(event.type);
 }
 
 function getAssignedPhotographerCount(event) {
@@ -1940,60 +798,17 @@ function getAssignedPhotographerCount(event) {
   return uniqueCanonicalPhotographers(event.photographers).length;
 }
 
-function parseRequiredPhotographerCountFromTitle(title = '') {
-  const text = String(title || '').toLowerCase();
-  const match = text.match(/(\d+)\s*(?:photogs?|photographers?|teams?|set-?ups?)/i);
-  if (match) return Math.max(1, Math.min(6, Number(match[1]) || 1));
-  return 1;
-}
-
-function parseRequiredAssistantCountFromTitle(title = '') {
-  const text = String(title || '').toLowerCase();
-  if (/no\s+assist|no\s+asst|no\s+assistant/.test(text)) return 0;
-  const match = text.match(/(\d+)\s*(?:assts?|assistants?)/i);
-  if (match) return Math.max(0, Math.min(6, Number(match[1]) || 0));
-  return 0;
-}
-
-function getRequiredPhotographerCount(event = {}) {
-  if (isTimeOffEvent(event)) return 0;
-  const explicit = Number(event.requiredPhotographers ?? event.required_photographers);
-  if (Number.isFinite(explicit) && explicit > 0) return Math.max(1, Math.min(6, explicit));
-  return Math.max(1, parseRequiredPhotographerCountFromTitle(event.title), getAssignedPhotographerCount(event));
-}
-
-function getRequiredAssistantCount(event = {}) {
-  if (event.noAssistant) return 0;
-  const explicit = Number(event.requiredAssistants ?? event.required_assistants);
-  if (Number.isFinite(explicit) && explicit >= 0) return Math.max(0, Math.min(6, explicit));
-  const assigned = Array.isArray(event.assistants) ? event.assistants.filter(Boolean).length : 0;
-  return Math.max(parseRequiredAssistantCountFromTitle(event.title), assigned);
-}
-
-function getRequirementStatusLabel(event = {}) {
-  const assignedPhotogs = getAssignedPhotographerCount(event);
-  const requiredPhotogs = getRequiredPhotographerCount(event);
-  const assignedAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean).length : 0;
-  const requiredAssistants = getRequiredAssistantCount(event);
-  const photogLabel = `${assignedPhotogs}/${requiredPhotogs} photographer${requiredPhotogs === 1 ? '' : 's'}`;
-  const assistantLabel = event.noAssistant ? 'No assistant' : `${assignedAssistants}/${requiredAssistants} assistant${requiredAssistants === 1 ? '' : 's'}`;
-  return `${photogLabel} · ${assistantLabel}`;
-}
-
-function eventMeetsPhotographerRequirement(event = {}) {
-  return getAssignedPhotographerCount(event) >= getRequiredPhotographerCount(event);
-}
-
 function getRolloutCount(event) {
   if (!isRolloutEvent(event)) return 0;
 
-  // Rollouts use the required photographer count when it has been set.
-  // This lets Schedule Live show capacity accurately before every specific photographer is assigned.
-  return Math.max(getAssignedPhotographerCount(event), getRequiredPhotographerCount(event));
+  // Rollouts are intentionally based on assigned photographers, not title parsing.
+  // Event titles use inconsistent wording like "1 Team", "2 Teams", or omit team counts entirely,
+  // so photographer assignment is the operational source of truth. Assistants do not count.
+  return getAssignedPhotographerCount(event);
 }
 
 function getCapacityTone(rollouts) {
-  if (rollouts >= WEEKLY_ROLLOUT_CAPACITY) return {
+  if (rollouts >= 20) return {
     label: 'Overloaded',
     className: 'border-rose-200 bg-rose-50 text-rose-800',
     barClassName: 'bg-rose-500'
@@ -2095,7 +910,7 @@ function WeekView({ events, selectedDate, onClick }) {
   const weekEvents = days.flatMap(date => events.filter(e => isDateInEventRange(e, date)));
   const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
+  const pct = Math.min(100, Math.round((weeklyRollouts / 22) * 100));
   const photographerSummary = Array.from(
     weekEvents.reduce((counts, event) => {
       if (!isRolloutEvent(event)) return counts;
@@ -2114,7 +929,7 @@ function WeekView({ events, selectedDate, onClick }) {
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Weekly Rollouts</div>
-              <div className="mt-1 text-lg font-semibold">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
+              <div className="mt-1 text-lg font-semibold">{weeklyRollouts} / 22</div>
             </div>
             <Pill className={`border-current bg-white/60 ${capacity.className}`}>{capacity.label}</Pill>
           </div>
@@ -2145,10 +960,7 @@ function WeekView({ events, selectedDate, onClick }) {
           return (
             <section key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-4 shadow-sm">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-900">{formatDate(date)}</h3>
-                  <HolidayText date={date} />
-                </div>
+                <h3 className="text-sm font-semibold text-zinc-900">{formatDate(date)}</h3>
                 <div className="flex flex-wrap gap-2">
                   <Pill className="border-zinc-200 bg-cream text-zinc-600">{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Pill>
                   {dayRollouts ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{dayRollouts} rollout{dayRollouts === 1 ? '' : 's'}</Pill> : null}
@@ -2195,17 +1007,10 @@ function WeekView({ events, selectedDate, onClick }) {
 
 function DayView({ events, onClick, selectedDate }) {
   const dayEvents = events.filter(event => isDateInEventRange(event, selectedDate));
-  if (!dayEvents.length) return (
-    <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">
-      <div className="mb-2 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</div>
-      <HolidayText date={selectedDate} />
-      <div>No events scheduled yet.</div>
-    </div>
-  );
+  if (!dayEvents.length) return <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">No events scheduled for {formatDate(selectedDate)} yet.</div>;
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
-      <h2 className="mb-1 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</h2>
-      <HolidayText date={selectedDate} />
+      <h2 className="mb-3 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</h2>
       <div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div>
     </div>
   );
@@ -2219,21 +1024,12 @@ function schoolKey(value = '') {
 }
 
 function schoolMatchesEvent(schoolName, event) {
-  const school = normalizeSchoolMatchKey(schoolName);
-  const canonical = normalizeSchoolMatchKey(event?.canonicalSchool || '');
-  const title = schoolKey(event?.title || '');
-  const looseSchool = schoolKey(schoolName);
-  if (!school && !looseSchool) return false;
-
-  // Canonical school names are intentional. If an event already has a canonical
-  // school label, only show it under that exact School List match/alias. This
-  // prevents broad pages like "Duanesburg" from continuing to show events that
-  // were reassigned to "Duanesburg MS/HS" or "Duanesburg Elementary".
-  if (canonical) return canonical === school;
-
-  // Older imported/unlinked events may not have a canonical school yet. For those
-  // legacy records only, keep using the loose title fallback so history is not lost.
-  if (title && looseSchool && title.includes(looseSchool)) return true;
+  const school = schoolKey(schoolName);
+  const canonical = schoolKey(event.canonicalSchool || '');
+  const title = schoolKey(event.title || '');
+  if (!school) return false;
+  if (canonical && (canonical === school || canonical.includes(school) || school.includes(canonical))) return true;
+  if (title && title.includes(school)) return true;
   return false;
 }
 
@@ -2246,25 +1042,7 @@ function getSchoolHistory(schoolName, events = EVENTS) {
 function getSchoolHistoryForNames(schoolNames = [], events = EVENTS) {
   const names = schoolNames.filter(Boolean);
   return events
-    .filter(event => {
-      // If an event has a true school_id link, do not let loose title/name matching
-      // keep it attached to an old/generic school history after it is reassigned.
-      if (event?.schoolId) return false;
-      return names.some(name => schoolMatchesEvent(name, event));
-    })
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function getSchoolHistoryForSchool(school = {}, mergedSourceSchools = [], events = EVENTS) {
-  const linkedIds = new Set([school?.id, ...(mergedSourceSchools || []).map(item => item?.id)].filter(Boolean));
-  const names = [school?.name, school?.originalName, ...(mergedSourceSchools || []).flatMap(item => [item?.name, item?.originalName])].filter(Boolean);
-  return events
-    .filter(event => {
-      // True school links are authoritative. Once an event is linked to a canonical
-      // school, it should move out of the old/generic school history immediately.
-      if (event?.schoolId) return linkedIds.has(event.schoolId);
-      return names.some(name => schoolMatchesEvent(name, event));
-    })
+    .filter(event => names.some(name => schoolMatchesEvent(name, event)))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -2459,10 +1237,6 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
   const seasons = ['Spring 2025', 'Fall 2025', 'Spring 2026', 'Fall 2026'];
 
   const addressLine = [school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n');
-  const schoolNoteHistory = getNoteHistory(school.noteAttribution);
-  const visiblePlainSchoolNotes = getVisiblePlainSchoolNotes(school.notes);
-  const plainSchoolNoteCount = countPlainSchoolNoteBlocks(visiblePlainSchoolNotes);
-  const totalSchoolNoteCount = schoolNoteHistory.length + plainSchoolNoteCount;
 
   return (
     <section className={`${compact ? 'rounded-2xl p-0' : 'rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm'}`}>
@@ -2493,12 +1267,12 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
           <div className="text-sm font-semibold text-zinc-800">Address</div>
           <div className="mt-1 whitespace-pre-wrap leading-5">{addressLine || '—'}</div>
-          {school.address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join('\n'))}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-[#DDE8D2]">Maps</a> : null}
+          {school.address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join(' '))}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-[#DDE8D2]">Maps</a> : null}
         </div>
 
         <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
           <div className="text-sm font-semibold text-zinc-800">Primary Contact</div>
-          <div className="mt-1 text-sm font-medium text-zinc-700">{[school.contactFirst, school.contactLast].filter(Boolean).join('\n') || '—'}</div>
+          <div className="mt-1 text-sm font-medium text-zinc-700">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || '—'}</div>
           {school.contactTitle ? <div className="mt-0.5 text-xs text-zinc-500">{school.contactTitle}</div> : null}
           {school.contactPhone ? <div className="mt-1">{school.contactPhone}</div> : null}
           {school.contactEmail ? <div className="break-words">{school.contactEmail}</div> : null}
@@ -2511,18 +1285,13 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
 
       <div className="mt-3 max-w-4xl rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm font-semibold text-zinc-800">School Notes ({totalSchoolNoteCount})</div>
-          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Add Note</button> : null}
+          <div className="text-sm font-semibold text-zinc-800">Notes on School</div>
+          {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 shadow-sm transition hover:bg-cream">Edit</button> : null}
         </div>
-        <div className="mt-3">
-          <NoteHistoryList entries={schoolNoteHistory} />
-        </div>
-        {visiblePlainSchoolNotes ? (
-          <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{getPlainSchoolNoteLabel(visiblePlainSchoolNotes)}</div>
-            <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{visiblePlainSchoolNotes}</div>
-          </div>
-        ) : null}
+        <button type="button" onClick={() => onEdit && onEdit(school)} className={`mt-1.5 w-full rounded-xl p-1.5 text-left transition ${onEdit ? 'hover:bg-cream/80' : 'cursor-default'}`}>
+          <div className="whitespace-pre-wrap leading-5">{school.notes || '—'}</div>
+          {school.noteAttribution ? <div className="mt-2"><AttributionPill attribution={school.noteAttribution} /></div> : null}
+        </button>
       </div>
 
       <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-5 grid gap-3 md:grid-cols-4'}`}>
@@ -2573,8 +1342,8 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
                   <span className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-zinc-500">{event.type}</span>
                 </div>
                 <div className="mt-1 text-xs font-medium text-zinc-700">{event.title}</div>
-                <div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>
-                {event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-5 text-zinc-600">{event.notes}</div> : null}
+                <div className="mt-2 whitespace-pre-wrap text-sm leading-5 text-zinc-600">{event.notes}</div>
+                {event.noteAttribution ? <div className="mt-2"><AttributionPill attribution={event.noteAttribution} /></div> : null}
               </button>
             ))}
           </div>
@@ -2606,8 +1375,6 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
   const [startTime, setStartTime] = useState('');
   const [selectedPhotographers, setSelectedPhotographers] = useState([]);
   const [selectedAssistants, setSelectedAssistants] = useState([]);
-  const [requiredPhotographers, setRequiredPhotographers] = useState(1);
-  const [requiredAssistants, setRequiredAssistants] = useState(0);
   const [noAssistant, setNoAssistant] = useState(false);
   const [notes, setNotes] = useState('');
 
@@ -2625,11 +1392,9 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
       title: `${school.name} Fall Picture Day`,
       canonicalSchool: school.name,
       type: 'Fall Picture Day',
-      status: selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned',
+      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: noAssistant ? [] : selectedAssistants,
-      requiredPhotographers: Number(requiredPhotographers) || 1,
-      requiredAssistants: noAssistant ? 0 : Number(requiredAssistants) || 0,
       noAssistant,
       features: [],
       irm: school.irm || null,
@@ -2647,8 +1412,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/30 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto flex max-h-[calc(100dvh-1.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-6 sm:max-h-[calc(100dvh-3rem)]">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -2660,7 +1425,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pb-8">
+          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Fall 2026 First Date</div>
@@ -2668,8 +1433,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">End Date</div>
-                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Multi-day' : 'One-day'}</button>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Second Date</div>
+                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Two-day' : 'One-day'}</button>
                 </div>
                 <input type="date" min="2026-09-01" max="2026-11-30" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
@@ -2691,25 +1456,6 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
               </div>
             </div>
 
-            <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
-              <p className="mt-1 text-xs text-zinc-500">Set how many people this event needs, even if you are not assigning every person yet.</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="rounded-2xl border border-zinc-200 bg-white p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Photographers Required</div>
-                  <select value={requiredPhotographers} onChange={(e) => setRequiredPhotographers(Number(e.target.value))} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
-                    {[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
-                  </select>
-                </label>
-                <label className="rounded-2xl border border-zinc-200 bg-white p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants Needed</div>
-                  <select value={noAssistant ? 0 : requiredAssistants} onChange={(e) => { const count = Number(e.target.value); setRequiredAssistants(count); setNoAssistant(count === 0); if (count === 0) setSelectedAssistants([]); }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
-                    {[0,1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
-                  </select>
-                </label>
-              </div>
-            </section>
-
             <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={school.name} />
 
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
@@ -2728,7 +1474,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
             </label>
           </div>
 
-          <div className="shrink-0 flex justify-end gap-2 border-t border-zinc-200 bg-cream p-5">
+          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
             <button type="button" onClick={saveSchedule} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save Schedule</button>
           </div>
@@ -2739,11 +1485,9 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 }
 
 
-function AddEventModal({ photographers, assistants, events = [], schools = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null, authEmail = '', canEditNotes = false }) {
+function AddEventModal({ photographers, assistants, events = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null }) {
   const isDuplicate = Boolean(initialEvent && sourceLabel === 'Duplicate Event' && !initialEvent?.supabaseId);
   const isEditing = Boolean(initialEvent?.supabaseId);
-  const initialPhotographerSelections = isDuplicate ? [] : uniqueCanonicalPhotographers(initialEvent?.photographers || []);
-  const initialAssistantSelections = isDuplicate ? [] : getAssignedAssistantNames(initialEvent || {});
   const [date, setDate] = useState(initialEvent?.date || defaultDate);
   const [isTwoDay, setIsTwoDay] = useState(Boolean(initialEvent?.endDate && initialEvent.endDate !== initialEvent.date));
   const [endDate, setEndDate] = useState(initialEvent?.endDate || '');
@@ -2752,30 +1496,15 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
   const [title, setTitle] = useState(initialEvent?.title || '');
   const [schoolName, setSchoolName] = useState(initialEvent?.canonicalSchool || '');
   const [eventType, setEventType] = useState(initialEvent?.type || 'Fall Picture Day');
-  const isTimeOff = eventType === 'Time Off';
-  const isPersonalAppointment = eventType === 'Personal Appointment';
-  const isInternalBlockingEvent = isTimeOff || isPersonalAppointment;
-  const [selectedPhotographers, setSelectedPhotographers] = useState(initialPhotographerSelections);
-  const [selectedAssistants, setSelectedAssistants] = useState(initialAssistantSelections);
-  const [requiredPhotographers, setRequiredPhotographers] = useState(getRequiredPhotographerCount(initialEvent || { title: initialEvent?.title || '' }));
-  const [requiredAssistants, setRequiredAssistants] = useState(getRequiredAssistantCount(initialEvent || { title: initialEvent?.title || '' }));
+  const [selectedPhotographers, setSelectedPhotographers] = useState(initialEvent?.photographers || []);
+  const [selectedAssistants, setSelectedAssistants] = useState(initialEvent?.assistants || []);
   const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
   const [notes, setNotes] = useState(initialEvent?.notes || '');
-  const [newNote, setNewNote] = useState('');
-  const [noteAttribution, setNoteAttribution] = useState(initialEvent?.noteAttribution || null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const canonicalSchoolOptions = useMemo(() => {
-    const sourceSchools = (schools && schools.length ? schools : SCHOOLS).filter(Boolean);
-    return sourceSchools
-      .filter(school => school.active !== false && !school.mergedInto)
-      .map(school => school.name)
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
-  }, [schools]);
-  const schoolOptions = canonicalSchoolOptions;
-  const matchedSchool = useMemo(() => resolveSchoolListMatch(schoolName, (schools && schools.length ? schools : SCHOOLS)) || null, [schoolName, schools]);
+  const schoolOptions = useMemo(() => SCHOOLS.map(school => school.name).sort((a, b) => a.localeCompare(b)), []);
+  const matchedSchool = useMemo(() => SCHOOLS.find(school => school.name.toLowerCase() === schoolName.trim().toLowerCase()), [schoolName]);
 
   const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
   const save = async () => {
@@ -2783,7 +1512,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
     setSaving(true);
     setError('');
 
-    const cleanName = isInternalBlockingEvent ? '' : schoolName.trim();
+    const cleanName = schoolName.trim();
     const cleanTitle = title.trim() || (cleanName ? `${cleanName} ${eventType}` : eventType);
     const cleanEndDate = isTwoDay ? (endDate || addDays(date, 1)) : '';
     if (isTwoDay && cleanEndDate < date) {
@@ -2797,24 +1526,19 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       date,
       endDate: cleanEndDate || null,
       title: cleanTitle,
-      canonicalSchool: matchedSchool?.name || cleanName || '',
-      schoolId: isInternalBlockingEvent ? null : (matchedSchool?.id || null),
+      canonicalSchool: cleanName || '',
       type: eventType,
-      status: isInternalBlockingEvent ? 'Scheduled' : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned'),
-      photographers: isInternalBlockingEvent ? [] : selectedPhotographers,
-      assistants: isInternalBlockingEvent || noAssistant ? [] : selectedAssistants,
-      requiredPhotographers: isInternalBlockingEvent ? 0 : (Number(requiredPhotographers) || 1),
-      requiredAssistants: isInternalBlockingEvent || noAssistant ? 0 : (Number(requiredAssistants) || 0),
-      noAssistant: isInternalBlockingEvent ? true : noAssistant,
+      status: selectedPhotographers.length ? 'Scheduled' : 'Needs Photographers Assigned',
+      photographers: selectedPhotographers,
+      assistants: noAssistant ? [] : selectedAssistants,
+      noAssistant,
       features: [],
-      irm: isInternalBlockingEvent ? null : (matchedSchool?.irm || null),
-      arrivalTime: isInternalBlockingEvent ? '' : (arrivalTime || ''),
-      time: isInternalBlockingEvent ? 'TBD' : (startTime || 'TBD'),
+      irm: matchedSchool?.irm || null,
+      arrivalTime: arrivalTime || '',
+      time: startTime || 'TBD',
       notes: notes || '',
-      newNote: newNote.trim(),
-      noteAttribution,
       rainInfo: '',
-      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : isTimeOff ? 'Created from Add Event as Time Off.' : isPersonalAppointment ? 'Created from Add Event as Personal Appointment.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
+      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
     const result = await onSave(event);
     if (result) {
@@ -2827,8 +1551,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/30 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto flex max-h-[calc(100dvh-1.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-6 sm:max-h-[calc(100dvh-3rem)]">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -2839,7 +1563,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
             </div>
           </div>
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pb-8">
+          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
             {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
@@ -2848,25 +1572,21 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">End Date</div>
-                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Multi-day' : 'One-day'}</button>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Second Date</div>
+                  <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Two-day' : 'One-day'}</button>
                 </div>
                 <input type="date" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
-              {!isInternalBlockingEvent ? (
-                <>
-                  <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
-                    <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                    <div className="mt-2 text-xs text-zinc-500">When photographers arrive.</div>
-                  </label>
-                  <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Start Time</div>
-                    <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                    <div className="mt-2 text-xs text-zinc-500">When photographing starts.</div>
-                  </label>
-                </>
-              ) : null}
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
+                <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <div className="mt-2 text-xs text-zinc-500">When photographers arrive.</div>
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Start Time</div>
+                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <div className="mt-2 text-xs text-zinc-500">When photographing starts.</div>
+              </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4 md:col-span-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Event Type</div>
                 <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4">
@@ -2875,82 +1595,40 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               </label>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {!isInternalBlockingEvent ? (
-                <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account</div>
-                  <input
-                    list="school-account-options"
-                    value={schoolName}
-                    onChange={(e) => { setSchoolName(e.target.value); setError(''); }}
-                    placeholder="Optional — select or type school/account name"
-                    className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4"
-                  />
-                  <datalist id="school-account-options">
-                    {schoolOptions.map(name => <option key={name} value={name} />)}
-                  </datalist>
-                  <div className="mt-2 text-xs text-zinc-500">Optional. If left blank, this event will not appear on a School List page.</div>
-                </label>
-              ) : null}
-              <label className={`rounded-3xl border border-zinc-200 bg-white/70 p-4 ${isInternalBlockingEvent ? 'md:col-span-2' : ''}`}>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account</div>
+                <input
+                  list="school-account-options"
+                  value={schoolName}
+                  onChange={(e) => { setSchoolName(e.target.value); setError(''); }}
+                  placeholder="Optional — select or type school/account name"
+                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4"
+                />
+                <datalist id="school-account-options">
+                  {schoolOptions.map(name => <option key={name} value={name} />)}
+                </datalist>
+                <div className="mt-2 text-xs text-zinc-500">Optional. If left blank, this event will not appear on a School List page.</div>
+              </label>
+              <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTimeOff ? "Example: Beth PTO" : isPersonalAppointment ? "Example: Matt dentist appointment" : "Optional — auto-fills if blank"} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                {!isInternalBlockingEvent && matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional — auto-fills if blank" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                {matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
-            {!isInternalBlockingEvent ? (
-              <>
-                <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                  <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
-                  <p className="mt-1 text-xs text-zinc-500">Set how many people this event needs, even if you are not assigning every person yet.</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <label className="rounded-2xl border border-zinc-200 bg-white p-3">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Photographers Required</div>
-                      <select value={requiredPhotographers} onChange={(e) => setRequiredPhotographers(Number(e.target.value))} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
-                        {[1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
-                      </select>
-                    </label>
-                    <label className="rounded-2xl border border-zinc-200 bg-white p-3">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants Needed</div>
-                      <select value={noAssistant ? 0 : requiredAssistants} onChange={(e) => { const count = Number(e.target.value); setRequiredAssistants(count); setNoAssistant(count === 0); if (count === 0) setSelectedAssistants([]); }} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none">
-                        {[0,1,2,3,4,5,6].map(count => <option key={count} value={count}>{count}</option>)}
-                      </select>
-                    </label>
-                  </div>
-                </section>
-
-                <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
-                <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                  <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
-                    {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
-                  </div>
-                </section>
-              </>
-            ) : null}
-            <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Time Off Notes' : isPersonalAppointment ? 'Personal Appointment Notes' : 'Add New Picture Day Note'}</div>
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder={isTimeOff ? 'Optional details about this time off.' : isPersonalAppointment ? 'Optional details about this personal appointment.' : 'Add a new picture day note. Admins can edit prior note entries if details change.'} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-            </label>
+            <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(noteAttribution).length})</div>
-                {canEditNotes ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-800">Admin note editing enabled</Pill> : null}
+              <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
+                {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
               </div>
-              <div className="mt-3"><NoteHistoryList entries={getNoteHistory(noteAttribution)} canEdit={canEditNotes} onEditNote={(noteId, text) => setNoteAttribution(prev => editNoteHistory(prev, noteId, authEmail, text))} /></div>
-              {notes ? (
-                <div className="mt-4 rounded-2xl border border-zinc-200 bg-white/70 p-3">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Existing Picture Day Info</div>
-                  {canEditNotes ? (
-                    <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={8} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
-                  ) : (
-                    <div className="whitespace-pre-wrap text-sm leading-6 text-zinc-700">{notes}</div>
-                  )}
-                </div>
-              ) : null}
             </section>
+            <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Info</div>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Optional info for this specific event/shoot..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+            </label>
           </div>
-          <div className="shrink-0 flex justify-end gap-2 border-t border-zinc-200 bg-cream p-5">
+          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
             <button type="button" onClick={save} disabled={saving} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : (isDuplicate ? "Save Duplicate" : isEditing ? "Save Changes" : "Save Event")}</button>
           </div>
@@ -3002,8 +1680,8 @@ function AddSchoolModal({ onClose, onSave }) {
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/30 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto flex max-h-[calc(100dvh-1.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-6 sm:max-h-[calc(100dvh-3rem)]">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -3015,7 +1693,7 @@ function AddSchoolModal({ onClose, onSave }) {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pb-8">
+          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
             {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -3069,12 +1747,12 @@ function AddSchoolModal({ onClose, onSave }) {
             </div>
 
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">School Notes</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Notes on School</div>
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Persistent notes about this school/account..." className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
           </div>
 
-          <div className="shrink-0 flex justify-end gap-2 border-t border-zinc-200 bg-cream p-5">
+          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
             <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save School</button>
           </div>
@@ -3129,7 +1807,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
 
   const q = query.trim().toLowerCase();
   const filteredSchools = q
-    ? schools.filter(item => [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join('\n').toLowerCase().includes(q))
+    ? schools.filter(item => [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q))
     : schools;
 
   const saveSchool = async (schoolValues) => {
@@ -3252,7 +1930,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
           </div>
         </div>
       ) : null}
-      {canEdit && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} schools={schoolsList} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
+      {canEdit && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
       {canEdit && addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={saveSchool} />}
     </div>
   );
@@ -3270,9 +1948,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
   const [contactPhone, setContactPhone] = useState(school?.contactPhone || '');
   const [contactEmail, setContactEmail] = useState(school?.contactEmail || '');
   const [contactTitle, setContactTitle] = useState(school?.contactTitle || '');
-  const [newNote, setNewNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState('');
+  const [notes, setNotes] = useState(school?.notes || '');
   const [referenceImages, setReferenceImages] = useState(school?.referenceImages || []);
   const [noFallSchedulingFall2026, setNoFallSchedulingFall2026] = useState(Boolean(school?.noFallSchedulingFall2026));
 
@@ -3287,9 +1963,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setContactPhone(school?.contactPhone || '');
     setContactEmail(school?.contactEmail || '');
     setContactTitle(school?.contactTitle || '');
-    setNewNote('');
-    setSaveStatus('');
-    setSaving(false);
+    setNotes(school?.notes || '');
     setReferenceImages(school?.referenceImages || []);
     setNoFallSchedulingFall2026(Boolean(school?.noFallSchedulingFall2026));
   }, [school]);
@@ -3324,42 +1998,24 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setReferenceImages(prev => prev.filter(image => image.id !== id));
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const cleanName = name.trim();
-    if (!cleanName || saving) return;
-    setSaving(true);
-    setSaveStatus('Saving school changes…');
-    try {
-      const result = await onSave(school.originalName || school.name, {
-        id: school.id,
-        originalName: school.originalName || school.name,
-        name: cleanName,
-        irm: irm === '' ? null : Number(irm),
-        address,
-        city,
-        stateZip,
-        contactFirst,
-        contactLast,
-        contactPhone,
-        contactEmail,
-        contactTitle,
-        notes: school.notes || '',
-        newNote: newNote.trim(),
-        referenceImages,
-        noFallSchedulingFall2026
-      });
-      if (result === false) {
-        setSaveStatus('Save failed. Check the message on the School List page.');
-        setSaving(false);
-        return;
-      }
-      setSaveStatus('Saved.');
-    } catch (error) {
-      const message = error?.message || 'Unknown save error.';
-      setSaveStatus(`Save failed: ${message}`);
-      if (typeof window !== 'undefined') window.alert(`Could not save school: ${message}`);
-      setSaving(false);
-    }
+    if (!cleanName) return;
+    onSave(school.originalName || school.name, {
+      name: cleanName,
+      irm: irm === '' ? null : Number(irm),
+      address,
+      city,
+      stateZip,
+      contactFirst,
+      contactLast,
+      contactPhone,
+      contactEmail,
+      contactTitle,
+      notes,
+      referenceImages,
+      noFallSchedulingFall2026
+    });
   };
 
   return (
@@ -3368,7 +2024,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-zinc-950">Edit School</h2>
-            <p className="mt-1 text-sm text-zinc-600">Edits save to Supabase. School Notes should remain attached to this school record.</p>
+            <p className="mt-1 text-sm text-zinc-600">Edits save to Supabase. Notes on School should remain attached to this school record.</p>
           </div>
           <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
         </div>
@@ -3407,18 +2063,8 @@ function EditSchoolModal({ school, onClose, onSave }) {
               <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
             </label>
           </div>
-          <section className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
-            <div className="text-sm font-semibold text-zinc-800">School Notes ({getNoteHistory(school.noteAttribution).length})</div>
-            <div className="mt-3"><NoteHistoryList entries={getNoteHistory(school.noteAttribution)} /></div>
-            {school.notes ? (
-              <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Stored School Notes</div>
-                <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{school.notes}</div>
-              </div>
-            ) : null}
-          </section>
-          <label className="text-sm font-medium text-zinc-700">Add New Note
-            <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={5} placeholder="Add a new school note. Existing note history cannot be edited." className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
+          <label className="text-sm font-medium text-zinc-700">Notes on School
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={10} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#AEBB9E]" />
           </label>
           <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-sm text-zinc-700">
             <input type="checkbox" checked={noFallSchedulingFall2026} onChange={(e) => setNoFallSchedulingFall2026(e.target.checked)} className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900" />
@@ -3451,10 +2097,9 @@ function EditSchoolModal({ school, onClose, onSave }) {
             ) : <div className="mt-3 text-xs text-zinc-400">No reference images yet.</div>}
           </div>
         </div>
-        {saveStatus ? <div className="mt-4 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/50 px-3 py-2 text-sm font-semibold text-zinc-800">{saveStatus}</div> : null}
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={saving} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
-          <button type="button" onClick={handleSave} disabled={saving} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : 'Save Changes'}</button>
+          <button onClick={onClose} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">Cancel</button>
+          <button onClick={handleSave} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">Save Changes</button>
         </div>
       </motion.div>
     </motion.div>
@@ -3512,14 +2157,12 @@ function splitStateZip(value = '') {
 }
 
 function joinStateZip(state, zip, fallback = '') {
-  const joined = [state, zip].filter(Boolean).join('\n').trim();
+  const joined = [state, zip].filter(Boolean).join(' ').trim();
   return joined || fallback || '';
 }
 
 function schoolToSupabaseRow(school = {}) {
-  const parsedStateZip = splitStateZip(school.stateZip || joinStateZip(school.state, school.zip));
-  const state = school.state || parsedStateZip.state || null;
-  const zip = school.zip || parsedStateZip.zip || null;
+  const stateZipParts = splitStateZip(school.stateZip || joinStateZip(school.state, school.zip));
   return {
     original_name: school.originalName || school.original_name || school.name,
     name: school.name || school.originalName || school.original_name,
@@ -3527,27 +2170,28 @@ function schoolToSupabaseRow(school = {}) {
     irm: school.irm === '' || school.irm === undefined || school.irm === null ? null : Number(school.irm),
     address: school.address || null,
     city: school.city || null,
-    state,
-    zip,
-    state_zip: school.stateZip || joinStateZip(state, zip) || null,
+    state: school.state || stateZipParts.state || null,
+    zip: school.zip || stateZipParts.zip || null,
+    state_zip: school.stateZip || joinStateZip(school.state, school.zip) || null,
     notes: school.notes || null,
-    school_notes_attribution: school.noteAttribution || school.school_notes_attribution || school.note_attribution || null,
+    school_notes_attribution: school.noteAttribution || school.school_notes_attribution || null,
     contact_first: school.contactFirst || null,
     contact_last: school.contactLast || null,
     contact_phone: school.contactPhone || null,
     contact_email: school.contactEmail || null,
     contact_title: school.contactTitle || null,
-    reference_images: school.referenceImages || school.reference_images || [],
+    reference_images: school.referenceImages || [],
     merged_into: school.mergedInto || null,
     active: school.active !== false,
-    no_fall_scheduling_fall_2026: Boolean(school.noFallSchedulingFall2026 || school.no_fall_scheduling_fall_2026)
+    no_fall_scheduling_fall_2026: Boolean(school.noFallSchedulingFall2026 || school.no_fall_scheduling_fall_2026),
+    updated_at: new Date().toISOString()
   };
 }
 
 function supabaseRowToSchool(row = {}) {
   return {
     id: row.id,
-    originalName: row.originalName || row.original_name || row.name,
+    originalName: row.original_name || row.name,
     name: row.name,
     district: row.district || '',
     irm: row.irm ?? '',
@@ -3555,19 +2199,102 @@ function supabaseRowToSchool(row = {}) {
     city: row.city || '',
     state: row.state || '',
     zip: row.zip || '',
-    stateZip: row.stateZip || row.state_zip || joinStateZip(row.state, row.zip),
+    stateZip: row.state_zip || joinStateZip(row.state, row.zip),
     notes: row.notes || '',
-    noteAttribution: normalizeAttribution(row.noteAttribution || row.school_notes_attribution || row.note_attribution),
-    contactFirst: row.contactFirst || row.contact_first || '',
-    contactLast: row.contactLast || row.contact_last || '',
-    contactPhone: row.contactPhone || row.contact_phone || '',
-    contactEmail: row.contactEmail || row.contact_email || '',
-    contactTitle: row.contactTitle || row.contact_title || '',
-    referenceImages: row.referenceImages || row.reference_images || [],
-    mergedInto: row.mergedInto || row.merged_into || null,
+    noteAttribution: normalizeAttribution(row.school_notes_attribution),
+    contactFirst: row.contact_first || '',
+    contactLast: row.contact_last || '',
+    contactPhone: row.contact_phone || '',
+    contactEmail: row.contact_email || '',
+    contactTitle: row.contact_title || '',
+    referenceImages: row.reference_images || [],
+    mergedInto: row.merged_into || null,
     active: row.active !== false,
-    noFallSchedulingFall2026: Boolean(row.noFallSchedulingFall2026 || row.no_fall_scheduling_fall_2026)
+    updatedAt: row.updated_at || null,
+    createdAt: row.created_at || null,
+    noFallSchedulingFall2026: Boolean(row.no_fall_scheduling_fall_2026)
   };
+}
+
+
+function schoolUpdatedTime(school = {}) {
+  const raw = school.updatedAt || school.updated_at || school.createdAt || school.created_at || '';
+  const time = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function schoolIdentityKey(school = {}) {
+  const original = String(school.originalName || school.original_name || '').trim();
+  if (original) return `original:${original.toLowerCase()}`;
+  const id = String(school.id || '').trim();
+  if (id) return `id:${id}`;
+  return `name:${String(school.name || '').trim().toLowerCase()}`;
+}
+
+function mergeSchoolRecords(preferred = {}, fallback = {}) {
+  const newest = schoolUpdatedTime(preferred) >= schoolUpdatedTime(fallback) ? preferred : fallback;
+  const older = newest === preferred ? fallback : preferred;
+  const merged = { ...older, ...newest };
+  ['address','city','state','zip','stateZip','notes','contactFirst','contactLast','contactPhone','contactEmail','contactTitle','district'].forEach((field) => {
+    if ((merged[field] === '' || merged[field] === null || merged[field] === undefined) && older[field]) merged[field] = older[field];
+  });
+  if ((merged.irm === '' || merged.irm === null || merged.irm === undefined) && older.irm) merged.irm = older.irm;
+  merged.referenceImages = [...(older.referenceImages || []), ...(newest.referenceImages || [])].filter(Boolean);
+  merged.active = newest.active !== false;
+  merged.mergedInto = newest.mergedInto || older.mergedInto || null;
+  merged.updatedAt = newest.updatedAt || newest.updated_at || older.updatedAt || older.updated_at || null;
+  merged.createdAt = newest.createdAt || newest.created_at || older.createdAt || older.created_at || null;
+  return merged;
+}
+
+function dedupeSchoolsForDisplay(rows = []) {
+  const byKey = new Map();
+  rows.filter(Boolean).forEach((school) => {
+    const key = schoolIdentityKey(school);
+    const existing = byKey.get(key);
+    byKey.set(key, existing ? mergeSchoolRecords(school, existing) : school);
+  });
+  return Array.from(byKey.values()).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+}
+
+function schoolSavePayload(school = {}) {
+  const row = schoolToSupabaseRow(school);
+  return Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined));
+}
+
+async function saveSchoolRowWithSchemaFallback(supabase, previous = {}, row = {}) {
+  const table = supabase.from('schools');
+  const runPrimary = previous.id
+    ? () => table.update(row).eq('id', previous.id).select().single()
+    : () => table.upsert(row, { onConflict: 'original_name' }).select().single();
+  let result = await runPrimary();
+  if (!result.error) return result;
+
+  const msg = String(result.error.message || '');
+  if (!/schema cache|column|Could not find/i.test(msg)) return result;
+
+  const safeRow = { ...row };
+  ['state_zip','school_notes_attribution','contact_first','contact_last','contact_phone','contact_email','contact_title','reference_images','merged_into','active','no_fall_scheduling_fall_2026'].forEach((field) => delete safeRow[field]);
+  const safeTable = supabase.from('schools');
+  return previous.id
+    ? await safeTable.update(safeRow).eq('id', previous.id).select().single()
+    : await safeTable.upsert(safeRow, { onConflict: 'name' }).select().single();
+}
+
+async function mergeSchoolRowWithFallback(supabase, source = {}, targetOriginalName = '') {
+  const payload = { merged_into: targetOriginalName, active: false, updated_at: new Date().toISOString() };
+  const primary = source.id
+    ? await supabase.from('schools').update(payload).eq('id', source.id).select().single()
+    : await supabase.from('schools').update(payload).eq('original_name', source.originalName || source.name).select().single();
+  if (!primary.error) return primary;
+
+  const msg = String(primary.error.message || '');
+  if (!/merged_into|schema cache|column|Could not find/i.test(msg)) return primary;
+
+  const activeOnlyPayload = { active: false, updated_at: new Date().toISOString() };
+  return source.id
+    ? await supabase.from('schools').update(activeOnlyPayload).eq('id', source.id).select().single()
+    : await supabase.from('schools').update(activeOnlyPayload).eq('original_name', source.originalName || source.name).select().single();
 }
 
 
@@ -3648,12 +2375,9 @@ function eventToSupabaseRow(event = {}) {
     picture_day_info: event.notes || null,
     picture_day_info_attribution: event.noteAttribution || event.picture_day_info_attribution || null,
     canonical_school: event.canonicalSchool || null,
-    school_id: event.schoolId || event.school_id || null,
     photographers: event.photographers || [],
     assistants: event.assistants || [],
     no_assistant: Boolean(event.noAssistant),
-    required_photographers: getRequiredPhotographerCount(event),
-    required_assistants: getRequiredAssistantCount(event),
     irm: event.irm === '' || event.irm === undefined || event.irm === null ? null : Number(event.irm),
     rain_info: event.rainInfo || null,
     history: event.history || null,
@@ -3674,14 +2398,11 @@ function supabaseRowToEvent(row = {}) {
     endDate: row.end_date || null,
     title: row.title,
     canonicalSchool: normalizeImportedCanonicalSchool(row),
-    schoolId: row.school_id || null,
     type: normalizeImportedEventType(row),
     status: row.status || 'Scheduled',
     photographers: row.photographers || [],
     assistants: row.assistants || [],
     noAssistant: Boolean(row.no_assistant),
-    requiredPhotographers: row.required_photographers ?? null,
-    requiredAssistants: row.required_assistants ?? null,
     features: [],
     irm: row.irm ?? null,
     time: row.time || 'TBD',
@@ -3695,6 +2416,8 @@ function supabaseRowToEvent(row = {}) {
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || row.created_at || null,
     active: row.active !== false,
+    updatedAt: row.updated_at || null,
+    createdAt: row.created_at || null,
     noFallSchedulingFall2026: Boolean(row.no_fall_scheduling_fall_2026)
   };
 }
@@ -3704,7 +2427,6 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   const q = (schoolListQuery || query).trim().toLowerCase();
   const [editingSchool, setEditingSchool] = useState(null);
   const [mergingSchool, setMergingSchool] = useState(null);
-  const [addingSchool, setAddingSchool] = useState(false);
   const [message, setMessage] = useState('');
 
   const mergedSourcesByTarget = useMemo(() => {
@@ -3732,79 +2454,51 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         notes,
         referenceImages: [...(school.referenceImages || []), ...mergedImages],
         mergedFrom: mergedSourceSchools.map(item => item.name),
-        history: getSchoolHistoryForSchool(school, mergedSourceSchools, events)
+        history: getSchoolHistoryForNames([school.name, school.originalName, ...mergedFrom].filter(Boolean), events)
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name)), [events, schools, mergedSourcesByTarget]);
 
   const filtered = q ? activeSchools.filter(school => [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : activeSchools;
-  const selected = activeSchools.find(school => school.name === selectedName || school.originalName === selectedName) || resolveSchoolListMatch(selectedName, activeSchools) || filtered[0] || null;
+  const selected = activeSchools.find(school => school.name === selectedName || school.originalName === selectedName) || filtered[0] || null;
 
   const saveSchool = async (originalName, values) => {
     const supabase = createClient();
     if (!hasSupabaseEnv() || !supabase) {
-      const msg = 'Supabase is not connected yet. School edits cannot be saved.';
-      setMessage(msg);
-      if (typeof window !== 'undefined') window.alert(msg);
-      return false;
+      setMessage('Supabase is not connected yet. School edits cannot be saved.');
+      return;
     }
 
-    try {
-      const previous = (schools || []).find(school =>
-        (values?.id && school.id === values.id) ||
-        (school.originalName || school.name) === originalName
-      ) || {};
-    const newNote = String(values.newNote || '').trim();
-    const { newNote: _discardNewNote, ...cleanValues } = values;
+    const previous = (schools || []).find(school => (school.originalName || school.name) === originalName) || {};
+    const notesChanged = String(previous.notes || '') !== String(values.notes || '');
     const nextSchool = {
       ...previous,
-      ...cleanValues,
+      ...values,
       originalName,
-      // v1.06: School List notes now persist to the existing Supabase `notes` column.
-      // This preserves any imported School Log notes and appends new user notes instead of
-      // relying only on noteAttribution, which made notes vulnerable to appearing missing.
-      notes: newNote ? appendPlainSchoolNote(previous.notes || cleanValues.notes || '', authEmail, newNote) : (cleanValues.notes ?? previous.notes ?? ''),
-      noteAttribution: newNote ? appendNoteHistory(previous.noteAttribution || cleanValues.noteAttribution, authEmail, newNote) : (previous.noteAttribution || cleanValues.noteAttribution || null)
+      noteAttribution: notesChanged ? makeNoteAttribution(authEmail) : (previous.noteAttribution || values.noteAttribution || null)
     };
-    const row = schoolToSupabaseRow(nextSchool);
+    const row = schoolSavePayload(nextSchool);
 
     // Save School List edits back to the exact Supabase row when an id exists.
-    // Earlier builds used only upsert(originalName). If an older school row had
-    // a blank originalName, saving School Notes could create/update a second
+    // Earlier builds used only upsert(original_name). If an older school row had
+    // a blank original_name, saving Notes on School could create/update a second
     // school record, making the note look like it disappeared when the original
     // record was shown again.
-    const saveQuery = supabase.from('schools');
-    const result = previous.id
-      ? await saveQuery.update(row).eq('id', previous.id).select().single()
-      : await saveQuery.upsert(row, { onConflict: 'original_name' }).select().single();
-
-    const { data, error } = result;
+    const { data, error } = await saveSchoolRowWithSchemaFallback(supabase, previous, row);
 
     if (error) {
-      const msg = `Could not save school: ${error.message}`;
-      setMessage(msg);
-      if (typeof window !== 'undefined') window.alert(msg);
-      return false;
+      setMessage(`Could not save school: ${error.message}`);
+      return;
     }
 
     const savedSchool = supabaseRowToSchool(data);
     setSchools(prev => {
-      const without = (prev || []).filter(school => {
-        if (savedSchool.id && school.id) return school.id !== savedSchool.id;
-        return (school.originalName || school.name) !== originalName;
-      });
+      const without = (prev || []).filter(school => (school.originalName || school.name) !== originalName);
       return [...without, savedSchool].sort((a, b) => a.name.localeCompare(b.name));
     });
     setSelectedName(savedSchool.name || originalName);
     setEditingSchool(null);
     setMessage('School changes saved to Supabase.');
-    return true;
-    } catch (error) {
-      const msg = `Could not save school: ${error?.message || 'Unknown error'}`;
-      setMessage(msg);
-      if (typeof window !== 'undefined') window.alert(msg);
-      return false;
-    }
   };
 
   const mergeSchool = async (sourceOriginalName, targetOriginalName) => {
@@ -3820,11 +2514,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       return;
     }
 
-    const mergePayload = { merged_into: targetOriginalName, updated_at: new Date().toISOString() };
-    const mergeQuery = supabase.from('schools').update(mergePayload);
-    const { data, error } = source.id
-      ? await mergeQuery.eq('id', source.id).select().single()
-      : await mergeQuery.eq('originalName', sourceOriginalName).select().single();
+    const { data, error } = await mergeSchoolRowWithFallback(supabase, source, targetOriginalName);
 
     if (error) {
       setMessage(`Could not merge school: ${error.message}`);
@@ -3848,18 +2538,8 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         </div>
       ) : null}
       <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
-        <section className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
-            <div className="flex items-center gap-2">
-              {canEditSchools ? (
-                <button type="button" onClick={() => setAddingSchool(true)} className="inline-flex items-center justify-center gap-1 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-1.5 text-xs font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">
-                  <Plus size={14} /> Add School
-                </button>
-              ) : null}
-              <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filtered.length}</Pill>
-            </div>
-          </div>
+        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
           <p className="mt-1 text-sm text-zinc-600">Click a school to view imported schedule history. Edits now save to Supabase.</p>
           <div className="mt-4">
             <input
@@ -3871,7 +2551,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
             />
           </div>
 
-          <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-auto pr-1 pb-3">
+          <div className="mt-3 max-h-[760px] space-y-2 overflow-auto pr-1">
             {filtered.map(school => (
               <button key={school.originalName || school.name} onClick={() => setSelectedName(school.name)} className={`w-full rounded-2xl border p-3 text-left text-sm transition hover:bg-white ${selected?.originalName === school.originalName ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
                 <div className="font-semibold text-zinc-900">{school.name}</div>
@@ -3883,10 +2563,6 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={canEditSchools ? setEditingSchool : null} onMerge={canMergeSchools ? setMergingSchool : null} />
         <AnimatePresence>
           {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
-          {addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={async (schoolValues) => {
-            const saved = await saveSchool(schoolValues.originalName || schoolValues.name, schoolValues);
-            if (saved !== false) setAddingSchool(false);
-          }} />}
           {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={activeSchools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
         </AnimatePresence>
       </div>
@@ -3927,33 +2603,20 @@ function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelecte
 }
 
 
-function MobileView({ events, photographers, assistants = [], selectedDate, setSelectedDate, onClick }) {
+function MobileView({ events, photographers, selectedDate, setSelectedDate, onClick }) {
   const fieldPhotographers = ['Stephanie', 'Matt', 'Molly', 'Beth', 'Andrew', 'Erin'];
-  const staffOptions = Array.from(new Set([
-    ...fieldPhotographers,
-    ...uniqueCanonicalPhotographers(photographers || []),
-    ...(assistants || []).filter(Boolean)
-  ])).filter(Boolean).sort((a, b) => a.localeCompare(b));
-  const [selectedStaff, setSelectedStaff] = useState('Stephanie');
+  const available = Array.from(new Set([...fieldPhotographers, ...uniqueCanonicalPhotographers(photographers || [])])).filter(Boolean);
+  const [selectedPhotographer, setSelectedPhotographer] = useState('Stephanie');
   const [viewMode, setViewMode] = useState('Day');
-  const [plainViewMode, setPlainViewMode] = useState('Week');
 
   const today = todayKey();
-  const productionEvents = useMemo(() => (events || [])
-    .filter(event => event?.active !== false && event.type !== 'Call or Meeting' && event.type !== 'Edit Day'), [events]);
-
-  const todayEvents = productionEvents
-    .filter(event => isDateInEventRange(event, today))
+  const todayEvents = (events || [])
+    .filter(event => isDateInEventRange(event, today) && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
     .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
   const visibleEvents = useMemo(() => {
-    const selected = String(selectedStaff || '').trim();
-    const canonical = canonicalPhotographerName(selected);
-    const assigned = productionEvents.filter(event => {
-      const photogMatch = uniqueCanonicalPhotographers(event.photographers || []).includes(canonical);
-      const assistantMatch = (event.assistants || []).map(name => String(name || '').trim()).includes(selected);
-      return photogMatch || assistantMatch;
-    });
+    const canonical = canonicalPhotographerName(selectedPhotographer);
+    const assigned = (events || []).filter(event => uniqueCanonicalPhotographers(event.photographers || []).includes(canonical));
     if (viewMode === 'Month') {
       const key = monthKey(selectedDate);
       return assigned.filter(event => monthKey(event.date) <= key && monthKey(event.endDate || event.date) >= key);
@@ -3963,7 +2626,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
       return assigned.filter(event => event.date <= end && (event.endDate || event.date) >= start);
     }
     return assigned.filter(event => isDateInEventRange(event, selectedDate));
-  }, [productionEvents, selectedStaff, selectedDate, viewMode]);
+  }, [events, selectedPhotographer, selectedDate, viewMode]);
 
   const move = (delta) => {
     if (viewMode === 'Month') setSelectedDate(addDays(selectedDate, delta * 30));
@@ -3971,138 +2634,49 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
     else setSelectedDate(addDays(selectedDate, delta));
   };
 
-  const movePlainView = (delta) => {
-    if (plainViewMode === 'Month') setSelectedDate(addDays(selectedDate, delta * 30));
-    else if (plainViewMode === 'Week') setSelectedDate(addDays(selectedDate, delta * 7));
-    else setSelectedDate(addDays(selectedDate, delta));
-  };
-
-  const plainViewEvents = useMemo(() => {
-    if (plainViewMode === 'Month') {
-      const key = monthKey(selectedDate);
-      return productionEvents.filter(event => monthKey(event.date) <= key && monthKey(event.endDate || event.date) >= key);
-    }
-    if (plainViewMode === 'Week') {
-      const { start, end } = weekBounds(selectedDate);
-      return productionEvents.filter(event => event.date <= end && (event.endDate || event.date) >= start);
-    }
-    return productionEvents.filter(event => isDateInEventRange(event, selectedDate));
-  }, [productionEvents, selectedDate, plainViewMode]);
-
-  const sortedPlainViewEvents = useMemo(() => (plainViewEvents || [])
-    .slice()
-    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || ''))), [plainViewEvents]);
-
-  const groupedPlainViewEvents = useMemo(() => {
-    const map = new Map();
-    sortedPlainViewEvents.forEach(event => {
-      const key = event.date || todayKey();
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(event);
-    });
-    return Array.from(map.entries());
-  }, [sortedPlainViewEvents]);
-
-  const plainViewLabel = plainViewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : plainViewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate);
   return (
-    <div className="mx-auto max-w-md space-y-3 sm:max-w-2xl">
-      <section className="rounded-[1.5rem] border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 shadow-sm sm:rounded-[2rem] sm:p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-600">What We're Photographing Today</div>
-            <div className="mt-0.5 text-sm font-black text-zinc-950 sm:text-lg">{formatDate(today)}</div>
-          </div>
-          <div className="rounded-full border border-white/80 bg-white/70 px-2.5 py-1 text-[11px] font-black text-zinc-600">{todayEvents.length}</div>
-        </div>
-        <div className="mt-2 space-y-1.5">
+    <div className="mx-auto max-w-md space-y-4 sm:max-w-2xl">
+      <section className="rounded-[2rem] border border-[#AEBB9E] bg-[#DDE8D2]/55 p-4 shadow-sm">
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-600">What We're Photographing Today</div>
+        <div className="mt-1 text-lg font-black text-zinc-950">{formatDate(today)}</div>
+        <div className="mt-3 space-y-2">
           {todayEvents.length ? todayEvents.map(event => (
-            <button key={event.id} type="button" onClick={() => onClick(event)} className="w-full rounded-xl border border-white/70 bg-white/80 p-2 text-left shadow-sm sm:rounded-2xl sm:p-3">
-              <div className="truncate text-sm font-bold text-zinc-950">{event.title}</div>
-              <div className="mt-0.5 text-xs text-zinc-600">{getEventTimeLabel(event)}</div>
-              <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">{compactCrewList(event).join(', ') || 'Staff TBD'}</div>
+            <button key={event.id} type="button" onClick={() => onClick(event)} className="w-full rounded-2xl border border-white/70 bg-white/80 p-3 text-left shadow-sm">
+              <div className="font-bold text-zinc-950">{event.title}</div>
+              <div className="mt-1 text-sm text-zinc-600">{getEventTimeLabel(event)}</div>
+              <div className="mt-1 text-xs font-semibold text-zinc-500">{uniqueCanonicalPhotographers(event.photographers || []).join(', ') || 'Photographer TBD'}</div>
             </button>
-          )) : <div className="rounded-xl border border-dashed border-white/80 bg-white/60 p-3 text-sm text-zinc-500">Nothing scheduled for today.</div>}
+          )) : <div className="rounded-2xl border border-dashed border-white/80 bg-white/60 p-4 text-sm text-zinc-500">Nothing scheduled for today.</div>}
         </div>
       </section>
 
-      <section className="rounded-[1.5rem] border border-zinc-200 bg-white/80 p-3 shadow-sm sm:rounded-[2rem] sm:p-4">
-        <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Staff Schedule</div>
-        <select value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-900 outline-none sm:py-3 sm:text-base">
-          {staffOptions.map(name => <option key={name} value={name}>{name}</option>)}
+      <section className="rounded-[2rem] border border-zinc-200 bg-white/80 p-4 shadow-sm">
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Photographer Schedule</div>
+        <select value={selectedPhotographer} onChange={(e) => setSelectedPhotographer(e.target.value)} className="mt-3 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-base font-bold text-zinc-900 outline-none">
+          {available.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
         <div className="mt-3 grid grid-cols-3 rounded-2xl border border-zinc-200 bg-cream/80 p-1">
-          {['Month', 'Week', 'Day'].map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-3 py-1.5 text-xs font-bold sm:py-2 sm:text-sm ${viewMode === mode ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}>{mode}</button>)}
+          {['Month', 'Week', 'Day'].map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-3 py-2 text-sm font-bold ${viewMode === mode ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}>{mode}</button>)}
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">
-          <button type="button" onClick={() => move(-1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold sm:py-2 sm:text-sm">Prev</button>
-          <button type="button" onClick={() => setSelectedDate(todayKey())} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-1.5 text-xs font-black text-zinc-900 sm:py-2 sm:text-sm">Today</button>
-          <div className="min-w-0 flex-1 text-center text-xs font-bold text-zinc-900 sm:text-sm">{viewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : viewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate)}</div>
-          <button type="button" onClick={() => move(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold sm:py-2 sm:text-sm">Next</button>
+          <button type="button" onClick={() => move(-1)} className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-bold">Prev</button>
+          <div className="text-center text-sm font-bold text-zinc-900">{viewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : viewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate)}</div>
+          <button type="button" onClick={() => move(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-bold">Next</button>
         </div>
-        <div className="mt-3 space-y-1.5">
-          {visibleEvents.length ? visibleEvents.slice().sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || ''))).map(event => (
-            <button key={event.id} type="button" onClick={() => onClick(event)} className="w-full rounded-xl border border-zinc-200 bg-white p-2 text-left shadow-sm sm:rounded-2xl sm:p-3">
+        <div className="mt-4 space-y-2">
+          {visibleEvents.length ? visibleEvents.sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || ''))).map(event => (
+            <button key={event.id} type="button" onClick={() => onClick(event)} className="w-full rounded-2xl border border-zinc-200 bg-white p-3 text-left shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400 sm:text-xs">{getEventDateLabel(event)}</div>
-                  <div className="mt-0.5 truncate text-sm font-black text-zinc-950 sm:text-base">{event.title}</div>
-                  <div className="mt-0.5 text-xs text-zinc-600 sm:text-sm">{getEventTimeLabel(event)}</div>
-                  {event.assistants?.length ? <div className="mt-0.5 text-[11px] font-semibold text-zinc-500">Assistant: {event.assistants.join(', ')}</div> : null}
+                  <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">{getEventDateLabel(event)}</div>
+                  <div className="mt-1 font-black text-zinc-950">{event.title}</div>
+                  <div className="mt-1 text-sm text-zinc-600">{getEventTimeLabel(event)}</div>
+                  {event.assistants?.length ? <div className="mt-1 text-xs font-semibold text-zinc-500">Assistant: {event.assistants.join(', ')}</div> : null}
                 </div>
-                <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} text-[10px]`}>{event.type}</Pill>
+                <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
               </div>
             </button>
-          )) : <div className="rounded-xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-center text-sm text-zinc-500">No {viewMode.toLowerCase()} events for {selectedStaff}.</div>}
-        </div>
-      </section>
-
-      <section className="rounded-[2rem] border border-zinc-200 bg-white/90 p-3 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Plain View</div>
-            <div className="mt-1 text-sm font-semibold text-zinc-600">Spreadsheet-style production schedule.</div>
-          </div>
-          <div className="rounded-full border border-zinc-200 bg-cream/80 px-2.5 py-1 text-[11px] font-black text-zinc-500">{sortedPlainViewEvents.length}</div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 rounded-2xl border border-zinc-200 bg-cream/80 p-1">
-          {['Day', 'Week', 'Month'].map(mode => <button key={mode} type="button" onClick={() => setPlainViewMode(mode)} className={`rounded-xl px-2 py-1.5 text-xs font-black ${plainViewMode === mode ? 'bg-zinc-900 text-white' : 'text-zinc-600'}`}>{mode}</button>)}
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <button type="button" onClick={() => movePlainView(-1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Prev</button>
-          <button type="button" onClick={() => setSelectedDate(todayKey())} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-1.5 text-xs font-black text-zinc-900">Today</button>
-          <div className="min-w-0 flex-1 text-center text-xs font-black text-zinc-900">{plainViewLabel}</div>
-          <button type="button" onClick={() => movePlainView(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Next</button>
-        </div>
-
-        <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-          <div className="grid grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-200 bg-zinc-50 text-[10px] font-black uppercase tracking-wide text-zinc-500">
-            <div className="px-2 py-2">Date</div>
-            <div className="px-2 py-2">Event</div>
-            <div className="px-2 py-2">Photog</div>
-            <div className="px-2 py-2">Assistant</div>
-          </div>
-          <div className="max-h-[520px] overflow-y-auto">
-            {groupedPlainViewEvents.length ? groupedPlainViewEvents.map(([date, dayEvents]) => (
-              <div key={date}>
-                {plainViewMode !== 'Day' ? <div className="border-b border-zinc-100 bg-cream/80 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-zinc-500">{formatDate(date)}</div> : null}
-                {dayEvents.map(event => {
-                  const photogs = uniqueCanonicalPhotographers(event.photographers || []).join(', ') || 'TBD';
-                  const assistantsLabel = (event.assistants || []).filter(Boolean).join(', ') || '—';
-                  return (
-                    <button key={event.id} type="button" onClick={() => onClick(event)} className="grid w-full grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45">
-                      <div className="px-2 py-1.5 font-semibold italic text-zinc-600">{plainViewMode === 'Day' ? shortDate(event.date) : shortDate(date)}</div>
-                      <div className="min-w-0 px-2 py-1.5">
-                        <div className="truncate font-black text-zinc-950">{event.title}</div>
-                      </div>
-                      <div className="px-2 py-1.5 font-semibold text-zinc-800">{photogs}</div>
-                      <div className="px-2 py-1.5 font-semibold text-zinc-800">{assistantsLabel}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            )) : <div className="p-4 text-center text-sm font-semibold text-zinc-500">No events in this {plainViewMode.toLowerCase()} view.</div>}
-          </div>
+          )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-4 text-center text-sm text-zinc-500">No {viewMode.toLowerCase()} events for {selectedPhotographer}.</div>}
         </div>
       </section>
     </div>
@@ -4137,88 +2711,6 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
 
 function normalizeMemberName(value) {
   return value.trim().replace(/\s+/g, ' ');
-}
-
-const STAFF_ROLE_OPTIONS = [
-  { value: 'photographer', label: 'Photographer' },
-  { value: 'assistant', label: 'Assistant' },
-  { value: 'admin', label: 'Admin' }
-];
-
-function displayStaffRole(role) {
-  const clean = String(role || '').trim().toLowerCase();
-  if (clean === 'photographer') return 'Photographer';
-  if (clean === 'assistant') return 'Assistant';
-  if (clean === 'admin') return 'Admin';
-  return role || 'Staff';
-}
-
-function normalizeStaffKey(name = '') {
-  return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function groupStaffMembers(members = []) {
-  const map = new Map();
-  (members || []).forEach(member => {
-    const name = normalizeMemberName(member.name || '');
-    if (!name) return;
-    const key = normalizeStaffKey(name);
-    const existing = map.get(key) || {
-      id: `staff-${key}`,
-      name,
-      title: '',
-      email: '',
-      phone: '',
-      active: false,
-      roles: [],
-      roleRows: {},
-      originalRows: []
-    };
-    const role = String(member.role || '').trim().toLowerCase() || 'staff';
-    existing.name = existing.name || name;
-    existing.title = existing.title || member.title || '';
-    existing.email = existing.email || member.email || '';
-    existing.phone = existing.phone || member.phone || member.cell || '';
-    existing.active = existing.active || member.active !== false;
-    if (role && !existing.roles.includes(role)) existing.roles.push(role);
-    existing.roleRows[role] = member;
-    existing.originalRows.push(member);
-    map.set(key, existing);
-  });
-  return Array.from(map.values()).map(member => ({
-    ...member,
-    roles: member.roles.sort((a, b) => {
-      const order = { photographer: 1, assistant: 2, admin: 3 };
-      return (order[a] || 99) - (order[b] || 99);
-    })
-  })).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-}
-
-function displayStaffRoles(member = {}) {
-  const roles = member.roles?.length ? member.roles : [member.role].filter(Boolean);
-  const activeRoles = roles.filter(role => !member.roleRows?.[role] || member.roleRows?.[role]?.active !== false);
-  return (activeRoles.length ? activeRoles : roles).map(displayStaffRole).join(', ') || 'Staff';
-}
-
-function builtInStaffMembers() {
-  const rows = [
-    ...uniqueCanonicalPhotographers(PHOTOGRAPHERS).map(name => ({ id: `builtin-photographer-${name}`, name, role: 'photographer', active: true })),
-    ...ASSISTANTS.map(name => ({ id: `builtin-assistant-${name}`, name, role: 'assistant', active: true }))
-  ];
-  return rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-}
-
-function StaffDirectoryRow({ member }) {
-  const phone = member.phone || member.cell || '';
-  const email = member.email || '';
-  return (
-    <tr className={`${member.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
-      <td className="whitespace-nowrap px-3 py-1.5 text-sm font-black">{member.name || 'Unnamed Staff Member'}</td>
-      <td className="whitespace-nowrap px-3 py-1.5 text-xs">{phone ? <a href={`tel:${phone}`} className="font-semibold text-zinc-800 hover:underline">{phone}</a> : <span className="text-zinc-400">—</span>}</td>
-      <td className="px-3 py-1.5 text-xs">{email ? <a href={`mailto:${email}`} className="font-semibold text-zinc-800 hover:underline">{email}</a> : <span className="text-zinc-400">—</span>}</td>
-      <td className="px-3 py-1.5 text-xs font-bold text-zinc-600">{displayStaffRoles(member)}</td>
-    </tr>
-  );
 }
 
 function TeamMemberEditor({ title, description, members, value, setValue, role, saving, onSaveMember, onDeactivateMember }) {
@@ -4262,24 +2754,11 @@ function TeamMemberEditor({ title, description, members, value, setValue, role, 
   );
 }
 
-function TeamMembers({ photographers, assistants, staffMembers = [], setPhotographers, setAssistants, reloadTeamMembers, teamMembersMessage }) {
+function TeamMembers({ photographers, assistants, setPhotographers, setAssistants, reloadTeamMembers, teamMembersMessage }) {
   const [photographerInput, setPhotographerInput] = useState('');
   const [assistantInput, setAssistantInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-  const [directoryQuery, setDirectoryQuery] = useState('');
-
-  const activeStaffMembers = useMemo(() => {
-    const rows = groupStaffMembers(staffMembers?.length ? staffMembers : builtInStaffMembers());
-    return rows.filter(member => member.active !== false);
-  }, [staffMembers]);
-
-  const filteredStaffMembers = useMemo(() => {
-    const q = directoryQuery.trim().toLowerCase();
-    if (!q) return activeStaffMembers;
-    return activeStaffMembers.filter(member => [member.name, member.email, member.phone, displayStaffRoles(member)].filter(Boolean).join('\n').toLowerCase().includes(q));
-  }, [activeStaffMembers, directoryQuery]);
-
 
   const saveMember = async (role, value) => {
     const name = normalizeMemberName(value);
@@ -4370,34 +2849,10 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
     <div className="space-y-4">
       <section className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/60 p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-950">Team Members</h2>
-        <p className="mt-1 text-sm text-zinc-700">Internal staff directory for quick phone, email, and scheduling-role lookup. Edit contact details from the Admin page.</p>
+        <p className="mt-1 text-sm text-zinc-700">Team Members now save to Supabase. Use the trash icon to deactivate someone instead of deleting them, so historical staffing remains usable later.</p>
         {teamMembersMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{teamMembersMessage}</p> : null}
         {message ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-700">{message}</p> : null}
       </section>
-
-      <section className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h3 className="text-lg font-black text-zinc-950">Staff Directory</h3>
-            <p className="mt-1 text-sm text-zinc-600">Compact contact list for quick phone, email, and role lookup.</p>
-          </div>
-          <input value={directoryQuery} onChange={event => setDirectoryQuery(event.target.value)} placeholder="Search staff..." className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
-        </div>
-        <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80">
-          <div className="max-h-[420px] overflow-auto">
-            <table className="w-full min-w-[780px] text-left">
-              <thead className="sticky top-0 z-10 bg-zinc-50 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Phone</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Roles</th></tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {filteredStaffMembers.map(member => <StaffDirectoryRow key={member.id || member.name} member={member} />)}
-              </tbody>
-            </table>
-          </div>
-          {!filteredStaffMembers.length ? <div className="border-t border-zinc-200 bg-cream/70 p-4 text-sm text-zinc-500">No active staff matched that search.</div> : null}
-        </div>
-      </section>
-
       <div className="grid gap-4 lg:grid-cols-2">
         <TeamMemberEditor title="Photographers" description="Active photographers available for future scheduling." members={photographers} value={photographerInput} setValue={setPhotographerInput} role="photographer" saving={saving} onSaveMember={saveMember} onDeactivateMember={deactivateMember} />
         <TeamMemberEditor title="Assistants" description="Active assistants available for future scheduling." members={assistants} value={assistantInput} setValue={setAssistantInput} role="assistant" saving={saving} onSaveMember={saveMember} onDeactivateMember={deactivateMember} />
@@ -4408,7 +2863,7 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
 
 function RecentlyAddedEventsModule({ events, onClick }) {
   const recentEvents = useMemo(() => {
-    const cutoff = Date.now() - (96 * 60 * 60 * 1000);
+    const cutoff = Date.now() - (72 * 60 * 60 * 1000);
     return (events || [])
       .filter(event => {
         if (!event?.createdAt) return false;
@@ -4418,7 +2873,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
         return isRecent && isManual && event.active !== false;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      ;
+      .slice(0, 8);
   }, [events]);
 
   return (
@@ -4426,92 +2881,31 @@ function RecentlyAddedEventsModule({ events, onClick }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Recently Added Events</h2>
-          <p className="mt-1 text-sm text-zinc-600">Manual events added to the calendar in the last 96 hours.</p>
+          <p className="mt-1 text-sm text-zinc-600">Manual events added to the calendar in the last 72 hours.</p>
         </div>
         <Pill className="border-zinc-200 bg-white text-zinc-600">{recentEvents.length} recent</Pill>
       </div>
 
-      <div className="mt-4 max-h-[504px] space-y-2 overflow-y-auto pr-1">
+      <div className="mt-4 space-y-2">
         {recentEvents.length ? recentEvents.map(event => (
           <button key={event.supabaseId || event.id} type="button" onClick={() => onClick?.(event)} className="block w-full rounded-2xl border border-zinc-200 bg-cream/75 p-3 text-left transition hover:bg-white hover:shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-zinc-950">{event.title}</div>
                 <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
-                <div className="mt-1 text-xs font-semibold text-zinc-600">Added {formatEventMetaDateTime((getEventAddedMeta(event) || {}).addedAt || event.createdAt) || 'recently'} by {(getEventAddedMeta(event) || {}).name || 'Before We Began Tracking'}</div>
               </div>
               <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
             </div>
           </button>
         )) : (
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No manual events added in the last 96 hours.</div>
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No manual events added in the last 72 hours.</div>
         )}
       </div>
     </section>
   );
 }
 
-
-function getRecentlyModifiedSortTime(event = {}) {
-  const edited = getEventLastEditedMeta(event);
-  const modifiedValue = edited?.editedAt || event.updatedAt || '';
-  const modifiedTime = new Date(modifiedValue).getTime();
-  return Number.isFinite(modifiedTime) ? modifiedTime : 0;
-}
-
-function RecentlyModifiedEventsModule({ events, onClick }) {
-  const modifiedEvents = useMemo(() => {
-    const cutoff = Date.now() - (96 * 60 * 60 * 1000);
-    return (events || [])
-      .filter(event => {
-        if (event.active === false) return false;
-        const modifiedTime = getRecentlyModifiedSortTime(event);
-        const createdTime = event.createdAt ? new Date(event.createdAt).getTime() : 0;
-        const isRecent = modifiedTime >= cutoff;
-        const notJustCreated = !Number.isFinite(createdTime) || Math.abs(modifiedTime - createdTime) > 60000;
-        return isRecent && notJustCreated;
-      })
-      .sort((a, b) => getRecentlyModifiedSortTime(b) - getRecentlyModifiedSortTime(a))
-      ;
-  }, [events]);
-
-  return (
-    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-950">Recently Modified Events</h2>
-          <p className="mt-1 text-sm text-zinc-600">Events changed in the last 96 hours. Use this to confirm edits hit the live Scheduler.</p>
-        </div>
-        <Pill className="border-zinc-200 bg-white text-zinc-600">{modifiedEvents.length} modified</Pill>
-      </div>
-
-      <div className="mt-4 max-h-[504px] space-y-2 overflow-y-auto pr-1">
-        {modifiedEvents.length ? modifiedEvents.map(event => {
-          const edited = getEventLastEditedMeta(event);
-          const editedAt = edited?.editedAt || event.updatedAt;
-          const editedName = (edited?.name || '').trim();
-          const shouldShowEditor = editedName && editedName !== 'Before We Began Tracking';
-          return (
-            <button key={event.supabaseId || event.id} type="button" onClick={() => onClick?.(event)} className="block w-full rounded-2xl border border-zinc-200 bg-cream/75 p-3 text-left transition hover:bg-white hover:shadow-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-zinc-950">{event.title}</div>
-                  <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
-                  <div className="mt-1 text-xs font-semibold text-zinc-600">Modified {formatEventMetaDateTime(editedAt) || 'recently'}{shouldShowEditor ? ` by ${editedName}` : ''}</div>
-                </div>
-                <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
-              </div>
-            </button>
-          );
-        }) : (
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events modified in the last 96 hours.</div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function RemovedEventsModule({ events, onRestore, onPermanentDelete, canRestore = true, canPermanentDelete = false }) {
+function RemovedEventsModule({ events, onRestore, canRestore = true }) {
   const sortedRemovedEvents = useMemo(() => {
     return [...(events || [])].sort((a, b) => {
       const aTime = new Date(a.updatedAt || a.createdAt || a.date || 0).getTime();
@@ -4542,10 +2936,7 @@ function RemovedEventsModule({ events, onRestore, onPermanentDelete, canRestore 
                 <div className="mt-2 truncate text-sm font-semibold text-zinc-950">{event.title}</div>
                 <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
               </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                {canRestore ? <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore</button> : null}
-                {canPermanentDelete ? <button type="button" onClick={() => onPermanentDelete?.(event)} className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Permanent Delete</button> : null}
-              </div>
+              {canRestore ? <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore</button> : null}
             </div>
           </div>
         )) : (
@@ -4558,14 +2949,9 @@ function RemovedEventsModule({ events, onRestore, onPermanentDelete, canRestore 
   );
 }
 
-function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true, canEdit = true, canEditNotes = false }) {
-  if (!event) return null;
-  const addedMeta = getEventAddedMeta(event);
-  const editedMeta = getEventLastEditedMeta(event);
-  const createdByLabel = `${addedMeta.name}${addedMeta.addedAt ? ` · ${formatEventMetaDateTime(addedMeta.addedAt)}` : ''}`;
-  const editedLabel = editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : '';
-
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-3 grid gap-1 text-xs leading-5 text-zinc-500"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div>{canEditNotes && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1 text-[11px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Edit Picture Day Notes</button> : null}</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true, canEdit = true }) {
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{event.supabaseId ? (canEdit ? <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">Editable</Pill> : <Pill className="border-slate-200 bg-slate-50 text-slate-700">View Only</Pill>) : <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill>}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /><Info icon={ClipboardList} title="Status" value={displayStatus(event.status)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{getEventIrm(event) ? <Info icon={Clock} title="IRM" value={`${getEventIrm(event)} — informational only`} /> : null}
+              <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Info</div><div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes || '—'}</div>{event.noteAttribution ? <div className="mt-3"><AttributionPill attribution={event.noteAttribution} /></div> : null}</div></div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -4580,7 +2966,7 @@ function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, 
   const normalizedQuery = normalizeSchoolLookupKey(query);
   const allSchoolMatches = (schools || []).filter(school => school.active !== false && !school.mergedInto && [
     school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone
-  ].filter(Boolean).join('\n').toLowerCase().includes(q));
+  ].filter(Boolean).join(' ').toLowerCase().includes(q));
   const schoolMatches = allSchoolMatches.slice(0, 6);
 
   const matchedSchoolKeys = new Set(allSchoolMatches.map(school => normalizeSchoolLookupKey(school.name)).filter(Boolean));
@@ -4633,7 +3019,7 @@ function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, 
             {schoolMatches.length ? schoolMatches.map(school => (
               <button key={school.name} onClick={() => onSelectSchool(school.name)} className="w-full rounded-2xl border border-zinc-100 bg-cream/70 p-3 text-left transition hover:bg-white hover:shadow-sm">
                 <div className="text-sm font-semibold text-zinc-900">{school.name}</div>
-                <div className="mt-1 text-xs text-zinc-500">{[school.contactFirst, school.contactLast].filter(Boolean).join('\n') || school.city || 'School List match'}{school.irm ? ` · IRM ${school.irm}` : ''}</div>
+                <div className="mt-1 text-xs text-zinc-500">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || school.city || 'School List match'}{school.irm ? ` · IRM ${school.irm}` : ''}</div>
               </button>
             )) : <div className="text-xs text-zinc-400">No school matches.</div>}
           </div>
@@ -4682,432 +3068,25 @@ function toCsv(rows = []) {
   return [allKeys.map(csvEscape).join(','), ...rows.map(row => allKeys.map(key => csvEscape(row?.[key])).join(','))].join('\n');
 }
 
-function stripHtmlForIcs(value = '') {
-  return String(value || '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function escapeIcsText(value = '') {
-  return stripHtmlForIcs(value)
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
-}
-
-function foldIcsLine(line = '') {
-  const text = String(line || '');
-  const parts = [];
-  let remaining = text;
-  while (remaining.length > 73) {
-    parts.push(remaining.slice(0, 73));
-    remaining = ' ' + remaining.slice(73);
-  }
-  parts.push(remaining);
-  return parts.join('\r\n');
-}
-
-function icsDate(value) {
-  return String(value || '').replace(/-/g, '').slice(0, 8);
-}
-
-function makeIcsUid(event = {}) {
-  const raw = String(event.sourceEventId || event.supabaseId || event.id || `${event.title}-${event.date}` || `event-${Date.now()}`);
-  return `${raw.replace(/[^a-zA-Z0-9._-]/g, '-') }@ismile-scheduler`;
-}
-
-function eventToIcsBlock(event = {}, index = 0) {
-  const startDate = icsDate(event.date || todayKey());
-  const endDate = icsDate(addDays(event.endDate || event.date || todayKey(), 1));
-  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const lines = [
-    'BEGIN:VEVENT',
-    `DTSTART;VALUE=DATE:${startDate}`,
-    `DTEND;VALUE=DATE:${endDate}`,
-    `DTSTAMP:${stamp}`,
-    `UID:${escapeIcsText(makeIcsUid(event) || `ismile-${index}@ismile-scheduler`)}`,
-    `CREATED:${stamp}`,
-    event.notes ? `DESCRIPTION:${escapeIcsText(event.notes)}` : '',
-    event.updatedAt ? `LAST-MODIFIED:${new Date(event.updatedAt).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}` : `LAST-MODIFIED:${stamp}`,
-    event.canonicalSchool || event.address ? `LOCATION:${escapeIcsText(event.address || event.canonicalSchool || '')}` : '',
-    'SEQUENCE:0',
-    'STATUS:CONFIRMED',
-    `SUMMARY:${escapeIcsText(event.title || 'Untitled Event')}`,
-    'TRANSP:TRANSPARENT',
-    'END:VEVENT'
-  ].filter(Boolean);
-  return lines.map(foldIcsLine).join('\r\n');
-}
-
-function eventsToIcs(events = [], calendarName = 'iSmile Scheduler Events') {
-  const blocks = (events || [])
-    .filter(event => event && event.active !== false && event.date && event.title)
-    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.title || '').localeCompare(String(b.title || '')))
-    .map(eventToIcsBlock);
-  return [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//iSmile Studios//iSmile Scheduler//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    `X-WR-CALNAME:${escapeIcsText(calendarName)}`,
-    ...blocks,
-    'END:VCALENDAR'
-  ].map(foldIcsLine).join('\r\n');
-}
-
-function crc32Bytes(bytes = new Uint8Array()) {
-  let crc = -1;
-  for (let i = 0; i < bytes.length; i += 1) {
-    crc ^= bytes[i];
-    for (let j = 0; j < 8; j += 1) {
-      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
-    }
-  }
-  return (crc ^ -1) >>> 0;
-}
-
-function stringToBytes(text = '') {
-  return new TextEncoder().encode(text);
-}
-
-function writeUint16(bytes, offset, value) {
-  bytes[offset] = value & 255;
-  bytes[offset + 1] = (value >>> 8) & 255;
-}
-
-function writeUint32(bytes, offset, value) {
-  bytes[offset] = value & 255;
-  bytes[offset + 1] = (value >>> 8) & 255;
-  bytes[offset + 2] = (value >>> 16) & 255;
-  bytes[offset + 3] = (value >>> 24) & 255;
-}
-
-function downloadZipFile(filename, files = []) {
-  if (typeof window === 'undefined') return;
-  const localParts = [];
-  const centralParts = [];
-  let offset = 0;
-  files.forEach(file => {
-    const nameBytes = stringToBytes(file.name);
-    const dataBytes = stringToBytes(file.content || '');
-    const crc = crc32Bytes(dataBytes);
-    const local = new Uint8Array(30 + nameBytes.length);
-    writeUint32(local, 0, 0x04034b50);
-    writeUint16(local, 4, 20);
-    writeUint16(local, 6, 0x0800);
-    writeUint16(local, 8, 0);
-    writeUint16(local, 10, 0);
-    writeUint16(local, 12, 0);
-    writeUint32(local, 14, crc);
-    writeUint32(local, 18, dataBytes.length);
-    writeUint32(local, 22, dataBytes.length);
-    writeUint16(local, 26, nameBytes.length);
-    writeUint16(local, 28, 0);
-    local.set(nameBytes, 30);
-    localParts.push(local, dataBytes);
-
-    const central = new Uint8Array(46 + nameBytes.length);
-    writeUint32(central, 0, 0x02014b50);
-    writeUint16(central, 4, 20);
-    writeUint16(central, 6, 20);
-    writeUint16(central, 8, 0x0800);
-    writeUint16(central, 10, 0);
-    writeUint16(central, 12, 0);
-    writeUint16(central, 14, 0);
-    writeUint32(central, 16, crc);
-    writeUint32(central, 20, dataBytes.length);
-    writeUint32(central, 24, dataBytes.length);
-    writeUint16(central, 28, nameBytes.length);
-    writeUint16(central, 30, 0);
-    writeUint16(central, 32, 0);
-    writeUint16(central, 34, 0);
-    writeUint16(central, 36, 0);
-    writeUint32(central, 38, 0);
-    writeUint32(central, 42, offset);
-    central.set(nameBytes, 46);
-    centralParts.push(central);
-    offset += local.length + dataBytes.length;
-  });
-  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
-  const end = new Uint8Array(22);
-  writeUint32(end, 0, 0x06054b50);
-  writeUint16(end, 4, 0);
-  writeUint16(end, 6, 0);
-  writeUint16(end, 8, files.length);
-  writeUint16(end, 10, files.length);
-  writeUint32(end, 12, centralSize);
-  writeUint32(end, 16, offset);
-  writeUint16(end, 20, 0);
-  const blob = new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-
 function makeBackupFilename(label, extension) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   return `ismile-scheduler-${label}-${stamp}.${extension}`;
 }
 
-function AdminPage({ events, schools, photographers, assistants, staffMembers = [], eventsMessage, schoolsMessage, reloadEvents, reloadSchools, reloadTeamMembers, authEmail }) {
+function AdminPage({ events, schools, photographers, assistants, eventsMessage, schoolsMessage, reloadEvents, reloadSchools, authEmail }) {
   const activeEvents = (events || []).filter(event => event.active !== false);
   const removedEvents = (events || []).filter(event => event.active === false);
   const googleImported = activeEvents.filter(event => event.source === 'google_calendar_import');
   const manualEvents = activeEvents.filter(event => event.source !== 'google_calendar_import');
   const fall2026 = activeEvents.filter(event => event.date >= '2026-09-01' && event.date <= '2026-11-30');
-  const schoolLinked = activeEvents.filter(event => event.schoolId);
-  const unlinked = activeEvents.filter(event => !event.schoolId && event.supabaseId);
+  const schoolLinked = activeEvents.filter(event => event.canonicalSchool);
+  const unlinked = activeEvents.filter(event => !event.canonicalSchool);
   const activeSchools = (schools || []).filter(school => school.active !== false);
   const inactiveSchools = (schools || []).filter(school => school.active === false || school.mergedInto);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminUsersMessage, setAdminUsersMessage] = useState('Loading users and permissions...');
   const [adminUsersSaving, setAdminUsersSaving] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'photographer' });
-  const [staffSaving, setStaffSaving] = useState(false);
-  const [staffMessage, setStaffMessage] = useState('');
-  const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '', roles: ['photographer'] });
-  const [unlinkedSearch, setUnlinkedSearch] = useState('');
-  const [manualSchoolSelections, setManualSchoolSelections] = useState({});
-  const [linkingEventId, setLinkingEventId] = useState('');
-  const [unlinkedMessage, setUnlinkedMessage] = useState('');
-
-  const activeStaffMembers = useMemo(() => groupStaffMembers(staffMembers?.length ? staffMembers : builtInStaffMembers()), [staffMembers]);
-
-  const activeVisibleSchools = useMemo(() => (schools || []).filter(school => school && school.active !== false && !school.mergedInto), [schools]);
-
-  const unlinkedEventCandidates = useMemo(() => {
-    const search = unlinkedSearch.trim().toLowerCase();
-    const seen = new Set();
-    return (unlinked || [])
-      .filter(event => event && event.supabaseId && event.active !== false)
-      .filter(event => {
-        if (!search) return true;
-        const text = [event.title, event.canonicalSchool, event.type, event.date].filter(Boolean).join(' ').toLowerCase();
-        return text.includes(search);
-      })
-      .map(event => {
-        const suggestion = resolveSchoolListMatch(event.canonicalSchool || event.title || '', activeVisibleSchools) || resolveSchoolListMatch(event.title || '', activeVisibleSchools);
-        return { event, suggestion };
-      })
-      .filter(({ event }) => {
-        const key = `${event.date || ''}|${event.title || ''}|${event.canonicalSchool || ''}`.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .sort((a, b) => String(b.event.date || '').localeCompare(String(a.event.date || '')) || String(a.event.title || '').localeCompare(String(b.event.title || '')))
-      .slice(0, 75);
-  }, [unlinked, activeVisibleSchools, unlinkedSearch]);
-
-  const linkUnlinkedEventToSchool = async (event, schoolId) => {
-    const selectedSchool = activeVisibleSchools.find(school => school.id === schoolId);
-    if (!event?.supabaseId || !selectedSchool?.id) {
-      setUnlinkedMessage('Choose a school before linking this event.');
-      return;
-    }
-    const supabase = createClient();
-    if (!hasSupabaseEnv() || !supabase) {
-      setUnlinkedMessage('Supabase is not connected yet, so this event could not be linked.');
-      return;
-    }
-    const ok = window.confirm(`Link this event to ${selectedSchool.name}?\n\n${event.title}\n${formatDate(event.date)}\n\nThis only updates this event record. It does not rename or delete anything.`);
-    if (!ok) return;
-    setLinkingEventId(event.supabaseId);
-    setUnlinkedMessage('Linking event...');
-    const { error } = await supabase
-      .from('events')
-      .update({
-        school_id: selectedSchool.id,
-        canonical_school: selectedSchool.name,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', event.supabaseId);
-    setLinkingEventId('');
-    if (error) {
-      setUnlinkedMessage(`Could not link event: ${error.message}`);
-      return;
-    }
-    setManualSchoolSelections(prev => {
-      const next = { ...prev };
-      delete next[event.supabaseId];
-      return next;
-    });
-    await reloadEvents?.();
-    setUnlinkedMessage(`Linked ${event.title} to ${selectedSchool.name}.`);
-  };
-
-  const saveStaffMember = async (event) => {
-    event?.preventDefault?.();
-    const name = normalizeMemberName(newStaff.name || '');
-    if (!name) {
-      setStaffMessage('Enter a staff member name.');
-      return;
-    }
-    const supabase = createClient();
-    if (!hasSupabaseEnv() || !supabase) {
-      setStaffMessage('Supabase is not connected yet.');
-      return;
-    }
-    setStaffSaving(true);
-    const selectedRoles = newStaff.roles?.length ? newStaff.roles : ['photographer'];
-    const rows = selectedRoles.map(role => ({
-      name,
-      title: null,
-      email: newStaff.email.trim().toLowerCase() || null,
-      phone: newStaff.phone.trim() || null,
-      role,
-      active: true,
-      updated_at: new Date().toISOString()
-    }));
-    const { error } = await supabase
-      .from('staff_members')
-      .upsert(rows, { onConflict: 'name,role' });
-    setStaffSaving(false);
-    if (error) {
-      setStaffMessage(`Could not save staff contact: ${error.message}. If this mentions the title column, run supabase/staff_directory_migration.sql once.`);
-      return;
-    }
-    setNewStaff({ name: '', email: '', phone: '', roles: ['photographer'] });
-    await reloadTeamMembers?.();
-    setStaffMessage(`${name} was saved to the staff directory.`);
-  };
-
-  const updateStaffMember = async (member, patch) => {
-    const supabase = createClient();
-    if (!hasSupabaseEnv() || !supabase) {
-      setStaffMessage('Supabase is not connected yet.');
-      return;
-    }
-    if (!member?.id || String(member.id).startsWith('builtin-')) {
-      setStaffMessage('This built-in staff member needs to be saved to Supabase before editing contact details.');
-      return;
-    }
-    setStaffSaving(true);
-    const { error } = await supabase
-      .from('staff_members')
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', member.id);
-    setStaffSaving(false);
-    if (error) {
-      setStaffMessage(`Could not update staff contact: ${error.message}. If this mentions the title column, run supabase/staff_directory_migration.sql once.`);
-      return;
-    }
-    await reloadTeamMembers?.();
-    setStaffMessage(`${member.name || 'Staff member'} was updated.`);
-  };
-
-
-  const updateStaffGroup = async (member, patch) => {
-    const supabase = createClient();
-    if (!hasSupabaseEnv() || !supabase) {
-      setStaffMessage('Supabase is not connected yet.');
-      return;
-    }
-    const editableRows = (member.originalRows || []).filter(row => row?.id && !String(row.id).startsWith('builtin-'));
-    if (!editableRows.length) {
-      setStaffMessage('This built-in staff member needs to be saved to Supabase before editing contact details.');
-      return;
-    }
-    setStaffSaving(true);
-    const updates = await Promise.all(editableRows.map(row => supabase
-      .from('staff_members')
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', row.id)));
-    setStaffSaving(false);
-    const failed = updates.find(result => result.error);
-    if (failed?.error) {
-      setStaffMessage(`Could not update staff contact: ${failed.error.message}.`);
-      return;
-    }
-    await reloadTeamMembers?.();
-    setStaffMessage(`${member.name || 'Staff member'} was updated.`);
-  };
-
-  const setStaffRoleActive = async (member, role, active) => {
-    const supabase = createClient();
-    if (!hasSupabaseEnv() || !supabase) {
-      setStaffMessage('Supabase is not connected yet.');
-      return;
-    }
-    const existingRow = member.roleRows?.[role];
-    if (existingRow?.id && !String(existingRow.id).startsWith('builtin-')) {
-      setStaffSaving(true);
-      const { error } = await supabase
-        .from('staff_members')
-        .update({ active, updated_at: new Date().toISOString() })
-        .eq('id', existingRow.id);
-      setStaffSaving(false);
-      if (error) {
-        setStaffMessage(`Could not update role: ${error.message}`);
-        return;
-      }
-    } else if (active) {
-      setStaffSaving(true);
-      const { error } = await supabase
-        .from('staff_members')
-        .upsert({
-          name: member.name,
-          title: member.title || null,
-          email: member.email || null,
-          phone: member.phone || null,
-          role,
-          active: true,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'name,role' });
-      setStaffSaving(false);
-      if (error) {
-        setStaffMessage(`Could not add role: ${error.message}`);
-        return;
-      }
-    }
-    await reloadTeamMembers?.();
-    setStaffMessage(`${member.name || 'Staff member'} roles updated.`);
-  };
-
-  const setStaffGroupActive = async (member, active) => {
-    const supabase = createClient();
-    if (!hasSupabaseEnv() || !supabase) {
-      setStaffMessage('Supabase is not connected yet.');
-      return;
-    }
-    const editableRows = (member.originalRows || []).filter(row => row?.id && !String(row.id).startsWith('builtin-'));
-    if (!editableRows.length) {
-      setStaffMessage('This built-in staff member needs to be saved to Supabase before changing active status.');
-      return;
-    }
-    setStaffSaving(true);
-    const updates = await Promise.all(editableRows.map(row => supabase
-      .from('staff_members')
-      .update({ active, updated_at: new Date().toISOString() })
-      .eq('id', row.id)));
-    setStaffSaving(false);
-    const failed = updates.find(result => result.error);
-    if (failed?.error) {
-      setStaffMessage(`Could not update staff status: ${failed.error.message}.`);
-      return;
-    }
-    await reloadTeamMembers?.();
-    setStaffMessage(`${member.name || 'Staff member'} was marked ${active ? 'active' : 'inactive'}.`);
-  };
 
   const loadAdminUsers = async () => {
     if (!hasSupabaseEnv()) {
@@ -5244,32 +3223,6 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
     downloadTextFile(makeBackupFilename('schools', 'csv'), toCsv(rows), 'text/csv;charset=utf-8');
   };
 
-  const exportIcsPackage = () => {
-    const activeExportEvents = activeEvents.filter(event => event?.date && event?.title);
-    const groups = [
-      ['all_events.ics', activeExportEvents, 'iSmile Scheduler — All Events'],
-      ['fall_picture_days.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('fall')), 'iSmile Scheduler — Fall Picture Days'],
-      ['spring_picture_days.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('spring')), 'iSmile Scheduler — Spring Picture Days'],
-      ['makeups.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('makeup')), 'iSmile Scheduler — Makeups'],
-      ['sports.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('sport')), 'iSmile Scheduler — Sports'],
-      ['special_events.ics', activeExportEvents.filter(event => String(event.type || '').toLowerCase().includes('special')), 'iSmile Scheduler — Special Events']
-    ];
-    const readme = [
-      'iSmile Scheduler ICS Backup Package',
-      `Exported: ${new Date().toISOString()}`,
-      '',
-      'Import these .ics files into Google Calendar if you ever need to rebuild calendar events from Scheduler.',
-      'Picture Day Info from Scheduler is exported as the Google Calendar event description.',
-      'Events are exported as all-day events to match the original school-calendar import style.',
-      '',
-      `Active events exported: ${activeExportEvents.length}`
-    ].join('\n');
-    downloadZipFile(makeBackupFilename('ics-package', 'zip'), [
-      { name: 'README.txt', content: readme },
-      ...groups.map(([name, groupEvents, calendarName]) => ({ name, content: eventsToIcs(groupEvents, calendarName) }))
-    ]);
-  };
-
   const copyBackupSql = async () => {
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
     const sql = `create table if not exists events_backup_${stamp} as select * from public.events;\ncreate table if not exists schools_backup_${stamp} as select * from public.schools;`;
@@ -5308,14 +3261,10 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-3">
         <button type="button" onClick={exportPackage} className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/70 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">
           <div className="text-sm font-bold text-zinc-950">Download Full Backup</div>
           <div className="mt-2 text-sm leading-6 text-zinc-600">JSON package with events, schools, team members, removed events, and counts.</div>
-        </button>
-        <button type="button" onClick={exportIcsPackage} className="rounded-3xl border border-sky-200 bg-sky-50/80 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-100">
-          <div className="text-sm font-bold text-zinc-950">Download ICS Package</div>
-          <div className="mt-2 text-sm leading-6 text-zinc-600">Google Calendar-friendly .ics backup package. Picture Day Info becomes the calendar description.</div>
         </button>
         <button type="button" onClick={exportEventsCsv} className="rounded-3xl border border-zinc-200 bg-white/70 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
           <div className="text-sm font-bold text-zinc-950">Download Events CSV</div>
@@ -5344,108 +3293,6 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
             <div className="mt-2 text-2xl font-black text-zinc-950">{value}</div>
           </div>
         ))}
-      </div>
-
-      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h3 className="font-semibold text-zinc-950">Unlinked Events</h3>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">Admin-only repair tool for events that do not have a true School List link yet. Suggestions use name matching; linking only updates the selected event record.</p>
-          </div>
-          <input value={unlinkedSearch} onChange={event => setUnlinkedSearch(event.target.value)} placeholder="Search unlinked events..." className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] md:w-72" />
-        </div>
-        {unlinkedMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-2 text-sm text-zinc-700">{unlinkedMessage}</p> : null}
-        <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80">
-          <div className="max-h-[420px] overflow-auto">
-            <table className="w-full min-w-[900px] text-left">
-              <thead className="sticky top-0 z-10 bg-zinc-50 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                <tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Event</th><th className="px-3 py-2">Suggested School</th><th className="px-3 py-2">Link To</th><th className="px-3 py-2 text-right">Action</th></tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {unlinkedEventCandidates.length ? unlinkedEventCandidates.map(({ event, suggestion }) => {
-                  const selectedSchoolId = manualSchoolSelections[event.supabaseId] || suggestion?.id || '';
-                  return (
-                    <tr key={event.supabaseId || event.id} className="text-zinc-900">
-                      <td className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-zinc-700">{formatDate(event.date)}</td>
-                      <td className="px-3 py-2"><div className="text-sm font-semibold text-zinc-950">{event.title}</div><div className="mt-0.5 text-xs text-zinc-500">{event.type || 'Event'}{event.canonicalSchool ? ` · Current text: ${event.canonicalSchool}` : ''}</div></td>
-                      <td className="px-3 py-2 text-sm text-zinc-700">{suggestion ? suggestion.name : <span className="text-zinc-400">No clear suggestion</span>}</td>
-                      <td className="px-3 py-2">
-                        <select value={selectedSchoolId} onChange={changeEvent => setManualSchoolSelections(prev => ({ ...prev, [event.supabaseId]: changeEvent.target.value }))} className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]">
-                          <option value="">Choose school...</option>
-                          {activeVisibleSchools.map(school => <option key={school.id || school.name} value={school.id}>{school.name}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 text-right"><button type="button" disabled={!selectedSchoolId || linkingEventId === event.supabaseId} onClick={() => linkUnlinkedEventToSchool(event, selectedSchoolId)} className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-zinc-800 disabled:bg-zinc-300">{linkingEventId === event.supabaseId ? 'Linking...' : 'Link Event'}</button></td>
-                    </tr>
-                  );
-                }) : <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-zinc-500">No unlinked events match this search.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <p className="mt-2 text-xs text-zinc-500">Showing up to 75 unique unlinked event/date combinations. This tool does not delete, rename, or bulk-link duplicate rows.</p>
-      </div>
-
-      <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h3 className="font-semibold text-zinc-950">Staff Directory Manager</h3>
-            <p className="mt-1 text-sm text-zinc-600">Compact editor for Team Members contact info.</p>
-          </div>
-          <button type="button" onClick={reloadTeamMembers} disabled={staffSaving} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-60">Reload</button>
-        </div>
-
-        <form onSubmit={saveStaffMember} className="mt-3 grid gap-2 lg:grid-cols-[1fr_1.2fr_1fr_150px_auto]">
-          <input value={newStaff.name} onChange={event => setNewStaff(prev => ({ ...prev, name: event.target.value }))} placeholder="Name" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
-          <input value={newStaff.email} onChange={event => setNewStaff(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" type="email" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
-          <input value={newStaff.phone} onChange={event => setNewStaff(prev => ({ ...prev, phone: event.target.value }))} placeholder="Phone" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700">
-            {STAFF_ROLE_OPTIONS.map(option => (
-              <label key={option.value} className="inline-flex items-center gap-1">
-                <input type="checkbox" checked={newStaff.roles.includes(option.value)} onChange={event => setNewStaff(prev => ({ ...prev, roles: event.target.checked ? Array.from(new Set([...(prev.roles || []), option.value])) : (prev.roles || []).filter(role => role !== option.value) }))} />
-                {option.label}
-              </label>
-            ))}
-          </div>
-          <button type="submit" disabled={staffSaving} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 disabled:bg-zinc-400">Add</button>
-        </form>
-
-        {staffMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-2 text-sm text-zinc-700">{staffMessage}</p> : null}
-
-        <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/80">
-          <div className="max-h-[360px] overflow-auto">
-            <table className="w-full min-w-[900px] text-left">
-              <thead className="sticky top-0 z-10 bg-zinc-50 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                <tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Email</th><th className="px-3 py-2">Phone</th><th className="px-3 py-2">Roles</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Active</th></tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {activeStaffMembers.map(member => {
-                  const builtin = (member.originalRows || []).every(row => String(row.id || '').startsWith('builtin-'));
-                  return (
-                    <tr key={member.id || member.name} className={`${member.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
-                      <td className="px-3 py-1.5"><input defaultValue={member.name || ''} onBlur={event => event.target.value !== (member.name || '') ? updateStaffGroup(member, { name: normalizeMemberName(event.target.value) }) : null} disabled={staffSaving || builtin} className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60" /></td>
-                      <td className="px-3 py-1.5"><input defaultValue={member.email || ''} onBlur={event => event.target.value !== (member.email || '') ? updateStaffGroup(member, { email: event.target.value.trim().toLowerCase() || null }) : null} disabled={staffSaving || builtin} placeholder="Email" type="email" className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" /></td>
-                      <td className="px-3 py-1.5"><input defaultValue={member.phone || ''} onBlur={event => event.target.value !== (member.phone || '') ? updateStaffGroup(member, { phone: event.target.value.trim() || null }) : null} disabled={staffSaving || builtin} placeholder="Phone" className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 text-sm outline-none focus:border-[#AEBB9E] disabled:opacity-60" /></td>
-                      <td className="px-3 py-1.5">
-                        <div className="flex flex-wrap gap-2 text-[11px] font-bold text-zinc-700">
-                          {STAFF_ROLE_OPTIONS.map(option => (
-                            <label key={option.value} className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-1">
-                              <input type="checkbox" checked={member.roles.includes(option.value) && member.roleRows?.[option.value]?.active !== false} disabled={staffSaving || builtin} onChange={event => setStaffRoleActive(member, option.value, event.target.checked)} />
-                              {option.label}
-                            </label>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-xs font-bold text-zinc-600">{builtin ? 'Built-in' : member.active === false ? 'Inactive' : 'Active'}</td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-right">{!builtin ? <button type="button" onClick={() => setStaffGroupActive(member, member.active === false)} disabled={staffSaving} className={`${member.active === false ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'} rounded-full border px-2.5 py-1 text-[11px] font-black disabled:opacity-60`}>{member.active === false ? 'Enable' : 'Deactivate'}</button> : <span className="text-[11px] text-zinc-400">—</span>}</td>
-                    </tr>
-                  );
-                })}
-                {!activeStaffMembers.length ? <tr><td colSpan="6" className="p-4 text-sm text-zinc-500">No staff members loaded yet.</td></tr> : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
 
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
@@ -5532,7 +3379,6 @@ export default function SchedulerApp() {
   const [photographers, setPhotographers] = useState(uniqueCanonicalPhotographers(PHOTOGRAPHERS));
   const [assistants, setAssistants] = useState(ASSISTANTS);
   const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
-  const [staffMembers, setStaffMembers] = useState(builtInStaffMembers());
   const [supabaseEvents, setSupabaseEvents] = useState([]);
   const [localManualEvents, setLocalManualEvents] = useState([]);
   const [eventsMessage, setEventsMessage] = useState('Loading events from Supabase...');
@@ -5727,13 +3573,13 @@ export default function SchedulerApp() {
         return;
       }
 
-      const seededSchools = (seeded || []).map(supabaseRowToSchool).sort((a, b) => a.name.localeCompare(b.name));
+      const seededSchools = dedupeSchoolsForDisplay((seeded || []).map(supabaseRowToSchool));
       setSchools(seededSchools.length ? seededSchools : SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
       setSchoolsMessage('Seeded the starter School List into Supabase.');
       return;
     }
 
-    const loadedSchools = data.map(supabaseRowToSchool).sort((a, b) => a.name.localeCompare(b.name));
+    const loadedSchools = dedupeSchoolsForDisplay(data.map(supabaseRowToSchool));
     setSchools(loadedSchools);
     setSchoolsMessage('School List is loading from Supabase.');
   };
@@ -5752,7 +3598,8 @@ export default function SchedulerApp() {
 
     const { data, error } = await supabase
       .from('staff_members')
-      .select('*')
+      .select('name, role, active')
+      .in('role', ['photographer', 'assistant'])
       .order('name', { ascending: true });
 
     if (error) {
@@ -5763,8 +3610,8 @@ export default function SchedulerApp() {
 
     if (!data?.length) {
       const seedRows = [
-        ...PHOTOGRAPHERS.map(name => ({ name, role: 'photographer', title: null, email: null, phone: null, active: true })),
-        ...ASSISTANTS.map(name => ({ name, role: 'assistant', title: null, email: null, phone: null, active: true }))
+        ...PHOTOGRAPHERS.map(name => ({ name, role: 'photographer', active: true })),
+        ...ASSISTANTS.map(name => ({ name, role: 'assistant', active: true }))
       ];
 
       const { error: seedError } = await supabase.from('staff_members').insert(seedRows);
@@ -5775,39 +3622,25 @@ export default function SchedulerApp() {
         return;
       }
 
-      setStaffMembers(seedRows.map((row, index) => ({ ...row, id: `seeded-${index}` })).sort((a, b) => a.name.localeCompare(b.name)));
       setPhotographers(uniqueCanonicalPhotographers(PHOTOGRAPHERS).sort((a, b) => a.localeCompare(b)));
       setAssistants([...ASSISTANTS].sort((a, b) => a.localeCompare(b)));
       setTeamMembersMessage('Seeded the starter photographers and assistants into Supabase.');
       return;
     }
 
-    const loadedStaffMembers = (data || []).map(member => ({
-      id: member.id,
-      name: member.name,
-      title: member.title || '',
-      email: member.email || '',
-      phone: member.phone || '',
-      role: member.role,
-      active: member.active !== false,
-      createdAt: member.created_at,
-      updatedAt: member.updated_at
-    })).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-
-    const activePhotographers = uniqueCanonicalPhotographers(loadedStaffMembers
+    const activePhotographers = uniqueCanonicalPhotographers(data
       .filter(member => member.active && member.role === 'photographer')
       .map(member => member.name))
       .sort((a, b) => a.localeCompare(b));
 
-    const activeAssistants = loadedStaffMembers
+    const activeAssistants = data
       .filter(member => member.active && member.role === 'assistant')
       .map(member => member.name)
       .sort((a, b) => a.localeCompare(b));
 
-    setStaffMembers(loadedStaffMembers);
     setPhotographers(activePhotographers);
     setAssistants(activeAssistants);
-    setTeamMembersMessage(`Loaded ${loadedStaffMembers.length} staff member${loadedStaffMembers.length === 1 ? '' : 's'} from Supabase.`);
+    setTeamMembersMessage('Team Members are loading from Supabase.');
   };
 
   useEffect(() => {
@@ -5897,23 +3730,10 @@ export default function SchedulerApp() {
       (event.supabaseId && item.supabaseId === event.supabaseId)
     );
     const notesChanged = String(previousEvent?.notes || '') !== String(event?.notes || '');
-    const newNote = String(event?.newNote || '').trim();
-    const isNewEvent = !event?.supabaseId && !previousEvent?.supabaseId;
-    const existingHistory = event.history || previousEvent?.history || '';
-    const historyWithCreator = isNewEvent && !/\[added_by_meta/.test(String(existingHistory || ''))
-      ? [stripInternalEventMeta(existingHistory), makeEventAddedHistoryLine(authEmail)].filter(Boolean).join('\n')
-      : existingHistory;
-    const historyWithEdit = !isNewEvent
-      ? [historyWithCreator, makeEventEditedHistoryLine(authEmail)].filter(Boolean).join('\n')
-      : historyWithCreator;
     const eventWithId = {
       ...event,
       id: event.id || `custom-${Date.now()}`,
-      notes: event.notes ?? previousEvent?.notes ?? '',
-      history: historyWithEdit,
-      noteAttribution: newNote
-        ? appendNoteHistory(event.noteAttribution || previousEvent?.noteAttribution, authEmail, newNote)
-        : (event.noteAttribution || (notesChanged ? makeNoteAttribution(authEmail) : (previousEvent?.noteAttribution || null)))
+      noteAttribution: notesChanged ? makeNoteAttribution(authEmail) : (event.noteAttribution || previousEvent?.noteAttribution || null)
     };
 
     const supabase = createClient();
@@ -5970,19 +3790,16 @@ export default function SchedulerApp() {
 
       setSelected(null);
       setEditingEvent(null);
+      setQuery('');
+      setCalendarMode('Month');
       setEventsMessage(
         readbackConfirmed
           ? (eventWithId.supabaseId ? 'Event changes saved and verified in Supabase.' : `Event saved and verified in Supabase for ${formatDate(confirmedEvent.date)}.`)
           : `Event appeared to save, but Supabase readback could not verify it: ${readbackResult.error?.message || 'unknown readback error'}. It is shown with a warning until verified.`
       );
-      if (!eventWithId.supabaseId) {
-        setMonth(monthKey(confirmedEvent.date));
-        setSelectedDate(confirmedEvent.date);
-        setActiveTab('Calendar View');
-      } else if (activeTab === 'Calendar View') {
-        setMonth(monthKey(confirmedEvent.date));
-        setSelectedDate(confirmedEvent.date);
-      }
+      setMonth(monthKey(confirmedEvent.date));
+      setSelectedDate(confirmedEvent.date);
+      setActiveTab('Calendar View');
       return confirmedEvent;
     } catch (unexpectedError) {
       console.error('Unexpected event save failure', unexpectedError, row);
@@ -6050,32 +3867,6 @@ export default function SchedulerApp() {
     setActiveTab('Calendar View');
   };
 
-  const handlePermanentDeleteEvent = async (event) => {
-    if (!event?.supabaseId || !isAdminUser) return;
-    const ok = window.confirm(`Permanently delete this removed event?\n\n${event.title}\n\nThis cannot be undone. Only use this for true duplicates or junk records.`);
-    if (!ok) return;
-
-    const supabase = createClient();
-    if (!hasSupabaseEnv() || !supabase) {
-      setEventsMessage('Supabase is not connected, so this event could not be permanently deleted.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('events')
-      .delete()
-      .eq('id', event.supabaseId)
-      .eq('active', false);
-
-    if (error) {
-      setEventsMessage(`Could not permanently delete event: ${error.message}`);
-      return;
-    }
-
-    setSupabaseEvents(prev => (prev || []).filter(item => item.supabaseId !== event.supabaseId));
-    setEventsMessage('Removed event permanently deleted.');
-  };
-
   const handleQuickAssignmentSave = async (event) => {
     const saved = await handleScheduleEvent(event);
     if (saved) {
@@ -6110,7 +3901,7 @@ export default function SchedulerApp() {
   const queryFilteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allEvents;
-    return allEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join('\n').toLowerCase().includes(q));
+    return allEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join(' ').toLowerCase().includes(q));
   }, [query, allEvents]);
 
   const normalizedCurrentUserRole = normalizePermissionRole(currentUserRole);
@@ -6119,14 +3910,13 @@ export default function SchedulerApp() {
   const canEditScheduler = isAdminUser || normalizedCurrentUserRole === 'photographer';
   const visibleTabs = useMemo(() => tabs.filter(tab => {
     if (tab === 'Admin') return isAdminUser;
-    if (tab === 'Team Members') return Boolean(authEmail) && !isAssistantUser;
-    if (tab === 'Schedule Live!') return !isAssistantUser;
+    if (tab === 'Team Members') return !isAssistantUser;
     return true;
-  }), [authEmail, isAdminUser, isAssistantUser]);
+  }), [isAdminUser, isAssistantUser]);
 
   useEffect(() => {
-    if ((!isAdminUser && activeTab === 'Admin') || (!authEmail && activeTab === 'Team Members') || (isAssistantUser && ['Team Members', 'Schedule Live!'].includes(activeTab))) setActiveTab('Calendar View');
-  }, [authEmail, isAdminUser, isAssistantUser, activeTab]);
+    if ((!isAdminUser && activeTab === 'Admin') || (isAssistantUser && activeTab === 'Team Members')) setActiveTab('Calendar View');
+  }, [isAdminUser, activeTab]);
 
   const overviewPeriodEvents = useMemo(() => {
     if (overviewMode === 'Month') return queryFilteredEvents.filter(event => event && monthKey(event.date) <= month && monthKey(event.endDate || event.date) >= month);
@@ -6140,7 +3930,7 @@ export default function SchedulerApp() {
   return (
     <main className="min-h-screen font-sans text-zinc-900">
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
-      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6`}>
+      <div className="mx-auto max-w-7xl space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
         <LoginRequiredNotice />
         {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
         {eventsMessage && activeTab === 'Calendar View' ? (
@@ -6151,39 +3941,23 @@ export default function SchedulerApp() {
         ) : null}
         {activeTab === 'Calendar View' && localManualEvents.some(event => event.localBackupOnly) ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
-        <section className={activeTab === 'Schedule Live!' ? 'rounded-none border-0 bg-transparent p-0 shadow-none' : 'rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4'}>
+        <section className="rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4">
           {activeTab === 'Overview' && <>
-            {canEditScheduler ? (
-              <div className="mb-4 rounded-[1.75rem] border border-red-200 bg-gradient-to-r from-red-50 via-white to-[#DDE8D2]/55 p-4 shadow-soft">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="text-xs font-black uppercase tracking-[0.2em] text-red-600"><span className="animate-pulse">🔴</span> Schedule Live!</div>
-                    <div className="mt-1 text-lg font-black text-zinc-950">Open the live scheduling draft room</div>
-                    <div className="mt-1 text-sm font-semibold text-zinc-600">Assign photographers week by week with live rollout counts, host control, Hold, and commentary.</div>
-                  </div>
-                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-7 py-3 text-sm font-black uppercase tracking-wide text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-[#DDE8D2] active:translate-y-0">Launch Schedule Live!</button>
-                </div>
-              </div>
-            ) : null}
             <OverviewControls viewMode={overviewMode} setViewMode={setOverviewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
             <PlanningBoard events={overviewPeriodEvents} onClick={setSelected} onAddEvent={() => openAddEvent(selectedDate)} onQuickAssign={(event, mode) => setQuickAssignment({ event, mode })} canEdit={canEditScheduler} />
             <div className="pt-6">
               <RecentlyAddedEventsModule events={allEvents} onClick={setSelected} />
             </div>
             <div className="pt-3">
-              <RecentlyModifiedEventsModule events={allEvents} onClick={setSelected} />
-            </div>
-            <div className="pt-3">
-              <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} onPermanentDelete={handlePermanentDeleteEvent} canRestore={isAdminUser} canPermanentDelete={isAdminUser} />
+              <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} canRestore={isAdminUser} />
             </div>
           </>}
-          {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
           {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} />}
-          {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} assistants={assistants} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
+          {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} />}
-          {activeTab === 'Team Members' && authEmail && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
-          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} />}
+          {activeTab === 'Team Members' && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
+          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} authEmail={authEmail} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>
@@ -6192,11 +3966,11 @@ export default function SchedulerApp() {
         </section>
       </div>
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} canAdmin={isAdminUser} />
-      {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} authEmail={authEmail} canEditNotes={isAdminUser} />}
+      {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} />}
       {canEditScheduler && quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
-      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} canEdit={canEditScheduler} canEditNotes={isAdminUser} onViewSchool={(schoolName) => { const matchedSchool = resolveSchoolListMatch(schoolName, schools); setSelectedSchoolName(matchedSchool?.name || schoolName); setActiveTab('School List'); setSelected(null); }} />
-      {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
-      {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
+      <Drawer event={selected} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} canEdit={canEditScheduler} onViewSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); setSelected(null); }} />
+      {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} />}
+      {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} />}
     </main>
   );
 }
