@@ -2623,8 +2623,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/30 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto flex max-h-[calc(100dvh-1.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-6 sm:max-h-[calc(100dvh-3rem)]">
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -2636,7 +2636,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
             </div>
           </div>
 
-          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pb-8">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Fall 2026 First Date</div>
@@ -2704,7 +2704,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
+          <div className="shrink-0 flex justify-end gap-2 border-t border-zinc-200 bg-cream p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
             <button type="button" onClick={saveSchedule} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save Schedule</button>
           </div>
@@ -2801,8 +2801,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/30 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto flex max-h-[calc(100dvh-1.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-6 sm:max-h-[calc(100dvh-3rem)]">
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -2813,7 +2813,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
             </div>
           </div>
-          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pb-8">
             {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
@@ -2924,7 +2924,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               ) : null}
             </section>
           </div>
-          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
+          <div className="shrink-0 flex justify-end gap-2 border-t border-zinc-200 bg-cream p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
             <button type="button" onClick={save} disabled={saving} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : (isDuplicate ? "Save Duplicate" : isEditing ? "Save Changes" : "Save Event")}</button>
           </div>
@@ -2976,8 +2976,8 @@ function AddSchoolModal({ onClose, onSave }) {
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/30 p-4 backdrop-blur-sm" onClick={onClose}>
-        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-3xl overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-8">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/30 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
+        <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto flex max-h-[calc(100dvh-1.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl sm:mt-6 sm:max-h-[calc(100dvh-3rem)]">
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -2989,7 +2989,7 @@ function AddSchoolModal({ onClose, onSave }) {
             </div>
           </div>
 
-          <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pb-8">
             {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div> : null}
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -3048,7 +3048,7 @@ function AddSchoolModal({ onClose, onSave }) {
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-zinc-200 p-5">
+          <div className="shrink-0 flex justify-end gap-2 border-t border-zinc-200 bg-cream p-5">
             <button type="button" onClick={onClose} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700">Cancel</button>
             <button type="button" onClick={save} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm">Save School</button>
           </div>
