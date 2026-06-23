@@ -441,7 +441,8 @@ function CalendarColorKey() {
     ['Seniors', TYPE_COLORS.Seniors],
     ['Call or Meeting', TYPE_COLORS['Call or Meeting']],
     ['Edit Day', TYPE_COLORS['Edit Day']],
-    ['Time Off', TYPE_COLORS['Time Off']]
+    ['Time Off', TYPE_COLORS['Time Off']],
+    ['Personal Appointment', TYPE_COLORS['Personal Appointment']]
   ];
 
   return (
@@ -708,7 +709,8 @@ function displayPhotographerAssignment(event) {
 }
 
 function isTimeOffEvent(event = {}) {
-  return String(event?.type || event?.event_type || '').trim().toLowerCase() === 'time off';
+  const type = String(event?.type || event?.event_type || '').trim().toLowerCase();
+  return type === 'time off' || type === 'personal appointment';
 }
 
 function isNeedsPhotographerAssignment(event) {
@@ -1899,6 +1901,7 @@ function isNonRolloutOperationalEvent(event = {}) {
     type === 'edit day' ||
     type === 'photo booth' ||
     type === 'time off' ||
+    type === 'personal appointment' ||
     /\b(call|meeting|huddle|interview|training|edit day|editing day|in-studio|in studio|do not book|hold)\b/.test(title) ||
     /photo\s*booth/.test(title)
   );
@@ -2724,6 +2727,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
   const [schoolName, setSchoolName] = useState(initialEvent?.canonicalSchool || '');
   const [eventType, setEventType] = useState(initialEvent?.type || 'Fall Picture Day');
   const isTimeOff = eventType === 'Time Off';
+  const isPersonalAppointment = eventType === 'Personal Appointment';
+  const isInternalBlockingEvent = isTimeOff || isPersonalAppointment;
   const [selectedPhotographers, setSelectedPhotographers] = useState(initialEvent?.photographers || []);
   const [selectedAssistants, setSelectedAssistants] = useState(initialEvent?.assistants || []);
   const [requiredPhotographers, setRequiredPhotographers] = useState(getRequiredPhotographerCount(initialEvent || { title: initialEvent?.title || '' }));
@@ -2752,7 +2757,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
     setSaving(true);
     setError('');
 
-    const cleanName = isTimeOff ? '' : schoolName.trim();
+    const cleanName = isInternalBlockingEvent ? '' : schoolName.trim();
     const cleanTitle = title.trim() || (cleanName ? `${cleanName} ${eventType}` : eventType);
     const cleanEndDate = isTwoDay ? (endDate || addDays(date, 1)) : '';
     if (isTwoDay && cleanEndDate < date) {
@@ -2767,23 +2772,23 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       endDate: cleanEndDate || null,
       title: cleanTitle,
       canonicalSchool: matchedSchool?.name || cleanName || '',
-      schoolId: isTimeOff ? null : (matchedSchool?.id || null),
+      schoolId: isInternalBlockingEvent ? null : (matchedSchool?.id || null),
       type: eventType,
-      status: isTimeOff ? 'Scheduled' : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned'),
-      photographers: isTimeOff ? [] : selectedPhotographers,
-      assistants: isTimeOff || noAssistant ? [] : selectedAssistants,
-      requiredPhotographers: isTimeOff ? 0 : (Number(requiredPhotographers) || 1),
-      requiredAssistants: isTimeOff || noAssistant ? 0 : (Number(requiredAssistants) || 0),
-      noAssistant: isTimeOff ? true : noAssistant,
+      status: isInternalBlockingEvent ? 'Scheduled' : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned'),
+      photographers: isInternalBlockingEvent ? [] : selectedPhotographers,
+      assistants: isInternalBlockingEvent || noAssistant ? [] : selectedAssistants,
+      requiredPhotographers: isInternalBlockingEvent ? 0 : (Number(requiredPhotographers) || 1),
+      requiredAssistants: isInternalBlockingEvent || noAssistant ? 0 : (Number(requiredAssistants) || 0),
+      noAssistant: isInternalBlockingEvent ? true : noAssistant,
       features: [],
-      irm: isTimeOff ? null : (matchedSchool?.irm || null),
-      arrivalTime: isTimeOff ? '' : (arrivalTime || ''),
-      time: isTimeOff ? 'TBD' : (startTime || 'TBD'),
+      irm: isInternalBlockingEvent ? null : (matchedSchool?.irm || null),
+      arrivalTime: isInternalBlockingEvent ? '' : (arrivalTime || ''),
+      time: isInternalBlockingEvent ? 'TBD' : (startTime || 'TBD'),
       notes: notes || '',
       newNote: newNote.trim(),
       noteAttribution,
       rainInfo: '',
-      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : isTimeOff ? 'Created from Add Event as Time Off.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
+      history: isDuplicate ? (initialEvent?.history || 'Created from a duplicated event.') : isTimeOff ? 'Created from Add Event as Time Off.' : isPersonalAppointment ? 'Created from Add Event as Personal Appointment.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.'
     };
     const result = await onSave(event);
     if (result) {
@@ -2822,7 +2827,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                 </div>
                 <input type="date" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
-              {!isTimeOff ? (
+              {!isInternalBlockingEvent ? (
                 <>
                   <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                     <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
@@ -2844,7 +2849,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               </label>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {!isTimeOff ? (
+              {!isInternalBlockingEvent ? (
                 <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Associated School / Account</div>
                   <input
@@ -2860,13 +2865,13 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                   <div className="mt-2 text-xs text-zinc-500">Optional. If left blank, this event will not appear on a School List page.</div>
                 </label>
               ) : null}
-              <label className={`rounded-3xl border border-zinc-200 bg-white/70 p-4 ${isTimeOff ? 'md:col-span-2' : ''}`}>
+              <label className={`rounded-3xl border border-zinc-200 bg-white/70 p-4 ${isInternalBlockingEvent ? 'md:col-span-2' : ''}`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTimeOff ? "Example: Beth PTO" : "Optional — auto-fills if blank"} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
-                {!isTimeOff && matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTimeOff ? "Example: Beth PTO" : isPersonalAppointment ? "Example: Matt dentist appointment" : "Optional — auto-fills if blank"} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                {!isInternalBlockingEvent && matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
-            {!isTimeOff ? (
+            {!isInternalBlockingEvent ? (
               <>
                 <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                   <h3 className="text-sm font-semibold text-zinc-900">Required Staffing</h3>
@@ -2898,8 +2903,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               </>
             ) : null}
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Time Off Notes' : 'Add New Picture Day Note'}</div>
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder={isTimeOff ? 'Optional details about this time off.' : 'Add a new picture day note. Admins can edit prior note entries if details change.'} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Time Off Notes' : isPersonalAppointment ? 'Personal Appointment Notes' : 'Add New Picture Day Note'}</div>
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder={isTimeOff ? 'Optional details about this time off.' : isPersonalAppointment ? 'Optional details about this personal appointment.' : 'Add a new picture day note. Admins can edit prior note entries if details change.'} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <div className="flex items-center justify-between gap-3">
