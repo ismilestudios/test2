@@ -55,6 +55,14 @@ function uniqueCanonicalPhotographers(names = []) {
   return Array.from(new Set((names || []).map(canonicalPhotographerName).filter(Boolean)));
 }
 
+function explicitCurrentPhotographerAssignments(names = [], allowedNames = PHOTOGRAPHERS) {
+  const allowed = new Set((allowedNames || []).map(name => String(name || '').trim()).filter(Boolean));
+  const rawNames = Array.isArray(names) ? names : [];
+  return Array.from(new Set(rawNames
+    .map(name => String(name || '').trim())
+    .filter(name => name && allowed.has(name))));
+}
+
 
 function Pill({ children, className = '' }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>{children}</span>;
@@ -706,7 +714,7 @@ function displayStatus(status) {
 
 function displayPhotographerAssignment(event) {
   if (isTimeOffEvent(event)) return '—';
-  const assigned = uniqueCanonicalPhotographers(event?.photographers || []);
+  const assigned = explicitCurrentPhotographerAssignments(event?.photographers || []);
   if (assigned.length) return assigned.join(', ');
   const required = Math.max(1, getRequiredPhotographerCount(event));
   return `Needs ${required} photographer${required === 1 ? '' : 's'} assigned`;
@@ -2738,7 +2746,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
   const isTimeOff = eventType === 'Time Off';
   const isPersonalAppointment = eventType === 'Personal Appointment';
   const isInternalBlockingEvent = isTimeOff || isPersonalAppointment;
-  const [selectedPhotographers, setSelectedPhotographers] = useState(isDuplicate ? [] : (initialEvent?.photographers || []));
+  const [selectedPhotographers, setSelectedPhotographers] = useState(isDuplicate ? [] : explicitCurrentPhotographerAssignments(initialEvent?.photographers || [], photographers));
   const [selectedAssistants, setSelectedAssistants] = useState(isDuplicate ? [] : (initialEvent?.assistants || []));
   const [requiredPhotographers, setRequiredPhotographers] = useState(getRequiredPhotographerCount(initialEvent || { title: initialEvent?.title || '' }));
   const [requiredAssistants, setRequiredAssistants] = useState(getRequiredAssistantCount(initialEvent || { title: initialEvent?.title || '' }));
