@@ -704,8 +704,29 @@ function displayStatus(status) {
   return status === 'Needs Photographers Assigned' ? 'Needs Photographers Assigned' : status;
 }
 
+function getAssignedPhotographerNames(event = {}) {
+  return uniqueCanonicalPhotographers(Array.isArray(event?.photographers) ? event.photographers : []);
+}
+
+function getAssignedAssistantNames(event = {}) {
+  return Array.from(new Set((Array.isArray(event?.assistants) ? event.assistants : [])
+    .map(name => String(name || '').trim())
+    .filter(Boolean)
+    .filter(name => !/^tbd$/i.test(name) && !/^unassigned$/i.test(name))));
+}
+
+function formatMissingAssignmentLabel(count, singularLabel) {
+  const cleanCount = Math.max(1, Number(count) || 1);
+  return `Needs ${cleanCount} ${singularLabel}${cleanCount === 1 ? '' : 's'} assigned`;
+}
+
 function displayPhotographerAssignment(event) {
-  return event.photographers?.length ? event.photographers.join(', ') : 'Needs Photographers Assigned';
+  const assigned = getAssignedPhotographerNames(event);
+  const required = getRequiredPhotographerCount(event);
+  const status = String(event?.status || '').trim().toLowerCase();
+  const explicitlyNeedsPhotographer = status.includes('need') && status.includes('photographer');
+  if (!assigned.length || explicitlyNeedsPhotographer) return formatMissingAssignmentLabel(required, 'photographer');
+  return assigned.join(', ');
 }
 
 function isTimeOffEvent(event = {}) {
@@ -736,7 +757,10 @@ function isNeedsPhotographerAssignment(event) {
 
 function displayAssistants(event) {
   if (event?.noAssistant) return 'No Assistant';
-  return event?.assistants?.length ? event.assistants.join(', ') : '—';
+  const assigned = getAssignedAssistantNames(event);
+  const required = getRequiredAssistantCount(event);
+  if (!assigned.length && required > 0) return formatMissingAssignmentLabel(required, 'assistant');
+  return assigned.length ? assigned.join(', ') : '—';
 }
 
 function normalizeSchoolLookupKey(value = '') {
@@ -2718,6 +2742,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 function AddEventModal({ photographers, assistants, events = [], schools = [], onClose, onSave, defaultDate = todayKey(), sourceLabel = 'prototype', initialEvent = null, authEmail = '', canEditNotes = false }) {
   const isDuplicate = Boolean(initialEvent && sourceLabel === 'Duplicate Event' && !initialEvent?.supabaseId);
   const isEditing = Boolean(initialEvent?.supabaseId);
+  const initialPhotographerSelections = isDuplicate ? [] : uniqueCanonicalPhotographers(initialEvent?.photographers || []);
+  const initialAssistantSelections = isDuplicate ? [] : getAssignedAssistantNames(initialEvent || {});
   const [date, setDate] = useState(initialEvent?.date || defaultDate);
   const [isTwoDay, setIsTwoDay] = useState(Boolean(initialEvent?.endDate && initialEvent.endDate !== initialEvent.date));
   const [endDate, setEndDate] = useState(initialEvent?.endDate || '');
@@ -2729,8 +2755,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
   const isTimeOff = eventType === 'Time Off';
   const isPersonalAppointment = eventType === 'Personal Appointment';
   const isInternalBlockingEvent = isTimeOff || isPersonalAppointment;
-  const [selectedPhotographers, setSelectedPhotographers] = useState(initialEvent?.photographers || []);
-  const [selectedAssistants, setSelectedAssistants] = useState(initialEvent?.assistants || []);
+  const [selectedPhotographers, setSelectedPhotographers] = useState(initialPhotographerSelections);
+  const [selectedAssistants, setSelectedAssistants] = useState(initialAssistantSelections);
   const [requiredPhotographers, setRequiredPhotographers] = useState(getRequiredPhotographerCount(initialEvent || { title: initialEvent?.title || '' }));
   const [requiredAssistants, setRequiredAssistants] = useState(getRequiredAssistantCount(initialEvent || { title: initialEvent?.title || '' }));
   const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
