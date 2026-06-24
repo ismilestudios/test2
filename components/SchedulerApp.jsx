@@ -2923,7 +2923,21 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       newNote: newNote.trim(),
       noteAttribution,
       rainInfo: '',
-      history: isDuplicate ? [stripInternalEventMeta(initialEvent?.history || ''), `Duplicated from ${initialEvent?.title || 'event'} on ${formatDate(todayKey())}.`].filter(Boolean).join('\n\n') : isTimeOff ? 'Created from Add Event as Time Off.' : isPersonalAppointment ? 'Created from Add Event as Personal Appointment.' : matchedSchool ? 'Created from Add Event using an existing school/account.' : cleanName ? 'Created from Add Event using a school/account name not yet in School List.' : 'Created from Add Event without a school/account association.',
+      history: isDuplicate
+        ? [stripInternalEventMeta(initialEvent?.history || ''), `Duplicated from ${initialEvent?.title || 'event'} on ${formatDate(todayKey())}.`].filter(Boolean).join('\n\n')
+        : isEditing
+          ? (initialEvent?.history || '')
+          : isTimeOff
+            ? 'Created from Add Event as Time Off.'
+            : isPersonalAppointment
+              ? 'Created from Add Event as Personal Appointment.'
+              : matchedSchool
+                ? 'Created from Add Event using an existing school/account.'
+                : cleanName
+                  ? 'Created from Add Event using a school/account name not yet in School List.'
+                  : 'Created from Add Event without a school/account association.',
+      source: isDuplicate ? 'manual_app' : (initialEvent?.source || 'manual_app'),
+      sourceEventId: isDuplicate ? null : (initialEvent?.sourceEventId || null),
       duplicatedFromEventId: isDuplicate ? (initialEvent?.supabaseId || initialEvent?.id || null) : null
     };
     const result = await onSave(event);
