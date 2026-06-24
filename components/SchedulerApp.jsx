@@ -1889,41 +1889,113 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   );
 }
 
+function buildMonthWeekSegments(events, weekDays, month) {
+  const monthRange = getMonthDateRange(month);
+  const weekStart = weekDays.find(Boolean);
+  const weekEnd = [...weekDays].reverse().find(Boolean);
+  if (!weekStart || !weekEnd) return [];
+
+  const segments = (events || [])
+    .filter(event => event && event.date && event.date <= weekEnd && (event.endDate || event.date) >= weekStart)
+    .map(event => {
+      const segmentStart = [event.date, weekStart, monthRange.start].filter(Boolean).sort()[2];
+      const segmentEnd = [event.endDate || event.date, weekEnd, monthRange.end].filter(Boolean).sort()[0];
+      if (!segmentStart || !segmentEnd || segmentStart > segmentEnd) return null;
+      const startCol = new Date(`${segmentStart}T12:00:00`).getDay();
+      const endCol = new Date(`${segmentEnd}T12:00:00`).getDay();
+      return {
+        event,
+        segmentStart,
+        segmentEnd,
+        startCol,
+        endCol,
+        span: Math.max(1, endCol - startCol + 1),
+        isMultiDay: Boolean(event.endDate && event.endDate !== event.date)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aDuration = getEventDateKeysInRange(a.event, a.segmentStart, a.segmentEnd).length;
+      const bDuration = getEventDateKeysInRange(b.event, b.segmentStart, b.segmentEnd).length;
+      return String(a.segmentStart).localeCompare(String(b.segmentStart)) || bDuration - aDuration || String(a.event.time || '').localeCompare(String(b.event.time || '')) || String(a.event.title || '').localeCompare(String(b.event.title || ''));
+    });
+
+  const occupiedRows = [];
+  return segments.map(segment => {
+    let row = 0;
+    while (true) {
+      occupiedRows[row] ||= Array(7).fill(false);
+      const blocked = occupiedRows[row].some((occupied, col) => occupied && col >= segment.startCol && col <= segment.endCol);
+      if (!blocked) break;
+      row += 1;
+    }
+    for (let col = segment.startCol; col <= segment.endCol; col += 1) occupiedRows[row][col] = true;
+    return { ...segment, row };
+  });
+}
+
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
+  const cells = [
+    ...Array.from({ length: offset }, () => null),
+    ...Array.from({ length: totalDays }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)
+  ];
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    const week = cells.slice(i, i + 7);
+    while (week.length < 7) week.push(null);
+    weeks.push(week);
+  }
+
   return (
     <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4">
       <div className="min-w-[760px] sm:min-w-0">
         <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
           {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}
         </div>
-        <div className="mt-2 grid grid-cols-7 gap-2">
-          {Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}
-          {Array.from({ length: totalDays }, (_, i) => i + 1).map(day => {
-            const date = `${month}-${String(day).padStart(2,'0')}`;
-            const dayEvents = events.filter(e => isDateInEventRange(e, date)).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+        <div className="mt-2 space-y-2">
+          {weeks.map((weekDays, weekIndex) => {
+            const segments = buildMonthWeekSegments(events, weekDays, month);
+            const visibleRows = Math.max(3, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
+            const rowMinHeight = Math.max(132, 48 + (visibleRows * 30));
             return (
-              <div
-                key={date}
-                onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
-                title="Double-click to add an event"
-                className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}
-              >
-                <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button>
-                <HolidayText date={date} />
-                <div className="space-y-1.5">
-                  {dayEvents.map(event => {
-                    const isMultiDay = Boolean(event.endDate && event.endDate !== event.date);
+              <div key={`week-${weekIndex}`} className="relative grid grid-cols-7 gap-2" style={{ minHeight: rowMinHeight }}>
+                {weekDays.map((date, index) => {
+                  const day = date ? Number(date.slice(-2)) : null;
+                  return date ? (
+                    <div
+                      key={date}
+                      onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
+                      title="Double-click to add an event"
+                      className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}
+                    >
+                      <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button>
+                      <HolidayText date={date} />
+                    </div>
+                  ) : <div key={`blank-${weekIndex}-${index}`} />;
+                })}
+
+                <div className="pointer-events-none absolute left-0 right-0 top-10 z-10 grid grid-cols-7 gap-x-2 gap-y-1.5">
+                  {segments.map(segment => {
+                    const { event, segmentStart, segmentEnd, isMultiDay } = segment;
+                    const startsOnTrueStart = segmentStart === event.date;
+                    const endsOnTrueEnd = segmentEnd === (event.endDate || event.date);
+                    const roundedClass = isMultiDay
+                      ? `${startsOnTrueStart ? 'rounded-l-xl' : 'rounded-l-sm'} ${endsOnTrueEnd ? 'rounded-r-xl' : 'rounded-r-sm'}`
+                      : 'rounded-xl';
+                    const labelPrefix = event.localBackupOnly ? '⚠ ' : isMultiDay ? '↳ ' : '';
                     return (
                       <button
-                        key={`${event.id}-${date}`}
+                        key={`${event.id}-${segmentStart}-${segmentEnd}`}
+                        type="button"
                         onDoubleClick={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); onClick(event); }}
-                        className={`block truncate border px-2 py-1.5 text-left text-[11px] font-medium ${isMultiDay ? '-mx-1 w-[calc(100%+0.65rem)]' : 'w-full'} ${getMonthEventSegmentClass(event, date)} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                        className={`pointer-events-auto min-w-0 truncate border px-2 py-1.5 text-left text-[11px] font-medium shadow-[0_1px_0_rgba(255,255,255,0.65)_inset] ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                        style={{ gridColumn: `${segment.startCol + 1} / span ${segment.span}`, gridRow: segment.row + 1 }}
                         title={isMultiDay ? `${event.title} • ${getEventDateLabel(event)}` : event.title}
                       >
-                        {getMonthEventSegmentLabel(event, date)}
+                        {labelPrefix}{event.title}
                       </button>
                     );
                   })}
@@ -1937,6 +2009,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
     </div>
   );
 }
+
 
 
 
