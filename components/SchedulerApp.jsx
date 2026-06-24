@@ -752,8 +752,8 @@ function displayStatus(status) {
 }
 
 function displayPhotographerAssignment(event) {
-  if (isTimeOffEvent(event)) return '—';
   const assigned = explicitCurrentPhotographerAssignments(event?.photographers || []);
+  if (isTimeOffEvent(event)) return assigned.length ? assigned.join(', ') : '—';
   if (assigned.length) return assigned.join(', ');
   const required = Math.max(1, getRequiredPhotographerCount(event));
   return `Needs ${required} photographer${required === 1 ? '' : 's'} assigned`;
