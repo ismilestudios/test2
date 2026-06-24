@@ -684,6 +684,45 @@ function isDateInEventRange(event, date) {
   return Boolean(start) && date >= start && date <= end;
 }
 
+function getEventDateKeys(event) {
+  if (!event?.date) return [];
+  const start = event.date;
+  const end = event.endDate || event.date;
+  const keys = [];
+  let cursor = start;
+  let guard = 0;
+  while (cursor <= end && guard < 370) {
+    keys.push(cursor);
+    cursor = addDays(cursor, 1);
+    guard += 1;
+  }
+  return keys;
+}
+
+function getEventDateKeysInRange(event, start, end) {
+  return getEventDateKeys(event).filter(date => (!start || date >= start) && (!end || date <= end));
+}
+
+function getMonthDateRange(month) {
+  return { start: `${month}-01`, end: `${month}-${String(daysInMonth(month)).padStart(2, '0')}` };
+}
+
+function getMonthEventSegmentClass(event, date) {
+  if (!event?.endDate || event.endDate === event.date) return 'rounded-xl';
+  const isStart = date === event.date;
+  const isEnd = date === event.endDate;
+  if (isStart && isEnd) return 'rounded-xl';
+  if (isStart) return 'rounded-l-xl rounded-r-sm';
+  if (isEnd) return 'rounded-r-xl rounded-l-sm';
+  return 'rounded-sm';
+}
+
+function getMonthEventSegmentLabel(event, date) {
+  if (!event?.endDate || event.endDate === event.date) return `${event.localBackupOnly ? '⚠ ' : ''}${event.title}`;
+  if (date === event.date) return `${event.localBackupOnly ? '⚠ ' : ''}${event.title}`;
+  return `${event.localBackupOnly ? '⚠ ' : ''}↳ ${event.title}`;
+}
+
 function getEventDateLabel(event) {
   if (!event?.endDate || event.endDate === event.date) return formatDate(event?.date);
   return `${formatDate(event.date)} – ${formatDate(event.endDate)}`;
@@ -937,7 +976,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
 
 function MobileBottomNav({ activeTab, setActiveTab, canAdmin = false }) {
   const mobileTabs = [
-    { label: 'Today', tab: 'Overview' },
+    { label: 'Overview', tab: 'Overview' },
     { label: 'Mobile', tab: 'Mobile View' },
     { label: 'Calendar', tab: 'Calendar View' },
     { label: 'Schools', tab: 'School List' },
@@ -1863,7 +1902,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
           {Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}
           {Array.from({ length: totalDays }, (_, i) => i + 1).map(day => {
             const date = `${month}-${String(day).padStart(2,'0')}`;
-            const dayEvents = events.filter(e => isDateInEventRange(e, date));
+            const dayEvents = events.filter(e => isDateInEventRange(e, date)).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
             return (
               <div
                 key={date}
@@ -1874,16 +1913,20 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
                 <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button>
                 <HolidayText date={date} />
                 <div className="space-y-1.5">
-                  {dayEvents.map(event => (
-                    <button
-                      key={event.id}
-                      onDoubleClick={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); onClick(event); }}
-                      className={`block w-full truncate rounded-xl border px-2 py-1.5 text-left text-[11px] font-medium ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
-                    >
-                      {event.localBackupOnly ? '⚠ ' : ''}{event.title}
-                    </button>
-                  ))}
+                  {dayEvents.map(event => {
+                    const isMultiDay = Boolean(event.endDate && event.endDate !== event.date);
+                    return (
+                      <button
+                        key={`${event.id}-${date}`}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); onClick(event); }}
+                        className={`block truncate border px-2 py-1.5 text-left text-[11px] font-medium ${isMultiDay ? '-mx-1 w-[calc(100%+0.65rem)]' : 'w-full'} ${getMonthEventSegmentClass(event, date)} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                        title={isMultiDay ? `${event.title} • ${getEventDateLabel(event)}` : event.title}
+                      >
+                        {getMonthEventSegmentLabel(event, date)}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -2792,7 +2835,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       schoolId: isInternalBlockingEvent ? null : (matchedSchool?.id || null),
       type: eventType,
       status: isInternalBlockingEvent ? 'Scheduled' : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned'),
-      photographers: isInternalBlockingEvent ? [] : selectedPhotographers,
+      photographers: selectedPhotographers,
       assistants: isInternalBlockingEvent || noAssistant ? [] : selectedAssistants,
       requiredPhotographers: isInternalBlockingEvent ? 0 : (Number(requiredPhotographers) || 1),
       requiredAssistants: isInternalBlockingEvent || noAssistant ? 0 : (Number(requiredAssistants) || 0),
@@ -2889,6 +2932,9 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                 {!isInternalBlockingEvent && matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
+            {isInternalBlockingEvent ? (
+              <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={title || eventType} />
+            ) : null}
             {!isInternalBlockingEvent ? (
               <>
                 <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
@@ -3996,8 +4042,9 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   const [plainViewMode, setPlainViewMode] = useState('Week');
 
   const today = todayKey();
-  const productionEvents = useMemo(() => (events || [])
-    .filter(event => event?.active !== false && event.type !== 'Call or Meeting' && event.type !== 'Edit Day'), [events]);
+  const allActiveEvents = useMemo(() => (events || []).filter(event => event?.active !== false), [events]);
+  const productionEvents = useMemo(() => allActiveEvents
+    .filter(event => event.type !== 'Call or Meeting' && event.type !== 'Edit Day'), [allActiveEvents]);
 
   const todayEvents = productionEvents
     .filter(event => isDateInEventRange(event, today))
@@ -4037,23 +4084,24 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   const plainViewEvents = useMemo(() => {
     if (plainViewMode === 'Month') {
       const key = monthKey(selectedDate);
-      return productionEvents.filter(event => monthKey(event.date) <= key && monthKey(event.endDate || event.date) >= key);
+      const { start, end } = getMonthDateRange(key);
+      return allActiveEvents.flatMap(event => getEventDateKeysInRange(event, start, end).map(instanceDate => ({ ...event, instanceDate })));
     }
     if (plainViewMode === 'Week') {
       const { start, end } = weekBounds(selectedDate);
-      return productionEvents.filter(event => event.date <= end && (event.endDate || event.date) >= start);
+      return allActiveEvents.flatMap(event => getEventDateKeysInRange(event, start, end).map(instanceDate => ({ ...event, instanceDate })));
     }
-    return productionEvents.filter(event => isDateInEventRange(event, selectedDate));
-  }, [productionEvents, selectedDate, plainViewMode]);
+    return allActiveEvents.filter(event => isDateInEventRange(event, selectedDate)).map(event => ({ ...event, instanceDate: selectedDate }));
+  }, [allActiveEvents, selectedDate, plainViewMode]);
 
   const sortedPlainViewEvents = useMemo(() => (plainViewEvents || [])
     .slice()
-    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || ''))), [plainViewEvents]);
+    .sort((a, b) => String(a.instanceDate || a.date || '').localeCompare(String(b.instanceDate || b.date || '')) || String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || ''))), [plainViewEvents]);
 
   const groupedPlainViewEvents = useMemo(() => {
     const map = new Map();
     sortedPlainViewEvents.forEach(event => {
-      const key = event.date || todayKey();
+      const key = event.instanceDate || event.date || todayKey();
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(event);
     });
@@ -4148,7 +4196,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
                   const assistantsLabel = (event.assistants || []).filter(Boolean).join(', ') || '—';
                   return (
                     <button key={event.id} type="button" onClick={() => onClick(event)} className="grid w-full grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45">
-                      <div className="px-2 py-1.5 font-semibold italic text-zinc-600">{plainViewMode === 'Day' ? shortDate(event.date) : shortDate(date)}</div>
+                      <div className="px-2 py-1.5 font-semibold italic text-zinc-600">{shortDate(event.instanceDate || date || event.date)}</div>
                       <div className="min-w-0 px-2 py-1.5">
                         <div className="truncate font-black text-zinc-950">{event.title}</div>
                       </div>
@@ -6206,13 +6254,7 @@ export default function SchedulerApp() {
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
       <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6`}>
         <LoginRequiredNotice />
-        {['Overview', 'Calendar View'].includes(activeTab) ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
-        {eventsMessage && activeTab === 'Calendar View' ? (
-          <div className="flex flex-col gap-2 rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>{eventsMessage}</div>
-            <button type="button" onClick={loadEventsFromSupabase} className="rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-white">Reload Supabase Events</button>
-          </div>
-        ) : null}
+        {activeTab === 'Overview' ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
         {activeTab === 'Calendar View' && localManualEvents.some(event => event.localBackupOnly) ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         <section className={activeTab === 'Schedule Live!' ? 'rounded-none border-0 bg-transparent p-0 shadow-none' : 'rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4'}>
@@ -6242,7 +6284,13 @@ export default function SchedulerApp() {
             </div>
           </>}
           {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
-          {activeTab === 'Calendar View' && <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} />}
+          {activeTab === 'Calendar View' && <>
+            <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} />
+            <div className="mt-4 flex flex-col gap-2 rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/40 p-3 text-sm text-zinc-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>{eventsMessage || 'Refresh the shared calendar data from Supabase when needed.'}</div>
+              <button type="button" onClick={loadEventsFromSupabase} className="rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-white">Reload Supabase Events</button>
+            </div>
+          </>}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} assistants={assistants} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} />}
