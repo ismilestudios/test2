@@ -1958,9 +1958,11 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
           {weeks.map((weekDays, weekIndex) => {
             const segments = buildMonthWeekSegments(events, weekDays, month);
             const visibleRows = Math.max(3, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
-            const rowMinHeight = Math.max(132, 48 + (visibleRows * 30));
+            const hasHolidayInWeek = weekDays.some(date => date && getHolidayLabels(date).length);
+            const eventLayerTop = hasHolidayInWeek ? 58 : 40;
+            const rowMinHeight = Math.max(132, eventLayerTop + 18 + (visibleRows * 34));
             return (
-              <div key={`week-${weekIndex}`} className="relative grid grid-cols-7 gap-2" style={{ minHeight: rowMinHeight }}>
+              <div key={`week-${weekIndex}`} className="relative grid grid-cols-7 gap-2 overflow-hidden" style={{ minHeight: rowMinHeight }}>
                 {weekDays.map((date, index) => {
                   const day = date ? Number(date.slice(-2)) : null;
                   return date ? (
@@ -1971,12 +1973,12 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
                       className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}
                     >
                       <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button>
-                      <HolidayText date={date} />
+                      <div className="relative z-20"><HolidayText date={date} /></div>
                     </div>
                   ) : <div key={`blank-${weekIndex}-${index}`} />;
                 })}
 
-                <div className="pointer-events-none absolute left-0 right-0 top-10 z-10 grid grid-cols-7 gap-x-2 gap-y-1.5">
+                <div className="pointer-events-none absolute left-0 right-0 z-10 grid grid-cols-7 gap-x-2 gap-y-1.5" style={{ top: eventLayerTop }}>
                   {segments.map(segment => {
                     const { event, segmentStart, segmentEnd, isMultiDay } = segment;
                     const startsOnTrueStart = segmentStart === event.date;
@@ -2256,7 +2258,7 @@ function WeekView({ events, selectedDate, onClick }) {
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-zinc-900">{formatDate(date)}</h3>
-                  <HolidayText date={date} />
+                  <div className="relative z-20"><HolidayText date={date} /></div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Pill className="border-zinc-200 bg-cream text-zinc-600">{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Pill>
