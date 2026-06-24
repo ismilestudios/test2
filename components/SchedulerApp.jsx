@@ -1047,7 +1047,7 @@ function buildDayCopyText(title, dayEvents) {
 function TodayTomorrowList({ title, date, events, onClickEvent }) {
   const [copied, setCopied] = useState(false);
   const dayEvents = events
-    .filter(event => isDateInEventRange(event, date) && event.type !== 'Call or Meeting' && event.type !== 'Edit Day')
+    .filter(event => isDateInEventRange(event, date) && !event?.removed)
     .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
   const copyDay = async () => {
