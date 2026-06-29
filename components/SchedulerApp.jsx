@@ -2117,9 +2117,9 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
                       key={date}
                       onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
                       title="Double-click to add an event"
-                      className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : cell.inCurrentMonth ? 'border-zinc-200 bg-cream/80' : 'border-zinc-100 bg-zinc-50/50 opacity-60'}`}
+                      className={`min-h-[132px] rounded-2xl border p-2 transition ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : cell.inCurrentMonth ? 'border-zinc-200 bg-cream/80' : 'border-zinc-200 bg-zinc-100/70 opacity-75 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]'}`}
                     >
-                      <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button>
+                      <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className={`mb-1 text-xs font-semibold hover:text-zinc-900 ${cell.inCurrentMonth ? 'text-zinc-500' : 'text-zinc-400'}`}>{day}</button>
                       <div className="relative z-20"><HolidayText date={date} /></div>
                     </div>
                   );
@@ -3547,11 +3547,14 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
                 </div>
                 <Pill className="border-current bg-white/60 text-current">{day.weekRollouts} / {WEEKLY_ROLLOUT_CAPACITY} week</Pill>
               </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Pill className="border-current bg-white/60 text-current">Day: {day.dayRollouts} rollout{day.dayRollouts === 1 ? '' : 's'}</Pill>
+                <Pill className="border-current bg-white/60 text-current">Week: {day.weekRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</Pill>
+              </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
                 <div className={`${day.capacity.barClassName || 'bg-emerald-500'} h-full rounded-full`} style={{ width: `${Math.min(100, Math.round((day.weekRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100))}%` }} />
               </div>
-              <div className="mt-2 text-xs font-semibold opacity-80">Week remaining: {day.remainingWeekRollouts} rollout{day.remainingWeekRollouts === 1 ? '' : 's'} · {shortDate(day.weekStart)} – {shortDate(day.weekEnd)}</div>
-              <div className="mt-1 text-xs opacity-70">Booked today: {day.scheduled.map(event => event.title).slice(0, 3).join(', ') || '—'}{day.scheduled.length > 3 ? ` +${day.scheduled.length - 3} more` : ''}</div>
+              <div className="mt-2 text-xs opacity-70">Booked today: {day.scheduled.map(event => event.title).slice(0, 3).join(', ') || '—'}{day.scheduled.length > 3 ? ` +${day.scheduled.length - 3} more` : ''}</div>
             </div>
           ))}
         </div>
