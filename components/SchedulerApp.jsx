@@ -941,15 +941,17 @@ function addMonths(key, delta) {
 function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }) {
   const mobileViewCompact = activeTab === 'Mobile View';
   return (
-    <header className={`sticky top-0 z-20 border-b border-zinc-200/70 bg-cream/90 backdrop-blur-xl ${mobileViewCompact ? 'sm:py-0' : ''}`}>
+    <header className={`sticky top-0 z-50 border-b border-zinc-200/70 bg-cream shadow-sm ${mobileViewCompact ? 'sm:py-0' : ''}`}>
       <div className={`mx-auto max-w-7xl px-4 sm:px-6 ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-4'}`}>
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-4'}`}>
           <div>
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain" /></span>
-              <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
+            <div className="flex items-start gap-4">
+              <span className="inline-flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-[#AEBB9E] bg-white shadow-sm"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-[4.5rem] w-[4.5rem] object-contain" /></span>
+              <div className="min-w-0 pt-1">
+                <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
+                <p className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} mt-2 max-w-xl text-sm leading-6 text-zinc-600`}>A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
+              </div>
             </div>
-            <p className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} mt-1 max-w-2xl text-sm text-zinc-600`}>A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
           </div>
           <div className={`flex w-full flex-col lg:w-auto lg:min-w-[560px] ${mobileViewCompact ? 'gap-2 sm:gap-3' : 'gap-3'}`}>
             <label className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} relative`}>
