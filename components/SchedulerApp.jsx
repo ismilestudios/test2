@@ -940,16 +940,18 @@ function addMonths(key, delta) {
 
 function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }) {
   const mobileViewCompact = activeTab === 'Mobile View';
+  const primaryTabs = visibleTabs.filter(tab => tab !== 'Admin');
+  const showAdminTab = visibleTabs.includes('Admin');
   return (
     <header className={`sticky top-0 z-50 border-b border-zinc-200/70 bg-cream shadow-sm ${mobileViewCompact ? 'sm:py-0' : ''}`}>
-      <div className={`mx-auto max-w-7xl px-4 sm:px-6 ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-4'}`}>
-        <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-4'}`}>
+      <div className={`mx-auto max-w-7xl px-4 sm:px-6 ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-3 sm:py-4'}`}>
+        <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-3 sm:gap-4'}`}>
           <div>
-            <div className="flex items-start gap-4">
-              <span className="inline-flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-[#AEBB9E] bg-white shadow-sm"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-[4.5rem] w-[4.5rem] object-contain" /></span>
-              <div className="min-w-0 pt-1">
+            <div className="flex items-center gap-3 sm:items-start sm:gap-4">
+              <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm sm:h-20 sm:w-20 sm:rounded-3xl"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain sm:h-[4.5rem] sm:w-[4.5rem]" /></span>
+              <div className="min-w-0 sm:pt-1">
                 <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
-                <p className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} mt-2 max-w-xl text-sm leading-6 text-zinc-600`}><span>A calm internal workspace for school picture days,</span><br /><span>staffing, notes, and historical reference.</span></p>
+                <p className="mt-2 hidden max-w-xl text-sm leading-6 text-zinc-600 sm:block"><span>A calm internal workspace for school picture days,</span><br /><span>staffing, notes, and historical reference.</span></p>
               </div>
             </div>
           </div>
@@ -964,12 +966,21 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
               />
             </label>
             <div className={`${mobileViewCompact ? 'hidden sm:flex' : 'flex'} justify-end`}><AuthStatus /></div>
-            <nav className="hidden justify-end gap-2 sm:flex sm:flex-wrap">
-              {visibleTabs.map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`${tab === 'Admin' ? 'sm:ml-auto' : ''} min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
-                  {tab}
-                </button>
-              ))}
+            <nav className="hidden flex-col gap-2 sm:flex">
+              <div className="flex flex-wrap justify-end gap-2">
+                {primaryTabs.map((tab) => (
+                  <button key={tab} onClick={() => setActiveTab(tab)} className={`min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
+                    {tab}
+                  </button>
+                ))}
+              </div>
+              {showAdminTab ? (
+                <div className="flex justify-end">
+                  <button onClick={() => setActiveTab('Admin')} className={`min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === 'Admin' ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
+                    Admin
+                  </button>
+                </div>
+              ) : null}
             </nav>
           </div>
         </div>
@@ -2749,6 +2760,15 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
             {school.contactPhone ? <a href={`tel:${school.contactPhone}`} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800">Call</a> : null}
             {school.contactEmail ? <a href={`mailto:${school.contactEmail}`} className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800">Email</a> : null}
           </div>
+          {[school.secondaryContactFirst, school.secondaryContactLast, school.secondaryContactEmail, school.secondaryContactTitle].some(Boolean) ? (
+            <div className="mt-4 border-t border-zinc-200 pt-3">
+              <div className="text-sm font-semibold text-zinc-800">Secondary Contact</div>
+              <div className="mt-1 text-sm font-medium text-zinc-700">{[school.secondaryContactFirst, school.secondaryContactLast].filter(Boolean).join('\n') || '—'}</div>
+              {school.secondaryContactTitle ? <div className="mt-0.5 text-xs text-zinc-500">{school.secondaryContactTitle}</div> : null}
+              {school.secondaryContactEmail ? <div className="break-words">{school.secondaryContactEmail}</div> : null}
+              {school.secondaryContactEmail ? <a href={`mailto:${school.secondaryContactEmail}`} className="mt-2 inline-flex rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800">Email</a> : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -3231,6 +3251,10 @@ function AddSchoolModal({ onClose, onSave }) {
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactTitle, setContactTitle] = useState('');
+  const [secondaryContactFirst, setSecondaryContactFirst] = useState('');
+  const [secondaryContactLast, setSecondaryContactLast] = useState('');
+  const [secondaryContactEmail, setSecondaryContactEmail] = useState('');
+  const [secondaryContactTitle, setSecondaryContactTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
@@ -3253,6 +3277,10 @@ function AddSchoolModal({ onClose, onSave }) {
       contactPhone,
       contactEmail,
       contactTitle,
+      secondaryContactFirst,
+      secondaryContactLast,
+      secondaryContactEmail,
+      secondaryContactTitle,
       notes,
       referenceImages: [],
       active: true
@@ -3325,6 +3353,28 @@ function AddSchoolModal({ onClose, onSave }) {
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact Title</div>
                 <input value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
               </label>
+            </div>
+
+            <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+              <div className="text-sm font-semibold text-zinc-800">Secondary Contact</div>
+              <div className="mt-3 grid gap-4 md:grid-cols-2">
+                <label>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">First Name</div>
+                  <input value={secondaryContactFirst} onChange={(e) => setSecondaryContactFirst(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                </label>
+                <label>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Last Name</div>
+                  <input value={secondaryContactLast} onChange={(e) => setSecondaryContactLast(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                </label>
+                <label>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Email</div>
+                  <input type="email" value={secondaryContactEmail} onChange={(e) => setSecondaryContactEmail(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                </label>
+                <label>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
+                  <input value={secondaryContactTitle} onChange={(e) => setSecondaryContactTitle(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                </label>
+              </div>
             </div>
 
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
@@ -3531,6 +3581,10 @@ function EditSchoolModal({ school, onClose, onSave }) {
   const [contactPhone, setContactPhone] = useState(school?.contactPhone || '');
   const [contactEmail, setContactEmail] = useState(school?.contactEmail || '');
   const [contactTitle, setContactTitle] = useState(school?.contactTitle || '');
+  const [secondaryContactFirst, setSecondaryContactFirst] = useState(school?.secondaryContactFirst || '');
+  const [secondaryContactLast, setSecondaryContactLast] = useState(school?.secondaryContactLast || '');
+  const [secondaryContactEmail, setSecondaryContactEmail] = useState(school?.secondaryContactEmail || '');
+  const [secondaryContactTitle, setSecondaryContactTitle] = useState(school?.secondaryContactTitle || '');
   const [newNote, setNewNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
@@ -3548,6 +3602,10 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setContactPhone(school?.contactPhone || '');
     setContactEmail(school?.contactEmail || '');
     setContactTitle(school?.contactTitle || '');
+    setSecondaryContactFirst(school?.secondaryContactFirst || '');
+    setSecondaryContactLast(school?.secondaryContactLast || '');
+    setSecondaryContactEmail(school?.secondaryContactEmail || '');
+    setSecondaryContactTitle(school?.secondaryContactTitle || '');
     setNewNote('');
     setSaveStatus('');
     setSaving(false);
@@ -3604,6 +3662,10 @@ function EditSchoolModal({ school, onClose, onSave }) {
         contactPhone,
         contactEmail,
         contactTitle,
+        secondaryContactFirst,
+        secondaryContactLast,
+        secondaryContactEmail,
+        secondaryContactTitle,
         notes: school.notes || '',
         newNote: newNote.trim(),
         referenceImages,
@@ -3669,6 +3731,23 @@ function EditSchoolModal({ school, onClose, onSave }) {
             </label>
           </div>
           <section className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
+            <div className="text-sm font-semibold text-zinc-800">Secondary Contact</div>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <label className="text-sm font-medium text-zinc-700">First
+                <input value={secondaryContactFirst} onChange={(e) => setSecondaryContactFirst(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+              </label>
+              <label className="text-sm font-medium text-zinc-700">Last
+                <input value={secondaryContactLast} onChange={(e) => setSecondaryContactLast(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+              </label>
+              <label className="text-sm font-medium text-zinc-700">Email
+                <input value={secondaryContactEmail} onChange={(e) => setSecondaryContactEmail(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+              </label>
+              <label className="text-sm font-medium text-zinc-700">Title
+                <input value={secondaryContactTitle} onChange={(e) => setSecondaryContactTitle(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
+              </label>
+            </div>
+          </section>
+          <section className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
             <div className="text-sm font-semibold text-zinc-800">School Notes ({getNoteHistory(school.noteAttribution).length})</div>
             <div className="mt-3"><NoteHistoryList entries={getNoteHistory(school.noteAttribution)} /></div>
             {school.notes ? (
@@ -3688,29 +3767,6 @@ function EditSchoolModal({ school, onClose, onSave }) {
               <span className="mt-1 block text-xs leading-5 text-zinc-500">Hide this school from Carrie View’s Fall 2026 To Be Scheduled list. This is reversible.</span>
             </span>
           </label>
-          <div className="rounded-2xl border border-zinc-200 bg-white/70 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-zinc-800">Reference Images</div>
-                <div className="text-xs text-zinc-500">Add JPG or PNG notes like parking maps, entrances, and setup references.</div>
-              </div>
-              <label className="inline-flex cursor-pointer items-center justify-center rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-2 text-xs font-semibold text-zinc-900 hover:bg-[#DDE8D2]">
-                Add Image
-                <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
-              </label>
-            </div>
-            {referenceImages.length ? (
-              <div className="mt-3 space-y-3">
-                {referenceImages.map((image) => (
-                  <div key={image.id} className="grid gap-3 rounded-2xl border border-zinc-200 bg-cream/70 p-2 sm:grid-cols-[120px_1fr_auto] sm:items-center">
-                    <img src={image.src} alt={image.caption || 'School reference'} className="h-24 w-full rounded-xl object-cover sm:w-[120px]" />
-                    <input value={image.caption || ''} onChange={(e) => updateImageCaption(image.id, e.target.value)} placeholder="Caption, e.g. Parking entrance" className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
-                    <button type="button" onClick={() => removeImage(image.id)} className="rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-50">Remove</button>
-                  </div>
-                ))}
-              </div>
-            ) : <div className="mt-3 text-xs text-zinc-400">No reference images yet.</div>}
-          </div>
         </div>
         {saveStatus ? <div className="mt-4 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/50 px-3 py-2 text-sm font-semibold text-zinc-800">{saveStatus}</div> : null}
         <div className="mt-5 flex justify-end gap-2">
@@ -3798,6 +3854,10 @@ function schoolToSupabaseRow(school = {}) {
     contact_phone: school.contactPhone || null,
     contact_email: school.contactEmail || null,
     contact_title: school.contactTitle || null,
+    secondary_contact_first: school.secondaryContactFirst || null,
+    secondary_contact_last: school.secondaryContactLast || null,
+    secondary_contact_email: school.secondaryContactEmail || null,
+    secondary_contact_title: school.secondaryContactTitle || null,
     reference_images: school.referenceImages || school.reference_images || [],
     merged_into: school.mergedInto || null,
     active: school.active !== false,
@@ -3825,6 +3885,10 @@ function supabaseRowToSchool(row = {}) {
     contactPhone: row.contactPhone || row.contact_phone || '',
     contactEmail: row.contactEmail || row.contact_email || '',
     contactTitle: row.contactTitle || row.contact_title || '',
+    secondaryContactFirst: row.secondaryContactFirst || row.secondary_contact_first || '',
+    secondaryContactLast: row.secondaryContactLast || row.secondary_contact_last || '',
+    secondaryContactEmail: row.secondaryContactEmail || row.secondary_contact_email || '',
+    secondaryContactTitle: row.secondaryContactTitle || row.secondary_contact_title || '',
     referenceImages: row.referenceImages || row.reference_images || [],
     mergedInto: row.mergedInto || row.merged_into || null,
     active: row.active !== false,
@@ -3842,7 +3906,7 @@ function getMissingSupabaseColumn(error) {
 }
 
 function getSchoolCompletenessScore(school = {}) {
-  return [school.name, school.address, school.city, school.stateZip, school.notes, school.contactFirst, school.contactLast, school.contactPhone, school.contactEmail, school.contactTitle]
+  return [school.name, school.address, school.city, school.stateZip, school.notes, school.contactFirst, school.contactLast, school.contactPhone, school.contactEmail, school.contactTitle, school.secondaryContactFirst, school.secondaryContactLast, school.secondaryContactEmail, school.secondaryContactTitle]
     .reduce((score, value) => score + (String(value || '').trim() ? 1 : 0), 0);
 }
 
@@ -3933,7 +3997,7 @@ function normalizeImportedEventType(row = {}) {
 
 function normalizeImportedCanonicalSchool(row = {}) {
   const current = String(row.canonical_school || '').trim();
-  if (row.source !== 'google_calendar_import' || !current) return current;
+  if (row.school_id || row.source !== 'google_calendar_import' || !current) return current;
   const clean = current
     .replace(/^HOLD\s+/i, '')
     .replace(/^NEW\s+/i, '')
@@ -4059,7 +4123,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     })
     .sort((a, b) => a.name.localeCompare(b.name)), [events, schools, mergedSourcesByTarget]);
 
-  const filtered = q ? activeSchools.filter(school => [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : activeSchools;
+  const filtered = q ? activeSchools.filter(school => [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.secondaryContactFirst, school.secondaryContactLast, school.secondaryContactEmail, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : activeSchools;
   const selected = activeSchools.find(school => school.name === selectedName || school.originalName === selectedName) || resolveSchoolListMatch(selectedName, activeSchools) || filtered[0] || null;
 
   const saveSchool = async (originalName, values) => {
@@ -4734,7 +4798,7 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
 
 function RecentlyAddedEventsModule({ events, onClick }) {
   const recentEvents = useMemo(() => {
-    const cutoff = Date.now() - (96 * 60 * 60 * 1000);
+    const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
     return (events || [])
       .filter(event => {
         if (!event?.createdAt) return false;
@@ -4752,7 +4816,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Recently Added Events</h2>
-          <p className="mt-1 text-sm text-zinc-600">Manual events added to the calendar in the last 96 hours.</p>
+          <p className="mt-1 text-sm text-zinc-600">Manual events added to the calendar in the last 7 days.</p>
         </div>
         <Pill className="border-zinc-200 bg-white text-zinc-600">{recentEvents.length} recent</Pill>
       </div>
@@ -4770,7 +4834,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
             </div>
           </button>
         )) : (
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No manual events added in the last 96 hours.</div>
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No manual events added in the last 7 days.</div>
         )}
       </div>
     </section>
@@ -4787,7 +4851,7 @@ function getRecentlyModifiedSortTime(event = {}) {
 
 function RecentlyModifiedEventsModule({ events, onClick }) {
   const modifiedEvents = useMemo(() => {
-    const cutoff = Date.now() - (96 * 60 * 60 * 1000);
+    const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
     return (events || [])
       .filter(event => {
         if (event.active === false) return false;
@@ -4806,7 +4870,7 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Recently Modified Events</h2>
-          <p className="mt-1 text-sm text-zinc-600">Events changed in the last 96 hours. Use this to confirm edits hit the live Scheduler.</p>
+          <p className="mt-1 text-sm text-zinc-600">Events changed in the last 7 days. Use this to confirm edits hit the live Scheduler.</p>
         </div>
         <Pill className="border-zinc-200 bg-white text-zinc-600">{modifiedEvents.length} modified</Pill>
       </div>
@@ -4830,7 +4894,7 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
             </button>
           );
         }) : (
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events modified in the last 96 hours.</div>
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events modified in the last 7 days.</div>
         )}
       </div>
     </section>
@@ -4905,7 +4969,7 @@ function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, 
 
   const normalizedQuery = normalizeSchoolLookupKey(query);
   const allSchoolMatches = (schools || []).filter(school => school.active !== false && !school.mergedInto && [
-    school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone
+    school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.contactPhone, school.secondaryContactFirst, school.secondaryContactLast, school.secondaryContactEmail
   ].filter(Boolean).join('\n').toLowerCase().includes(q));
   const schoolMatches = allSchoolMatches.slice(0, 6);
 
