@@ -610,7 +610,7 @@ function HolidayText({ date }) {
   const holidays = getHolidayLabels(date);
   if (!holidays.length) return null;
   return (
-    <div className="mb-1 space-y-0.5 text-[10px] font-semibold italic leading-tight text-zinc-500" title={holidays.join(', ')}>
+    <div className="mb-1 space-y-0.5 text-xs font-semibold italic leading-tight text-zinc-500" title={holidays.join(', ')}>
       {holidays.map(label => <div key={label} className="truncate">{label}</div>)}
     </div>
   );
@@ -1966,8 +1966,8 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   );
 }
 
-function buildMonthWeekSegments(events, weekDays, month) {
-  const monthRange = getMonthDateRange(month);
+function buildMonthWeekSegments(events, weekDays, month = null) {
+  const monthRange = month ? getMonthDateRange(month) : null;
   const weekStart = weekDays.find(Boolean);
   const weekEnd = [...weekDays].reverse().find(Boolean);
   if (!weekStart || !weekEnd) return [];
@@ -1975,8 +1975,8 @@ function buildMonthWeekSegments(events, weekDays, month) {
   const segments = (events || [])
     .filter(event => event && event.date && event.date <= weekEnd && (event.endDate || event.date) >= weekStart)
     .map(event => {
-      const segmentStart = [event.date, weekStart, monthRange.start].filter(Boolean).sort()[2];
-      const segmentEnd = [event.endDate || event.date, weekEnd, monthRange.end].filter(Boolean).sort()[0];
+      const segmentStart = [event.date, weekStart, monthRange?.start].filter(Boolean).sort()[[event.date, weekStart, monthRange?.start].filter(Boolean).length - 1];
+      const segmentEnd = [event.endDate || event.date, weekEnd, monthRange?.end].filter(Boolean).sort()[0];
       if (!segmentStart || !segmentEnd || segmentStart > segmentEnd) return null;
       const startCol = new Date(`${segmentStart}T12:00:00`).getDay();
       const endCol = new Date(`${segmentEnd}T12:00:00`).getDay();
@@ -2011,14 +2011,25 @@ function buildMonthWeekSegments(events, weekDays, month) {
   });
 }
 
-function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
-  const totalDays = daysInMonth(month);
+function getCalendarMonthCells(month) {
+  const [year, monthNumber] = month.split('-').map(Number);
   const offset = firstDayOffset(month);
+  const totalDays = daysInMonth(month);
+  const previousMonthDate = new Date(year, monthNumber - 2, 1, 12, 0, 0);
+  const nextMonthDate = new Date(year, monthNumber, 1, 12, 0, 0);
+  const previousMonth = `${previousMonthDate.getFullYear()}-${pad2(previousMonthDate.getMonth() + 1)}`;
+  const nextMonth = `${nextMonthDate.getFullYear()}-${pad2(nextMonthDate.getMonth() + 1)}`;
+  const previousTotal = daysInMonth(previousMonth);
   const cells = [
-    ...Array.from({ length: offset }, () => null),
-    ...Array.from({ length: totalDays }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)
+    ...Array.from({ length: offset }, (_, i) => ({ date: `${previousMonth}-${pad2(previousTotal - offset + i + 1)}`, inCurrentMonth: false })),
+    ...Array.from({ length: totalDays }, (_, i) => ({ date: `${month}-${pad2(i + 1)}`, inCurrentMonth: true }))
   ];
-  while (cells.length % 7 !== 0) cells.push(null);
+  while (cells.length % 7 !== 0) cells.push({ date: `${nextMonth}-${pad2(cells.length - offset - totalDays + 1)}`, inCurrentMonth: false });
+  return cells;
+}
+
+function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
+  const cells = getCalendarMonthCells(month);
   const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   return (
@@ -2027,8 +2038,8 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
         {dayNames.map((day, index) => <div key={`${day}-${index}`}>{day}</div>)}
       </div>
       <div className="grid grid-cols-7">
-        {cells.map((date, index) => {
-          if (!date) return <div key={`blank-${index}`} className="min-h-[78px] border-b border-zinc-100" />;
+        {cells.map((cell, index) => {
+          const date = cell.date;
           const dayEvents = events
             .filter(event => isDateInEventRange(event, date))
             .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
@@ -2042,7 +2053,7 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
               type="button"
               onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
               onClick={() => { setSelectedDate(date); setViewMode('Day'); }}
-              className={`min-h-[78px] border-b border-r border-zinc-100 p-1 text-left ${isSelected ? 'bg-[#DDE8D2]/70' : 'bg-white/45'}`}
+              className={`min-h-[78px] border-b border-r border-zinc-100 p-1 text-left ${isSelected ? 'bg-[#DDE8D2]/70' : cell.inCurrentMonth ? 'bg-white/45' : 'bg-zinc-50/60 opacity-55'}`}
             >
               <div className="mb-1 flex items-center justify-between gap-1">
                 <span className={`text-sm font-black ${isSelected ? 'text-zinc-950' : 'text-zinc-700'}`}>{Number(date.slice(-2))}</span>
@@ -2074,17 +2085,10 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
 }
 
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
-  const totalDays = daysInMonth(month);
-  const offset = firstDayOffset(month);
-  const cells = [
-    ...Array.from({ length: offset }, () => null),
-    ...Array.from({ length: totalDays }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)
-  ];
+  const cells = getCalendarMonthCells(month);
   const weeks = [];
   for (let i = 0; i < cells.length; i += 7) {
-    const week = cells.slice(i, i + 7);
-    while (week.length < 7) week.push(null);
-    weeks.push(week);
+    weeks.push(cells.slice(i, i + 7));
   }
 
   return (
@@ -2097,26 +2101,28 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
         </div>
         <div className="mt-2 space-y-2">
           {weeks.map((weekDays, weekIndex) => {
-            const segments = buildMonthWeekSegments(events, weekDays, month);
+            const dates = weekDays.map(cell => cell.date);
+            const segments = buildMonthWeekSegments(events, dates, null);
             const visibleRows = Math.max(3, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
-            const hasHolidayInWeek = weekDays.some(date => date && getHolidayLabels(date).length);
+            const hasHolidayInWeek = dates.some(date => date && getHolidayLabels(date).length);
             const eventLayerTop = hasHolidayInWeek ? 58 : 40;
             const rowMinHeight = Math.max(132, eventLayerTop + 18 + (visibleRows * 34));
             return (
               <div key={`week-${weekIndex}`} className="relative grid grid-cols-7 gap-2 overflow-hidden" style={{ minHeight: rowMinHeight }}>
-                {weekDays.map((date, index) => {
-                  const day = date ? Number(date.slice(-2)) : null;
-                  return date ? (
+                {weekDays.map((cell, index) => {
+                  const date = cell.date;
+                  const day = Number(date.slice(-2));
+                  return (
                     <div
                       key={date}
                       onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
                       title="Double-click to add an event"
-                      className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : 'border-zinc-200 bg-cream/80'}`}
+                      className={`min-h-[132px] rounded-2xl border p-2 ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : cell.inCurrentMonth ? 'border-zinc-200 bg-cream/80' : 'border-zinc-100 bg-zinc-50/50 opacity-60'}`}
                     >
                       <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className="mb-1 text-xs font-semibold text-zinc-500 hover:text-zinc-900">{day}</button>
                       <div className="relative z-20"><HolidayText date={date} /></div>
                     </div>
-                  ) : <div key={`blank-${weekIndex}-${index}`} />;
+                  );
                 })}
 
                 <div className="pointer-events-none absolute left-0 right-0 z-10 grid grid-cols-7 gap-x-2 gap-y-1.5" style={{ top: eventLayerTop }}>
@@ -2166,8 +2172,7 @@ const ROLLOUT_EVENT_TYPES = new Set([
   'Makeup Day',
   'Rain Date',
   'Family Photos',
-  'Special Event',
-  'Headshots'
+  'Special Event'
 ]);
 
 function isNonRolloutOperationalEvent(event = {}) {
@@ -2346,102 +2351,72 @@ function PhotographerAssignmentPicker({ photographers, selectedPhotographers, se
 function WeekView({ events, selectedDate, onClick }) {
   const { start, end } = weekBounds(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const weekEvents = days.flatMap(date => events.filter(e => isDateInEventRange(e, date)));
+  const weekEvents = events.filter(event => event && event.date && event.date <= end && (event.endDate || event.date) >= start);
   const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
   const capacity = getCapacityTone(weeklyRollouts);
   const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
-  const photographerSummary = Array.from(
-    weekEvents.reduce((counts, event) => {
-      if (!isRolloutEvent(event)) return counts;
-      uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
-        counts.set(name, (counts.get(name) || 0) + 1);
-      });
-      return counts;
-    }, new Map())
-  ).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const segments = buildMonthWeekSegments(events, days, null);
+  const visibleRows = Math.max(4, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
+  const hasHolidayInWeek = days.some(date => getHolidayLabels(date).length);
+  const eventLayerTop = hasHolidayInWeek ? 64 : 44;
+  const rowMinHeight = Math.max(320, eventLayerTop + 24 + (visibleRows * 38));
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-sm font-semibold text-zinc-800">Week of {shortDate(start)} – {shortDate(end)}</h2>
-        <div tabIndex={0} className={`group relative rounded-2xl border px-4 py-3 outline-none ${capacity.className}`}>
+        <div className={`rounded-2xl border px-4 py-3 ${capacity.className}`}>
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Weekly Rollouts</div>
               <div className="mt-1 text-lg font-semibold">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
             </div>
-            <Pill className={`border-current bg-white/60 ${capacity.className}`}>{capacity.label}</Pill>
+            <Pill className="border-current bg-white/60 text-current">{capacity.label}</Pill>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
             <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
           </div>
+        </div>
+      </div>
 
-          <div className="pointer-events-none absolute right-0 top-full z-30 mt-3 w-72 translate-y-1 rounded-3xl border border-zinc-200 bg-white p-4 text-zinc-900 opacity-0 shadow-2xl transition group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">This week's photographer load</div>
-            <div className="mt-1 text-sm font-semibold text-zinc-900">{shortDate(start)} – {shortDate(end)}</div>
-            <div className="mt-3 space-y-2">
-              {photographerSummary.length ? photographerSummary.map(([name, count]) => (
-                <div key={name} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-100 bg-cream/70 px-3 py-2 text-sm">
-                  <span className="truncate font-medium">{name}</span>
-                  <span className="shrink-0 text-xs font-semibold text-zinc-500">{count} school{count === 1 ? '' : 's'}</span>
-                </div>
-              )) : (
-                <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-500">No photographers assigned this week yet.</div>
-              )}
+      <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4">
+        <div className="min-w-[760px]">
+          <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            {days.map(date => <div key={`heading-${date}`}>{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}</div>)}
+          </div>
+          <div className="mt-2 relative grid grid-cols-7 gap-2 overflow-hidden" style={{ minHeight: rowMinHeight }}>
+            {days.map(date => (
+              <div key={date} className="min-h-[320px] rounded-2xl border border-zinc-200 bg-cream/80 p-2">
+                <div className="mb-1 text-xs font-semibold text-zinc-500">{Number(date.slice(-2))}</div>
+                <div className="relative z-20"><HolidayText date={date} /></div>
+              </div>
+            ))}
+            <div className="pointer-events-none absolute left-0 right-0 z-10 grid grid-cols-7 gap-x-2 gap-y-1.5" style={{ top: eventLayerTop }}>
+              {segments.map(segment => {
+                const { event, segmentStart, segmentEnd, isMultiDay } = segment;
+                const startsOnTrueStart = segmentStart === event.date;
+                const endsOnTrueEnd = segmentEnd === (event.endDate || event.date);
+                const roundedClass = isMultiDay
+                  ? `${startsOnTrueStart ? 'rounded-l-xl' : 'rounded-l-sm'} ${endsOnTrueEnd ? 'rounded-r-xl' : 'rounded-r-sm'}`
+                  : 'rounded-xl';
+                const labelPrefix = event.localBackupOnly ? '⚠ ' : isMultiDay ? '↳ ' : '';
+                return (
+                  <button
+                    key={`${event.id}-${segmentStart}-${segmentEnd}`}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onClick(event); }}
+                    className={`pointer-events-auto relative min-w-0 overflow-hidden truncate border px-2 py-1.5 text-left text-[11px] font-medium shadow-[0_1px_0_rgba(255,255,255,0.65)_inset] ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-3' : ''} ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                    style={{ gridColumn: `${segment.startCol + 1} / span ${segment.span}`, gridRow: segment.row + 1 }}
+                    title={isMultiDay ? `${event.title} • ${getEventDateLabel(event)}` : event.title}
+                  >
+                    {event.type === 'Studio Assigned Schools (SAS)' ? <span className="absolute inset-y-0 left-0 w-1.5 bg-purple-950" aria-hidden="true" /> : null}
+                    {labelPrefix}{event.title}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
-      </div>
-      <div className="space-y-4">
-        {days.map(date => {
-          const dayEvents = events.filter(e => isDateInEventRange(e, date));
-          const dayRollouts = dayEvents.reduce((total, event) => total + getRolloutCount(event), 0);
-          return (
-            <section key={date} className="rounded-2xl border border-zinc-200 bg-white/75 p-4 shadow-sm">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-900">{formatDate(date)}</h3>
-                  <div className="relative z-20"><HolidayText date={date} /></div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Pill className="border-zinc-200 bg-cream text-zinc-600">{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Pill>
-                  {dayRollouts ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{dayRollouts} rollout{dayRollouts === 1 ? '' : 's'}</Pill> : null}
-                </div>
-              </div>
-              {dayEvents.length ? (
-                <div className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-100 bg-white">
-                  {dayEvents.map(event => {
-                    const rolloutCount = getRolloutCount(event);
-                    return (
-                      <button
-                        key={event.id}
-                        type="button"
-                        onClick={() => onClick(event)}
-                        className="flex w-full flex-col gap-2 px-4 py-3 text-left transition hover:bg-[#DDE8D2]/35 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-semibold text-zinc-900">{event.title}</div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                            <span>{event.time || 'TBD'}</span>
-                            {event.canonicalSchool ? <span>{event.canonicalSchool}</span> : null}
-                            {event.photographers?.length ? <span>Photographers Assigned: {event.photographers.join(', ')}</span> : null}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
-                          <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
-                          {getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
-                          {rolloutCount ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{rolloutCount} rollout{rolloutCount === 1 ? '' : 's'}</Pill> : null}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-4 text-sm text-zinc-400">No scheduled items</div>
-              )}
-            </section>
-          );
-        })}
       </div>
     </div>
   );
@@ -2705,10 +2680,14 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
     const day = d.getDay();
     if (day === 0 || day === 6) continue;
     const key = d.toISOString().slice(0, 10);
+    const { start: weekStart, end: weekEnd } = weekBounds(key);
     const scheduled = events.filter(event => isDateInEventRange(event, key));
-    const bookedPhotographers = new Set(scheduled.flatMap(event => uniqueCanonicalPhotographers(event.photographers || [])));
-    const availablePhotographers = uniqueCanonicalPhotographers(photographers).filter(name => !bookedPhotographers.has(canonicalPhotographerName(name)));
-    dates.push({ date: key, scheduledCount: scheduled.length, availablePhotographers, scheduled });
+    const weekEvents = events.filter(event => event && event.date && event.date <= weekEnd && (event.endDate || event.date) >= weekStart);
+    const dayRollouts = scheduled.reduce((total, event) => total + getRolloutCount(event), 0);
+    const weekRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+    const remainingWeekRollouts = Math.max(0, WEEKLY_ROLLOUT_CAPACITY - weekRollouts);
+    const capacity = getCapacityTone(weekRollouts);
+    dates.push({ date: key, scheduledCount: scheduled.length, scheduled, dayRollouts, weekRollouts, remainingWeekRollouts, capacity, weekStart, weekEnd });
   }
   return dates;
 }
@@ -3556,19 +3535,23 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
       <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
-          <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Empty means nothing has been scheduled yet.</p>
+          <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Availability now reflects booked events and weekly rollout capacity.</p>
         </div>
         <div className="grid max-h-[520px] gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
           {availability.map(day => (
-            <div key={day.date} className="rounded-2xl border border-zinc-200 bg-cream/75 p-3">
+            <div key={day.date} className={`rounded-2xl border p-3 ${day.capacity.className || 'border-zinc-200 bg-cream/75 text-zinc-800'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-zinc-900">{formatDate(day.date)}</div>
-                  <div className="mt-1 text-xs text-zinc-500">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
+                  <div className="text-sm font-semibold">{formatDate(day.date)}</div>
+                  <div className="mt-1 text-xs opacity-75">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'} · ${day.dayRollouts} rollout${day.dayRollouts === 1 ? '' : 's'} today` : 'No events scheduled yet'}</div>
                 </div>
-                <Pill className="border-emerald-200 bg-emerald-50 text-emerald-900">{day.availablePhotographers.length} photographers open</Pill>
+                <Pill className="border-current bg-white/60 text-current">{day.weekRollouts} / {WEEKLY_ROLLOUT_CAPACITY} week</Pill>
               </div>
-              <div className="mt-2 text-xs text-zinc-600">Available: {day.availablePhotographers.join(', ') || '—'}</div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+                <div className={`${day.capacity.barClassName || 'bg-emerald-500'} h-full rounded-full`} style={{ width: `${Math.min(100, Math.round((day.weekRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100))}%` }} />
+              </div>
+              <div className="mt-2 text-xs font-semibold opacity-80">Week remaining: {day.remainingWeekRollouts} rollout{day.remainingWeekRollouts === 1 ? '' : 's'} · {shortDate(day.weekStart)} – {shortDate(day.weekEnd)}</div>
+              <div className="mt-1 text-xs opacity-70">Booked today: {day.scheduled.map(event => event.title).slice(0, 3).join(', ') || '—'}{day.scheduled.length > 3 ? ` +${day.scheduled.length - 3} more` : ''}</div>
             </div>
           ))}
         </div>
@@ -3987,8 +3970,15 @@ function importedEventToSupabaseRow(event = {}) {
 }
 
 
+
+function normalizeEventTypeName(value = '') {
+  const clean = String(value || '').trim();
+  if (clean.toLowerCase() === 'headshots' || clean.toLowerCase() === 'headshot') return 'Special Event';
+  return clean || 'Special Event';
+}
+
 function normalizeImportedEventType(row = {}) {
-  const rawType = String(row.event_type || '').trim();
+  const rawType = normalizeEventTypeName(row.event_type);
   const title = String(row.title || '').toLowerCase();
   const date = String(row.date || '');
   const isGoogleImport = row.source === 'google_calendar_import';
@@ -3997,7 +3987,7 @@ function normalizeImportedEventType(row = {}) {
   if (title.includes('makeup') || title.includes('make up') || title.includes('retake') || rawType === 'makeup/retake') return 'Makeup Day';
   if (title.includes('sports') || rawType === 'sports') return 'Sports';
   if (title.includes('photo booth') || title.includes('photobooth') || rawType === 'photo booth') return 'Photo Booth';
-  if (title.includes('headshot')) return 'Headshots';
+  if (title.includes('headshot')) return 'Special Event';
   if (title.includes('senior') && !title.includes('underclass') && !title.includes('graduation') && !title.includes('pano')) return 'Seniors';
   if (title.includes('spring') || rawType === 'spring picture day') {
     if (!title.includes('grad') && !title.includes('graduation') && !title.includes('pano')) return 'Spring Picture Day';
@@ -4047,7 +4037,7 @@ function eventToSupabaseRow(event = {}) {
     end_date: event.endDate || null,
     time: event.time || null,
     arrival_time: event.arrivalTime || null,
-    event_type: event.type || event.eventType || 'Special Event',
+    event_type: normalizeEventTypeName(event.type || event.eventType || 'Special Event'),
     status: event.status || 'Scheduled',
     season: event.season || getSeasonLabel(event.date || ''),
     picture_day_info: event.notes || null,
