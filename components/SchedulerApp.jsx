@@ -966,7 +966,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
             <div className={`${mobileViewCompact ? 'hidden sm:flex' : 'flex'} justify-end`}><AuthStatus /></div>
             <nav className="hidden justify-end gap-2 sm:flex sm:flex-wrap">
               {visibleTabs.map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`${tab === 'Admin' ? 'sm:basis-full sm:ml-auto' : ''} min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
+                <button key={tab} onClick={() => setActiveTab(tab)} className={`${tab === 'Admin' ? 'sm:ml-auto' : ''} min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
                 </button>
               ))}
@@ -2039,8 +2039,8 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
               </div>
               <div className="space-y-0.5">
                 {visibleEvents.map(event => (
-                  <div key={`${event.id}-${date}`} className={`truncate rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-4 ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`} title={event.title}>
-                    {event.type === 'Studio Assigned Schools (SAS)' ? 'SAS · ' : ''}{event.title}
+                  <div key={`${event.id}-${date}`} className={`relative overflow-hidden truncate rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-4 ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-2.5' : ''} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`} title={event.title}>
+                    {event.type === 'Studio Assigned Schools (SAS)' ? <span className="absolute inset-y-0 left-0 w-1 bg-purple-950" aria-hidden="true" /> : null}{event.title}
                   </div>
                 ))}
                 {hiddenCount ? <div className="px-1 text-[10px] font-black text-zinc-500">+{hiddenCount}</div> : null}
@@ -2123,10 +2123,11 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
                         type="button"
                         onDoubleClick={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); onClick(event); }}
-                        className={`pointer-events-auto min-w-0 truncate border px-2 py-1.5 text-left text-[10px] font-medium shadow-[0_1px_0_rgba(255,255,255,0.65)_inset] ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                        className={`pointer-events-auto relative min-w-0 overflow-hidden truncate border px-2 py-1.5 text-left text-[10px] font-medium shadow-[0_1px_0_rgba(255,255,255,0.65)_inset] ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-3' : ''} ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
                         style={{ gridColumn: `${segment.startCol + 1} / span ${segment.span}`, gridRow: segment.row + 1 }}
                         title={isMultiDay ? `${event.title} • ${getEventDateLabel(event)}` : event.title}
                       >
+                        {event.type === 'Studio Assigned Schools (SAS)' ? <span className="absolute inset-y-0 left-0 w-1.5 bg-purple-950" aria-hidden="true" /> : null}
                         {labelPrefix}{event.title}
                       </button>
                     );
