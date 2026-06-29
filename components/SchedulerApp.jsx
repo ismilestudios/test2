@@ -458,7 +458,6 @@ function CalendarColorKey() {
       {items.map(([label, className]) => (
         <span key={label} className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-zinc-700">
           <span className={`h-3 w-3 rounded-full border ${className}`} />
-          {label === 'Studio Assigned Schools (SAS)' ? <Wand2 size={12} className="text-purple-700" /> : null}
           {label}
         </span>
       ))}
@@ -946,7 +945,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-4'}`}>
           <div>
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 text-zinc-900 shadow-sm"><CalendarDays size={22} /></span>
+              <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-11 w-11 object-contain" /></span>
               <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
             </div>
             <p className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} mt-1 max-w-2xl text-sm text-zinc-600`}>A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
@@ -1717,7 +1716,57 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   };
 
   return (
-    <div className="schedule-live-stage overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#000604] via-[#00120c] to-[#031b13] p-3 text-white shadow-2xl">
+    <>
+      <div className="space-y-3 sm:hidden">
+        <section className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-4 text-white shadow-2xl">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-red-300">🔴 Schedule Live!</div>
+              <h2 className="mt-1 text-xl font-black">{getScheduleLiveSessionMonthLabel(liveState.weekStart)}</h2>
+              <p className="mt-0.5 text-xs font-semibold text-white/60">Week of {getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</p>
+            </div>
+            <div className={`rounded-2xl border px-3 py-2 text-right ${capacity.className} bg-white text-zinc-900`}>
+              <div className="text-[10px] font-black uppercase opacity-70">Rollouts</div>
+              <div className="text-lg font-black">{weeklyRollouts}/{WEEKLY_ROLLOUT_CAPACITY}</div>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/10 p-2">
+            <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(-1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronLeft size={18} /></button>
+            <span className="text-center text-xs font-black text-white/80">{getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</span>
+            <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronRight size={18} /></button>
+          </div>
+        </section>
+
+        {days.map(date => {
+          const dayEvents = weekEvents.filter(event => isDateInEventRange(event, date)).sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+          return (
+            <section key={`mobile-live-${date}`} className="rounded-[1.5rem] border border-zinc-200 bg-white/80 p-3 shadow-sm">
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-black text-zinc-950">{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</div>
+                  {getHolidayLabels(date).length ? <div className="mt-0.5 text-[10px] font-semibold italic text-zinc-500">{getHolidayLabels(date).join(', ')}</div> : null}
+                </div>
+                <span className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-black text-zinc-600">{dayEvents.length}</span>
+              </div>
+              <div className="space-y-2">
+                {dayEvents.length ? dayEvents.map(event => (
+                  <button key={event.id} type="button" onClick={() => onClickEvent(event)} className={`w-full rounded-2xl border p-3 text-left shadow-sm ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>
+                    <div className="truncate text-sm font-black">{event.title}</div>
+                    <div className="mt-1 text-xs font-semibold opacity-75">{getEventTimeLabel(event)}</div>
+                    <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+                      <div><span className="font-black">Photogs:</span> {displayPhotographerAssignment(event)}</div>
+                      <div><span className="font-black">Assistants:</span> {displayAssistants(event)}</div>
+                    </div>
+                  </button>
+                )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/70 p-4 text-center text-sm text-zinc-500">No events this day.</div>}
+              </div>
+            </section>
+          );
+        })}
+        {statusMessage ? <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3 text-xs font-semibold text-zinc-500">{statusMessage}</div> : null}
+      </div>
+
+      <div className="schedule-live-stage hidden overflow-hidden rounded-[2rem] border border-[#AEBB9E]/35 bg-gradient-to-br from-[#000604] via-[#00120c] to-[#031b13] p-3 text-white shadow-2xl sm:block">
       <style jsx global>{`
         @keyframes scheduleLiveShimmer {
           0% { background-position: 0% 50%; }
@@ -1898,7 +1947,8 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
           {statusMessage ? <div className="mt-4 rounded-2xl border border-white/10 bg-white/10 p-3 text-xs font-semibold text-white/65">{statusMessage}</div> : null}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -1947,6 +1997,68 @@ function buildMonthWeekSegments(events, weekDays, month) {
   });
 }
 
+function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
+  const totalDays = daysInMonth(month);
+  const offset = firstDayOffset(month);
+  const cells = [
+    ...Array.from({ length: offset }, () => null),
+    ...Array.from({ length: totalDays }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  return (
+    <div className="rounded-3xl border border-zinc-200 bg-white/70 p-2 shadow-sm sm:hidden">
+      <div className="grid grid-cols-7 border-b border-zinc-200 pb-1 text-center text-[10px] font-black uppercase tracking-wide text-zinc-500">
+        {dayNames.map((day, index) => <div key={`${day}-${index}`}>{day}</div>)}
+      </div>
+      <div className="grid grid-cols-7">
+        {cells.map((date, index) => {
+          if (!date) return <div key={`blank-${index}`} className="min-h-[78px] border-b border-zinc-100" />;
+          const dayEvents = events
+            .filter(event => isDateInEventRange(event, date))
+            .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+          const visibleEvents = dayEvents.slice(0, 2);
+          const hiddenCount = Math.max(0, dayEvents.length - visibleEvents.length);
+          const isSelected = selectedDate === date;
+          const holidays = getHolidayLabels(date);
+          return (
+            <button
+              key={date}
+              type="button"
+              onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
+              onClick={() => { setSelectedDate(date); setViewMode('Day'); }}
+              className={`min-h-[78px] border-b border-r border-zinc-100 p-1 text-left ${isSelected ? 'bg-[#DDE8D2]/70' : 'bg-white/45'}`}
+            >
+              <div className="mb-1 flex items-center justify-between gap-1">
+                <span className={`text-sm font-black ${isSelected ? 'text-zinc-950' : 'text-zinc-700'}`}>{Number(date.slice(-2))}</span>
+                {holidays.length ? <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" title={holidays.join(', ')} /> : null}
+              </div>
+              <div className="space-y-0.5">
+                {visibleEvents.map(event => (
+                  <div key={`${event.id}-${date}`} className={`truncate rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-4 ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`} title={event.title}>
+                    {event.type === 'Studio Assigned Schools (SAS)' ? 'SAS · ' : ''}{event.title}
+                  </div>
+                ))}
+                {hiddenCount ? <div className="px-1 text-[10px] font-black text-zinc-500">+{hiddenCount}</div> : null}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
+        <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Selected Day</div>
+        <div className="mt-1 text-sm font-black text-zinc-950">{formatDate(selectedDate)}</div>
+        <div className="mt-2 space-y-1.5">
+          {events.filter(event => isDateInEventRange(event, selectedDate)).length ? events.filter(event => isDateInEventRange(event, selectedDate)).map(event => (
+            <button key={event.id} type="button" onClick={() => onClick(event)} className={`w-full truncate rounded-2xl border px-3 py-2 text-left text-xs font-bold ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>
+          )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/70 p-3 text-sm text-zinc-500">No events on this day.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const totalDays = daysInMonth(month);
   const offset = firstDayOffset(month);
@@ -1962,7 +2074,9 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
   }
 
   return (
-    <div className="overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:p-4">
+    <>
+      <MobileMonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={onAddEvent} />
+      <div className="hidden overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:block sm:p-4">
       <div className="min-w-[560px] sm:min-w-0">
         <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
           {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}
@@ -1999,7 +2113,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
                     const roundedClass = isMultiDay
                       ? `${startsOnTrueStart ? 'rounded-l-xl' : 'rounded-l-sm'} ${endsOnTrueEnd ? 'rounded-r-xl' : 'rounded-r-sm'}`
                       : 'rounded-xl';
-                    const labelPrefix = event.localBackupOnly ? '⚠ ' : event.type === 'Studio Assigned Schools (SAS)' ? '★ ' : isMultiDay ? '↳ ' : '';
+                    const labelPrefix = event.localBackupOnly ? '⚠ ' : isMultiDay ? '↳ ' : '';
                     return (
                       <button
                         key={`${event.id}-${segmentStart}-${segmentEnd}`}
@@ -2020,8 +2134,9 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
           })}
         </div>
       </div>
-      {events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}
-    </div>
+        {events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}
+      </div>
+    </>
   );
 }
 
