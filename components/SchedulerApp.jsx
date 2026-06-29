@@ -444,6 +444,7 @@ function CalendarColorKey() {
     ['Spring Picture Day', TYPE_COLORS['Spring Picture Day']],
     ['Makeup Day', TYPE_COLORS['Makeup Day']],
     ['Sports', TYPE_COLORS.Sports],
+    ['Seniors', TYPE_COLORS.Seniors],
     ['Special Event', TYPE_COLORS['Special Event']],
     ['Rain Date', TYPE_COLORS['Rain Date']],
     ['Call or Meeting', TYPE_COLORS['Call or Meeting']],
@@ -945,7 +946,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-4'}`}>
           <div>
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-11 w-11 object-contain" /></span>
+              <span className="inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain" /></span>
               <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
             </div>
             <p className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} mt-1 max-w-2xl text-sm text-zinc-600`}>A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
