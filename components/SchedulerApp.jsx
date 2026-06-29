@@ -2604,9 +2604,29 @@ function getPictureDayInfoHistory(history = []) {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+function isCarrieFall2026ScheduledEvent(event) {
+  if (!event || event.removed) return false;
+  if (!event.date || event.date < '2026-09-01' || event.date > '2026-11-30') return false;
+  const internalOnlyTypes = new Set(['Call or Meeting', 'Time Off', 'Personal Appointment', 'Edit Day', 'Rain Date']);
+  return !internalOnlyTypes.has(event.type);
+}
+
+function eventMatchesSchoolIdentity(event, school = {}, mergedSourceSchools = []) {
+  if (!event || !school) return false;
+  const linkedIds = new Set([school.id, ...(mergedSourceSchools || []).map(item => item?.id)].filter(Boolean));
+  if (event.schoolId && linkedIds.size) return linkedIds.has(event.schoolId);
+
+  const names = [school.name, school.originalName, ...(mergedSourceSchools || []).flatMap(item => [item?.name, item?.originalName])].filter(Boolean);
+  return names.some(name => schoolMatchesEvent(name, event));
+}
+
+function schoolHasCarrieFall2026ScheduledEvent(school = {}, mergedSourceSchools = [], events = EVENTS) {
+  return events.some(event => isCarrieFall2026ScheduledEvent(event) && eventMatchesSchoolIdentity(event, school, mergedSourceSchools));
+}
+
 function getFall2026ScheduledSchools(events = EVENTS) {
   return new Set(
-    events.filter(event => event && event.date >= '2026-09-01' && event.date <= '2026-11-30' && event.type === 'Fall Picture Day' && event.canonicalSchool)
+    events.filter(event => isCarrieFall2026ScheduledEvent(event) && event.canonicalSchool)
       .map(event => schoolKey(event.canonicalSchool))
   );
 }
@@ -2635,7 +2655,6 @@ function getSchoolsToSchedule(events = EVENTS) {
 }
 
 function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
-  const scheduled2026 = getFall2026ScheduledSchools(events);
   const allSchools = (schoolsList && schoolsList.length ? schoolsList : SCHOOLS).filter(Boolean);
 
   const mergedSourcesByTarget = {};
@@ -2649,12 +2668,11 @@ function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
   return allSchools
     .filter(school => school.active !== false && !school.mergedInto)
     .filter(school => !school.noFallSchedulingFall2026)
-    .filter(school => !scheduled2026.has(schoolKey(school.name)) && !scheduled2026.has(schoolKey(school.originalName || school.name)))
     .map(school => {
       const mergedFrom = mergedSourcesByTarget[school.originalName || school.name] || [];
       const mergedSourceSchools = mergedFrom.map(name => allSchools.find(item => (item.originalName || item.name) === name)).filter(Boolean);
-      const historyNames = [school.name, school.originalName, ...mergedFrom, ...mergedSourceSchools.map(item => item.name)].filter(Boolean);
-      const history = getSchoolHistoryForNames(historyNames, events);
+      if (schoolHasCarrieFall2026ScheduledEvent(school, mergedSourceSchools, events)) return null;
+      const history = getSchoolHistoryForSchool(school, mergedSourceSchools, events);
       const fall2025 = history.filter(event => event && event.date >= '2025-09-01' && event.date <= '2025-11-30');
       const fallPictureDayEvents = fall2025.filter(event => event.type === 'Fall Picture Day');
       const referenceEvent = chooseCarrieReferenceEvent(history);
@@ -2675,6 +2693,7 @@ function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
         status: 'Needs Fall 2026 Scheduling'
       };
     })
+    .filter(Boolean)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
