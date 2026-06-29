@@ -3540,21 +3540,20 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         <div className="grid max-h-[520px] gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
           {availability.map(day => (
             <div key={day.date} className={`rounded-2xl border p-3 ${day.capacity.className || 'border-zinc-200 bg-cream/75 text-zinc-800'}`}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-sm font-semibold">{formatDate(day.date)}</div>
-                  <div className="mt-1 text-xs opacity-75">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'} · ${day.dayRollouts} rollout${day.dayRollouts === 1 ? '' : 's'} today` : 'No events scheduled yet'}</div>
+                  <div className="mt-1 text-xs opacity-75">{day.scheduledCount ? `${day.scheduledCount} scheduled item${day.scheduledCount === 1 ? '' : 's'}` : 'No events scheduled yet'}</div>
                 </div>
-                <Pill className="border-current bg-white/60 text-current">{day.weekRollouts} / {WEEKLY_ROLLOUT_CAPACITY} week</Pill>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <Pill className="border-current bg-white/60 text-current">Day: {day.dayRollouts} rollout{day.dayRollouts === 1 ? '' : 's'}</Pill>
+                  <Pill className="border-current bg-white/60 text-current">Week: {day.weekRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</Pill>
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Pill className="border-current bg-white/60 text-current">Day: {day.dayRollouts} rollout{day.dayRollouts === 1 ? '' : 's'}</Pill>
-                <Pill className="border-current bg-white/60 text-current">Week: {day.weekRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</Pill>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/70">
                 <div className={`${day.capacity.barClassName || 'bg-emerald-500'} h-full rounded-full`} style={{ width: `${Math.min(100, Math.round((day.weekRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100))}%` }} />
               </div>
-              <div className="mt-2 text-xs opacity-70">Booked today: {day.scheduled.map(event => event.title).slice(0, 3).join(', ') || '—'}{day.scheduled.length > 3 ? ` +${day.scheduled.length - 3} more` : ''}</div>
+              <div className="mt-3 text-xs leading-relaxed opacity-70">Currently Booked: {day.scheduled.map(event => event.title).join(', ') || '—'}</div>
             </div>
           ))}
         </div>
