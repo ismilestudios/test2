@@ -949,7 +949,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
               <span className="inline-flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-[#AEBB9E] bg-white shadow-sm"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-[4.5rem] w-[4.5rem] object-contain" /></span>
               <div className="min-w-0 pt-1">
                 <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
-                <p className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} mt-2 max-w-xl text-sm leading-6 text-zinc-600`}>A calm internal workspace for school picture days, staffing, notes, and historical reference.</p>
+                <p className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} mt-2 max-w-xl text-sm leading-6 text-zinc-600`}><span>A calm internal workspace for school picture days,</span><br /><span>staffing, notes, and historical reference.</span></p>
               </div>
             </div>
           </div>
@@ -966,7 +966,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
             <div className={`${mobileViewCompact ? 'hidden sm:flex' : 'flex'} justify-end`}><AuthStatus /></div>
             <nav className="hidden justify-end gap-2 sm:flex sm:flex-wrap">
               {visibleTabs.map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
+                <button key={tab} onClick={() => setActiveTab(tab)} className={`${tab === 'Admin' ? 'sm:basis-full sm:ml-auto' : ''} min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                   {tab}
                 </button>
               ))}
