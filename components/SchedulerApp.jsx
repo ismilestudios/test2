@@ -883,6 +883,37 @@ function isNeedsPhotographerAssignment(event) {
   return assignedCount < requiredCount || placeholderStatuses.has(status);
 }
 
+
+function eventMeetsAssistantRequirement(event = {}) {
+  if (isTimeOffEvent(event) || event?.noAssistant) return true;
+  const required = getRequiredAssistantCount(event);
+  if (required <= 0) return true;
+  if (isMultiDayScheduleEvent(event)) {
+    const dates = getEventDateKeys(event);
+    if (!dates.length) return false;
+    return dates.every(date => getScheduleLiveAssistantsForDate(event, date).length >= required);
+  }
+  const assigned = Array.isArray(event.assistants) ? event.assistants.filter(Boolean).length : 0;
+  return assigned >= required;
+}
+
+function isNeedsAssistantAssignment(event = {}) {
+  if (!event || isTimeOffEvent(event) || event.noAssistant) return false;
+  const required = getRequiredAssistantCount(event);
+  if (required <= 0) return false;
+  const status = String(event.status || '').trim().toLowerCase();
+  if (status === 'schedule live complete') return false;
+  return !eventMeetsAssistantRequirement(event);
+}
+
+function isRainWatchEvent(event = {}) {
+  if (!event || isTimeOffEvent(event)) return false;
+  const status = String(event.status || '').trim().toLowerCase();
+  const type = String(event.type || event.event_type || '').trim().toLowerCase();
+  const title = String(event.title || '').trim().toLowerCase();
+  return status === 'rain watch' || type === 'rain date' || /\brain\s*(watch|date)\b/.test(title);
+}
+
 function displayAssistants(event) {
   if (isTimeOffEvent(event)) return '—';
   if (event?.noAssistant) return 'No Assistant';
@@ -1377,12 +1408,12 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
     {
       key: 'needs-assistant',
       title: 'Need Assistant(s) Assigned',
-      filter: (event) => !isTimeOffEvent(event) && event.status === 'Scheduled' && !event.noAssistant && getRequiredAssistantCount(event) > 0 && (!event.assistants || event.assistants.length === 0)
+      filter: (event) => isNeedsAssistantAssignment(event)
     },
     {
       key: 'rain-watch',
       title: 'Rain Watch',
-      filter: (event) => event.status === 'Rain Watch'
+      filter: (event) => isRainWatchEvent(event)
     }
   ];
 
@@ -1415,7 +1446,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
 }
 
 const SCHEDULE_LIVE_SESSION_ID = 'main';
-const SCHEDULE_LIVE_HOLD_STATUS = 'Hold! Needs Discussion Later';
+const SCHEDULE_LIVE_HOLD_STATUS = 'Shelved! Needs Discussion Later';
 const SCHEDULE_LIVE_COMPLETE_STATUS = 'Schedule Live Complete';
 const SCHEDULE_LIVE_COMMENTARY_RETENTION_DAYS = 15;
 
@@ -1640,7 +1671,7 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
       <div className="mt-2 flex flex-wrap gap-1.5">
         <button type="button" onClick={() => setExpandedHistory(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold text-zinc-700">Past</button>
         <button type="button" onClick={() => setExpandedInfo(prev => !prev)} className="rounded-full border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold text-zinc-700">Info</button>
-        {canEdit ? <button type="button" onClick={() => onToggleHold(event)} className={`rounded-full border px-2 py-1 text-[10px] font-black ${isHeld ? 'border-yellow-300 bg-yellow-200 text-yellow-950' : 'border-yellow-300 bg-yellow-100 text-yellow-950'}`}>{isHeld ? 'Return' : 'Hold!'}</button> : null}
+        {canEdit ? <button type="button" onClick={() => onToggleHold(event)} className={`rounded-full border px-2 py-1 text-[10px] font-black ${isHeld ? 'border-yellow-300 bg-yellow-200 text-yellow-950' : 'border-yellow-300 bg-yellow-100 text-yellow-950'}`}>{isHeld ? 'Return' : 'Shelve'}</button> : null}
         {canEdit ? <button type="button" onClick={() => onToggleComplete?.(event)} className={`rounded-full border px-2 py-1 text-[10px] font-black ${isMarkedComplete ? 'border-emerald-300 bg-emerald-100 text-emerald-900' : 'border-emerald-200 bg-white text-emerald-700'}`}>{isMarkedComplete ? 'Reopen' : 'Done'}</button> : null}
       </div>
 
@@ -2034,11 +2065,11 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
         <div className="mt-5 hidden gap-3 sm:grid lg:grid-cols-[1fr_1fr]">
           <section className="schedule-live-premium-glow rounded-[1.5rem] border border-[#FFEA00] bg-[#FFEA00] p-3 text-zinc-950 shadow-lg shadow-yellow-950/20">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-black text-zinc-950">🟡 Hold! Needs Discussion Later</h3>
+              <h3 className="text-sm font-black text-zinc-950">🟡 Shelved! Needs Discussion Later</h3>
               <span className="rounded-full bg-zinc-950 px-2 py-1 text-[10px] font-black text-[#FFEA00]">{heldEvents.length}</span>
             </div>
             <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-              {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="min-w-[220px] rounded-2xl border border-zinc-950/10 bg-white/85 p-3 text-left text-xs font-bold text-zinc-950 shadow-sm hover:bg-white"><div>{event.title}</div><div className="mt-1 text-zinc-700">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">Return to week</span> : null}</button>) : <div className="w-full rounded-2xl border border-dashed border-zinc-950/20 bg-white/35 p-4 text-center text-xs font-black text-zinc-800">Nothing on hold.</div>}
+              {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="min-w-[220px] rounded-2xl border border-zinc-950/10 bg-white/85 p-3 text-left text-xs font-bold text-zinc-950 shadow-sm hover:bg-white"><div>{event.title}</div><div className="mt-1 text-zinc-700">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">Return to week</span> : null}</button>) : <div className="w-full rounded-2xl border border-dashed border-zinc-950/20 bg-white/35 p-4 text-center text-xs font-black text-zinc-800">Nothing shelved.</div>}
             </div>
           </section>
 
@@ -2346,7 +2377,7 @@ function isNonRolloutOperationalEvent(event = {}) {
     type === 'photo booth' ||
     type === 'time off' ||
     type === 'personal appointment' ||
-    /\b(call|meeting|huddle|interview|training|edit day|editing day|in-studio|in studio|do not book|hold)\b/.test(title) ||
+    /\b(call|meeting|huddle|interview|training|edit day|editing day|in-studio|in studio|do not book)\b/.test(title) ||
     /photo\s*booth/.test(title)
   );
 }
@@ -2856,11 +2887,9 @@ function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
 
 function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS) {
   const dates = [];
-  const start = new Date('2026-09-01T12:00:00');
-  const end = new Date('2026-11-30T12:00:00');
+  const start = new Date('2026-08-01T12:00:00');
+  const end = new Date('2026-12-31T12:00:00');
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const day = d.getDay();
-    if (day === 0 || day === 6) continue;
     const key = d.toISOString().slice(0, 10);
     const { start: weekStart, end: weekEnd } = weekBounds(key);
     const scheduled = events.filter(event => isDateInEventRange(event, key));
@@ -3802,7 +3831,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
       <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
-          <p className="mt-1 text-sm text-zinc-600">Weekdays from September through November. Availability now reflects booked events and weekly rollout capacity.</p>
+          <p className="mt-1 text-sm text-zinc-600">August through December, including weekends. Availability reflects booked events and weekly rollout capacity.</p>
         </div>
         <div className="grid max-h-[520px] gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
           {availability.map(day => (
@@ -6838,7 +6867,7 @@ export default function SchedulerApp() {
                   <div>
                     <div className="text-xs font-black uppercase tracking-[0.2em] text-red-600"><span className="animate-pulse">🔴</span> Schedule Live!</div>
                     <div className="mt-1 text-lg font-black text-zinc-950">Open the live scheduling draft room</div>
-                    <div className="mt-1 text-sm font-semibold text-zinc-600">Assign photographers week by week with live rollout counts, host control, Hold, and commentary.</div>
+                    <div className="mt-1 text-sm font-semibold text-zinc-600">Assign photographers week by week with live rollout counts, host control, Shelve, and commentary.</div>
                   </div>
                   <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="schedule-live-launch-button inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-7 py-3 text-sm font-black uppercase tracking-wide text-zinc-950 shadow-lg shadow-red-200/60 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-red-50 active:translate-y-0">✨ Launch Schedule Live!</button>
                 </div>
