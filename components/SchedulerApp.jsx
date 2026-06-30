@@ -736,8 +736,29 @@ function setScheduleLiveAssignmentForDate(event = {}, date = '', patch = {}) {
   return { ...event, scheduleLiveDayAssignments: dayAssignments };
 }
 
+function normalizeScheduleLiveDayAssignmentsForDates(event = {}, dates = []) {
+  const existing = getScheduleLiveDayAssignments(event);
+  const fallbackPhotographers = uniqueCanonicalPhotographers(event.photographers || []);
+  const fallbackAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
+  return (dates || []).reduce((map, date) => {
+    const assignment = existing[date] && typeof existing[date] === 'object' ? existing[date] : {};
+    map[date] = {
+      photographers: uniqueCanonicalPhotographers(assignment.photographers || fallbackPhotographers),
+      assistants: Array.isArray(assignment.assistants) ? assignment.assistants.filter(Boolean) : fallbackAssistants
+    };
+    return map;
+  }, {});
+}
+
 function scheduleLiveDateMeetsPhotographerRequirement(event = {}, date = '') {
   return getScheduleLivePhotographersForDate(event, date).length >= getRequiredPhotographerCount(event);
+}
+
+function eventMeetsPerDayPhotographerRequirement(event = {}) {
+  if (!isMultiDayScheduleEvent(event)) return eventMeetsPhotographerRequirement(event);
+  const dates = getEventDateKeys(event);
+  if (!dates.length) return false;
+  return dates.every(date => scheduleLiveDateMeetsPhotographerRequirement(event, date));
 }
 
 
@@ -1766,19 +1787,19 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
     const requiredPhotographers = Math.max(1, Math.min(6, Number(counts.requiredPhotographers ?? getRequiredPhotographerCount(event)) || 1));
     const requiredAssistants = Math.max(0, Math.min(6, Number(counts.requiredAssistants ?? getRequiredAssistantCount(event)) || 0));
     const nextEvent = { ...event, requiredPhotographers, requiredAssistants, noAssistant: requiredAssistants === 0 };
-    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
+    await onSchedule({ ...nextEvent, status: eventMeetsPerDayPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
   };
 
   const toggleHold = async (event) => {
     if (!canEdit) return;
     const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
-    await onSchedule({ ...event, status: isHeld ? (eventMeetsPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
+    await onSchedule({ ...event, status: isHeld ? (eventMeetsPerDayPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
   };
 
   const toggleComplete = async (event) => {
     if (!canEdit) return;
     const isComplete = event.status === SCHEDULE_LIVE_COMPLETE_STATUS;
-    await onSchedule({ ...event, status: isComplete ? (eventMeetsPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_COMPLETE_STATUS });
+    await onSchedule({ ...event, status: isComplete ? (eventMeetsPerDayPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_COMPLETE_STATUS });
   };
 
   const addCommentary = async () => {
@@ -3131,6 +3152,12 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
   const isInternalBlockingEvent = isTimeOff || isPersonalAppointment;
   const [selectedPhotographers, setSelectedPhotographers] = useState(isDuplicate ? [] : explicitCurrentPhotographerAssignments(initialEvent?.photographers || [], photographers));
   const [selectedAssistants, setSelectedAssistants] = useState(isDuplicate ? [] : (initialEvent?.assistants || []));
+  const [dayAssignments, setDayAssignments] = useState(() => {
+    if (isDuplicate) return {};
+    const start = initialEvent?.date || defaultDate;
+    const end = initialEvent?.endDate || initialEvent?.date || defaultDate;
+    return normalizeScheduleLiveDayAssignmentsForDates(initialEvent || {}, getEventDateKeys({ date: start, endDate: end }));
+  });
   const [requiredPhotographers, setRequiredPhotographers] = useState(getRequiredPhotographerCount(initialEvent || { title: initialEvent?.title || '' }));
   const [requiredAssistants, setRequiredAssistants] = useState(getRequiredAssistantCount(initialEvent || { title: initialEvent?.title || '' }));
   const [noAssistant, setNoAssistant] = useState(Boolean(initialEvent?.noAssistant));
@@ -3150,8 +3177,33 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
   }, [schools]);
   const schoolOptions = canonicalSchoolOptions;
   const matchedSchool = useMemo(() => resolveSchoolListMatch(schoolName, (schools && schools.length ? schools : SCHOOLS)) || null, [schoolName, schools]);
+  const assignmentDates = useMemo(() => getEventDateKeys({ date, endDate: isTwoDay ? (endDate || addDays(date, 1)) : date }), [date, endDate, isTwoDay]);
+
+  useEffect(() => {
+    if (!isTwoDay) return;
+    setDayAssignments(prev => {
+      const next = {};
+      assignmentDates.forEach(day => {
+        const existing = prev?.[day] || {};
+        next[day] = {
+          photographers: uniqueCanonicalPhotographers(existing.photographers || []),
+          assistants: Array.isArray(existing.assistants) ? existing.assistants.filter(Boolean) : []
+        };
+      });
+      return next;
+    });
+  }, [isTwoDay, assignmentDates.join('|')]);
 
   const toggleName = (name, setter) => setter(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
+  const toggleDayAssignmentName = (day, key, name) => {
+    setDayAssignments(prev => {
+      const current = prev?.[day] || { photographers: [], assistants: [] };
+      const list = key === 'photographers' ? uniqueCanonicalPhotographers(current.photographers || []) : (current.assistants || []).filter(Boolean);
+      const cleanName = key === 'photographers' ? canonicalPhotographerName(name) : name;
+      const nextList = list.includes(cleanName) ? list.filter(item => item !== cleanName) : [...list, cleanName];
+      return { ...prev, [day]: { ...current, [key]: nextList } };
+    });
+  };
   const save = async () => {
     if (saving) return;
     setSaving(true);
@@ -3165,6 +3217,16 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       setSaving(false);
       return;
     }
+    const cleanAssignmentDates = getEventDateKeys({ date, endDate: cleanEndDate || date });
+    const cleanDayAssignments = isTwoDay ? cleanAssignmentDates.reduce((map, day) => {
+      const current = dayAssignments?.[day] || {};
+      map[day] = {
+        photographers: uniqueCanonicalPhotographers(current.photographers || []),
+        assistants: Array.isArray(current.assistants) ? current.assistants.filter(Boolean) : []
+      };
+      return map;
+    }, {}) : {};
+    const multiDayMeetsRequirement = isTwoDay ? cleanAssignmentDates.every(day => (cleanDayAssignments[day]?.photographers || []).length >= (Number(requiredPhotographers) || 1)) : false;
     const event = {
       id: isDuplicate ? `custom-${Date.now()}` : (initialEvent?.id || `custom-${Date.now()}`),
       supabaseId: isDuplicate ? undefined : initialEvent?.supabaseId,
@@ -3174,9 +3236,10 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       canonicalSchool: matchedSchool?.name || cleanName || '',
       schoolId: isInternalBlockingEvent ? null : (matchedSchool?.id || null),
       type: eventType,
-      status: isInternalBlockingEvent ? 'Scheduled' : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned'),
-      photographers: selectedPhotographers,
-      assistants: isInternalBlockingEvent || noAssistant ? [] : selectedAssistants,
+      status: isInternalBlockingEvent ? 'Scheduled' : (isTwoDay ? (multiDayMeetsRequirement ? 'Scheduled' : 'Needs Photographers Assigned') : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned')),
+      photographers: isTwoDay ? [] : selectedPhotographers,
+      assistants: isTwoDay || isInternalBlockingEvent || noAssistant ? [] : selectedAssistants,
+      scheduleLiveDayAssignments: isTwoDay ? cleanDayAssignments : {},
       requiredPhotographers: isInternalBlockingEvent ? 0 : (Number(requiredPhotographers) || 1),
       requiredAssistants: isInternalBlockingEvent || noAssistant ? 0 : (Number(requiredAssistants) || 0),
       noAssistant: isInternalBlockingEvent ? true : noAssistant,
@@ -3310,14 +3373,48 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                   </div>
                 </section>
 
-                <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
-                <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                {isTwoDay ? (
+                  <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
+                    <h3 className="text-sm font-semibold text-zinc-900">Per-Day Staffing</h3>
+                    <p className="mt-1 text-xs text-zinc-500">Multi-day events can have different photographers and assistants on each date. These assignments are shared with Schedule Live.</p>
+                    <div className="mt-3 space-y-3">
+                      {assignmentDates.map(day => {
+                        const assignedPhotogs = uniqueCanonicalPhotographers(dayAssignments?.[day]?.photographers || []);
+                        const assignedAssts = Array.isArray(dayAssignments?.[day]?.assistants) ? dayAssignments[day].assistants.filter(Boolean) : [];
+                        return (
+                          <div key={day} className="rounded-2xl border border-zinc-200 bg-white p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-sm font-black text-zinc-900">{formatDate(day)}</div>
+                              <Pill className={assignedPhotogs.length >= (Number(requiredPhotographers) || 1) ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'}>{assignedPhotogs.length}/{Number(requiredPhotographers) || 1} photogs</Pill>
+                            </div>
+                            <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Photographers</div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {photographers.map(name => {
+                                const clean = canonicalPhotographerName(name);
+                                return <button key={`${day}-photog-${clean}`} type="button" onClick={() => toggleDayAssignmentName(day, 'photographers', clean)} className={`rounded-full border px-3 py-2 text-sm transition ${assignedPhotogs.includes(clean) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{clean}</button>;
+                              })}
+                            </div>
+                            <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants</div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {assistants.map(name => <button key={`${day}-asst-${name}`} type="button" onClick={() => toggleDayAssignmentName(day, 'assistants', name)} className={`rounded-full border px-3 py-2 text-sm transition ${assignedAssts.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : (
+                  <>
+                    <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
+                    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                   <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
                     {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
                   </div>
                 </section>
+                  </>
+                )}
               </>
             ) : null}
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
