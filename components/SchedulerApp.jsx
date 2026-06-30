@@ -761,6 +761,38 @@ function eventMeetsPerDayPhotographerRequirement(event = {}) {
   return dates.every(date => scheduleLiveDateMeetsPhotographerRequirement(event, date));
 }
 
+function getMultiDayStaffingSummary(event = {}) {
+  if (!isMultiDayScheduleEvent(event)) return null;
+  const dates = getEventDateKeys(event);
+  const requiredPhotographers = getRequiredPhotographerCount(event);
+  const requiredAssistants = getRequiredAssistantCount(event);
+  const incompletePhotographerDates = dates.filter(date => getScheduleLivePhotographersForDate(event, date).length < requiredPhotographers);
+  const incompleteAssistantDates = event?.noAssistant || requiredAssistants <= 0
+    ? []
+    : dates.filter(date => getScheduleLiveAssistantsForDate(event, date).length < requiredAssistants);
+  const totalDates = dates.length;
+  return {
+    totalDates,
+    incompletePhotographerDates,
+    incompleteAssistantDates,
+    photographersComplete: incompletePhotographerDates.length === 0,
+    assistantsComplete: incompleteAssistantDates.length === 0,
+    fullyStaffed: incompletePhotographerDates.length === 0 && incompleteAssistantDates.length === 0
+  };
+}
+
+function getMultiDayMainStaffingStatus(event = {}) {
+  const summary = getMultiDayStaffingSummary(event);
+  if (!summary) return null;
+  const parts = [];
+  if (summary.incompletePhotographerDates.length) {
+    parts.push(`Needs Photographers (${summary.incompletePhotographerDates.length} of ${summary.totalDates} day${summary.totalDates === 1 ? '' : 's'} incomplete)`);
+  }
+  if (summary.incompleteAssistantDates.length) {
+    parts.push(`Needs Assistants (${summary.incompleteAssistantDates.length} of ${summary.totalDates} day${summary.totalDates === 1 ? '' : 's'} incomplete)`);
+  }
+  return parts.length ? parts.join(' · ') : 'Fully Staffed';
+}
 
 function getEventDateKeysInRange(event, start, end) {
   return getEventDateKeys(event).filter(date => (!start || date >= start) && (!end || date <= end));
@@ -815,6 +847,9 @@ function displayStatus(status) {
 }
 
 function displayPhotographerAssignment(event) {
+  if (isMultiDayScheduleEvent(event)) {
+    return getMultiDayMainStaffingStatus(event) || '—';
+  }
   const assigned = explicitCurrentPhotographerAssignments(event?.photographers || []);
   if (isTimeOffEvent(event)) return assigned.length ? assigned.join(', ') : '—';
   if (assigned.length) return assigned.join(', ');
@@ -851,6 +886,13 @@ function isNeedsPhotographerAssignment(event) {
 function displayAssistants(event) {
   if (isTimeOffEvent(event)) return '—';
   if (event?.noAssistant) return 'No Assistant';
+  if (isMultiDayScheduleEvent(event)) {
+    const summary = getMultiDayStaffingSummary(event);
+    if (!summary) return '—';
+    if (summary.incompleteAssistantDates.length) return `Needs Assistants (${summary.incompleteAssistantDates.length} of ${summary.totalDates} day${summary.totalDates === 1 ? '' : 's'} incomplete)`;
+    const required = getRequiredAssistantCount(event);
+    return required > 0 ? 'Assistants fully staffed' : '—';
+  }
   const assigned = Array.isArray(event?.assistants) ? event.assistants.filter(Boolean) : [];
   if (assigned.length) return assigned.join(', ');
   const required = Math.max(0, getRequiredAssistantCount(event));
@@ -1576,10 +1618,14 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
             <option value="">Assign photographer...</option>
             {photographers.map(name => <option key={name} value={name}>{canonicalPhotographerName(name)}</option>)}
           </select>
-          <select value="" onChange={(e) => { assignAssistant(e.target.value); e.target.value = ''; }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
-            <option value="">Assign assistant optional...</option>
-            {assistants.map(name => <option key={name} value={name}>{name}</option>)}
-          </select>
+          {requiredAssistants > 0 && !event.noAssistant ? (
+            <select value="" onChange={(e) => { assignAssistant(e.target.value); e.target.value = ''; }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 outline-none ring-[#AEBB9E]/30 focus:ring-4">
+              <option value="">Assign assistant...</option>
+              {assistants.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          ) : (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs font-bold text-zinc-500">No assistant needed</div>
+          )}
         </div>
       ) : null}
 
@@ -3394,10 +3440,16 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                                 return <button key={`${day}-photog-${clean}`} type="button" onClick={() => toggleDayAssignmentName(day, 'photographers', clean)} className={`rounded-full border px-3 py-2 text-sm transition ${assignedPhotogs.includes(clean) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{clean}</button>;
                               })}
                             </div>
-                            <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants</div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {assistants.map(name => <button key={`${day}-asst-${name}`} type="button" onClick={() => toggleDayAssignmentName(day, 'assistants', name)} className={`rounded-full border px-3 py-2 text-sm transition ${assignedAssts.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
-                            </div>
+                            {noAssistant || (Number(requiredAssistants) || 0) <= 0 ? (
+                              <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm font-semibold text-zinc-500">No assistant needed for this event. Change Assistants Needed above if that changes.</div>
+                            ) : (
+                              <>
+                                <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants</div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {assistants.map(name => <button key={`${day}-asst-${name}`} type="button" onClick={() => toggleDayAssignmentName(day, 'assistants', name)} className={`rounded-full border px-3 py-2 text-sm transition ${assignedAssts.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
+                                </div>
+                              </>
+                            )}
                           </div>
                         );
                       })}
@@ -3407,12 +3459,15 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                   <>
                     <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
                     <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                  <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => { setNoAssistant(true); setSelectedAssistants([]); }} className={`rounded-full border px-3 py-2 text-sm transition ${noAssistant ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>No Assistant</button>
-                    {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
-                  </div>
-                </section>
+                      <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
+                      {noAssistant || (Number(requiredAssistants) || 0) <= 0 ? (
+                        <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm font-semibold text-zinc-500">No assistant needed for this event. Change Assistants Needed above if that changes.</div>
+                      ) : (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
+                        </div>
+                      )}
+                    </section>
                   </>
                 )}
               </>
