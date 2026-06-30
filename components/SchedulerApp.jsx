@@ -939,7 +939,7 @@ function addMonths(key, delta) {
 }
 
 function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }) {
-  const mobileViewCompact = activeTab === 'Mobile View';
+  const mobileViewCompact = activeTab === 'Mobile View' || activeTab === 'Calendar View';
   const primaryTabs = visibleTabs.filter(tab => tab !== 'Admin');
   const showAdminTab = visibleTabs.includes('Admin');
   return (
@@ -1551,7 +1551,7 @@ function ScheduleLiveEventCard({ event, events, photographers, assistants = [], 
   );
 }
 
-function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent, onSchedule, authEmail, isAdminUser, canEdit = true, reloadEvents }) {
+function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent, onSchedule, onAddEvent, authEmail, isAdminUser, canEdit = true, reloadEvents }) {
   const [liveState, setLiveState] = useState(() => scheduleLiveDefaultState(todayKey()));
   const [statusMessage, setStatusMessage] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -1748,6 +1748,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
             <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(-1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronLeft size={18} /></button>
             <span className="text-center text-xs font-black text-white/80">{getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</span>
             <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronRight size={18} /></button>
+            {canEdit ? <button type="button" onClick={() => onAddEvent?.(liveState.weekStart)} className="rounded-full border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-zinc-950 shadow-sm">+ Add Event</button> : null}
           </div>
         </section>
 
@@ -1931,6 +1932,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                 <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(-1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronLeft size={18} /></button>
                 <button type="button" disabled={!canControlWeek} onClick={() => changeWeek(1)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white disabled:opacity-40"><ChevronRight size={18} /></button>
                 <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-black text-white">{getScheduleLiveWeekLabel(liveState.weekStart, liveState.showWeekends)}</span>
+                {canEdit ? <button type="button" onClick={() => onAddEvent?.(liveState.weekStart)} className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-zinc-950 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50">+ Add Event</button> : null}
               </div>
               <label className="inline-flex items-center gap-2 text-sm font-bold text-white/85">
                 <input type="checkbox" checked={Boolean(liveState.showWeekends)} disabled={!canControlWeek} onChange={(e) => saveLiveState(prev => ({ ...prev, showWeekends: e.target.checked }))} />
@@ -2030,54 +2032,79 @@ function getCalendarMonthCells(month) {
 
 function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const cells = getCalendarMonthCells(month);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
   const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   return (
-    <div className="rounded-3xl border border-zinc-200 bg-white/70 p-2 shadow-sm sm:hidden">
+    <div className="rounded-2xl border border-zinc-200 bg-white/70 p-1.5 shadow-sm sm:hidden">
       <div className="grid grid-cols-7 border-b border-zinc-200 pb-1 text-center text-[10px] font-black uppercase tracking-wide text-zinc-500">
         {dayNames.map((day, index) => <div key={`${day}-${index}`}>{day}</div>)}
       </div>
-      <div className="grid grid-cols-7">
-        {cells.map((cell, index) => {
-          const date = cell.date;
-          const dayEvents = events
-            .filter(event => isDateInEventRange(event, date))
-            .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
-          const visibleEvents = dayEvents.slice(0, 2);
-          const hiddenCount = Math.max(0, dayEvents.length - visibleEvents.length);
-          const isSelected = selectedDate === date;
-          const holidays = getHolidayLabels(date);
+      <div className="mt-1 space-y-1">
+        {weeks.map((weekDays, weekIndex) => {
+          const dates = weekDays.map(cell => cell.date);
+          const segments = buildMonthWeekSegments(events, dates, null);
+          const visibleRows = Math.max(2, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
+          const eventLayerTop = 22;
+          const rowMinHeight = Math.max(72, eventLayerTop + 3 + (visibleRows * 19));
           return (
-            <button
-              key={date}
-              type="button"
-              onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
-              onClick={() => { setSelectedDate(date); setViewMode('Day'); }}
-              className={`min-h-[78px] border-b border-r border-zinc-100 p-1 text-left ${isSelected ? 'bg-[#DDE8D2]/70' : cell.inCurrentMonth ? 'bg-white/45' : 'bg-zinc-50/60 opacity-55'}`}
-            >
-              <div className="mb-1 flex items-center justify-between gap-1">
-                <span className={`text-sm font-black ${isSelected ? 'text-zinc-950' : 'text-zinc-700'}`}>{Number(date.slice(-2))}</span>
-                {holidays.length ? <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" title={holidays.join(', ')} /> : null}
+            <div key={`mobile-week-${weekIndex}`} className="relative grid grid-cols-7 overflow-hidden rounded-xl border border-zinc-100" style={{ minHeight: rowMinHeight }}>
+              {weekDays.map((cell) => {
+                const date = cell.date;
+                const isSelected = selectedDate === date;
+                const holidays = getHolidayLabels(date);
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    onDoubleClick={() => { setSelectedDate(date); onAddEvent?.(date); }}
+                    onClick={() => { setSelectedDate(date); setViewMode('Week'); }}
+                    className={`relative min-h-[72px] border-r border-zinc-100 p-1 text-left last:border-r-0 ${isSelected ? 'bg-[#DDE8D2]/70' : cell.inCurrentMonth ? 'bg-white/45' : 'bg-zinc-50/70 opacity-60'}`}
+                    title={holidays.length ? holidays.join(', ') : undefined}
+                  >
+                    <div className="absolute left-1 top-1 z-20 flex items-center gap-1">
+                      <span className={`text-[10px] font-black leading-none ${isSelected ? 'text-zinc-950' : cell.inCurrentMonth ? 'text-zinc-650' : 'text-zinc-400'}`}>{Number(date.slice(-2))}</span>
+                      {holidays.length ? <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" aria-label={holidays.join(', ')} /> : null}
+                    </div>
+                  </button>
+                );
+              })}
+              <div className="pointer-events-none absolute left-0 right-0 z-10 grid grid-cols-7 gap-x-0 gap-y-0.5 px-0.5" style={{ top: eventLayerTop }}>
+                {segments.slice(0, 8).map(segment => {
+                  const { event, segmentStart, segmentEnd, isMultiDay } = segment;
+                  const startsOnTrueStart = segmentStart === event.date;
+                  const endsOnTrueEnd = segmentEnd === (event.endDate || event.date);
+                  const roundedClass = isMultiDay
+                    ? `${startsOnTrueStart ? 'rounded-l-full' : 'rounded-l-sm'} ${endsOnTrueEnd ? 'rounded-r-full' : 'rounded-r-sm'}`
+                    : 'rounded-full';
+                  const labelPrefix = event.localBackupOnly ? '⚠ ' : isMultiDay ? '↳ ' : '';
+                  return (
+                    <button
+                      key={`${event.id}-${segmentStart}-${segmentEnd}`}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onClick(event); }}
+                      className={`pointer-events-auto relative min-w-0 overflow-hidden truncate border px-1 py-0.5 text-left text-[8px] font-bold leading-3 ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-2' : ''} ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                      style={{ gridColumn: `${segment.startCol + 1} / span ${segment.span}`, gridRow: segment.row + 1 }}
+                      title={isMultiDay ? `${event.title} • ${getEventDateLabel(event)}` : event.title}
+                    >
+                      {event.type === 'Studio Assigned Schools (SAS)' ? <span className="absolute inset-y-0 left-0 w-1 bg-purple-950" aria-hidden="true" /> : null}
+                      {labelPrefix}{event.title}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="space-y-0.5">
-                {visibleEvents.map(event => (
-                  <div key={`${event.id}-${date}`} className={`relative overflow-hidden truncate rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-4 ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-2.5' : ''} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`} title={event.title}>
-                    {event.type === 'Studio Assigned Schools (SAS)' ? <span className="absolute inset-y-0 left-0 w-1 bg-purple-950" aria-hidden="true" /> : null}{event.title}
-                  </div>
-                ))}
-                {hiddenCount ? <div className="px-1 text-[10px] font-black text-zinc-500">+{hiddenCount}</div> : null}
-              </div>
-            </button>
+            </div>
           );
         })}
       </div>
-      <div className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
-        <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Selected Day</div>
-        <div className="mt-1 text-sm font-black text-zinc-950">{formatDate(selectedDate)}</div>
-        <div className="mt-2 space-y-1.5">
-          {events.filter(event => isDateInEventRange(event, selectedDate)).length ? events.filter(event => isDateInEventRange(event, selectedDate)).map(event => (
-            <button key={event.id} type="button" onClick={() => onClick(event)} className={`w-full truncate rounded-2xl border px-3 py-2 text-left text-xs font-bold ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>{event.title}</button>
-          )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/70 p-3 text-sm text-zinc-500">No events on this day.</div>}
+      <div className="mt-2 rounded-2xl border border-zinc-200 bg-cream/70 p-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-wide text-zinc-500">Selected Week</div>
+            <div className="mt-0.5 text-xs font-black text-zinc-950">{shortDate(weekBounds(selectedDate).start)} – {shortDate(weekBounds(selectedDate).end)}</div>
+          </div>
+          <button type="button" onClick={() => setViewMode('Week')} className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-black text-zinc-700">Open Week</button>
         </div>
       </div>
     </div>
@@ -6568,23 +6595,31 @@ export default function SchedulerApp() {
 
   return (
     <main className="min-h-screen font-sans text-zinc-900">
+      <style jsx global>{`
+        @keyframes scheduleLiveLaunchShine {
+          0% { box-shadow: 0 0 0 rgba(248,113,113,0.0), 0 12px 24px rgba(248,113,113,0.22); transform: translateY(0); }
+          50% { box-shadow: 0 0 24px rgba(248,113,113,0.38), 0 16px 34px rgba(248,113,113,0.32); transform: translateY(-1px); }
+          100% { box-shadow: 0 0 0 rgba(248,113,113,0.0), 0 12px 24px rgba(248,113,113,0.22); transform: translateY(0); }
+        }
+        .schedule-live-launch-button { animation: scheduleLiveLaunchShine 2.6s ease-in-out infinite; }
+      `}</style>
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
-      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-6 px-3 pb-28 pt-4 sm:px-6 sm:pb-6 sm:pt-6`}>
+      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-6 ${['Calendar View','Mobile View','Schedule Live!'].includes(activeTab) ? 'px-1.5 sm:px-6' : 'px-3 sm:px-6'} pb-28 pt-4 sm:pb-6 sm:pt-6`}>
         <LoginRequiredNotice />
         {activeTab === 'Overview' ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
         {activeTab === 'Calendar View' && localManualEvents.some(event => event.localBackupOnly) ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
-        <section className={activeTab === 'Schedule Live!' ? 'rounded-none border-0 bg-transparent p-0 shadow-none' : 'rounded-[2rem] border border-zinc-200/80 bg-white/35 p-3 shadow-soft sm:p-4'}>
+        <section className={activeTab === 'Schedule Live!' ? 'rounded-none border-0 bg-transparent p-0 shadow-none' : `rounded-[2rem] border border-zinc-200/80 bg-white/35 ${['Calendar View','Mobile View'].includes(activeTab) ? 'p-1.5 sm:p-4' : 'p-3 sm:p-4'} shadow-soft`}>
           {activeTab === 'Overview' && <>
             {canEditScheduler ? (
-              <div className="mb-4 rounded-[1.75rem] border border-red-200 bg-gradient-to-r from-red-50 via-white to-[#DDE8D2]/55 p-4 shadow-soft">
+              <div className="mb-4 rounded-[1.75rem] border border-red-200 bg-gradient-to-r from-red-100 via-white to-white p-4 shadow-soft">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="text-xs font-black uppercase tracking-[0.2em] text-red-600"><span className="animate-pulse">🔴</span> Schedule Live!</div>
                     <div className="mt-1 text-lg font-black text-zinc-950">Open the live scheduling draft room</div>
                     <div className="mt-1 text-sm font-semibold text-zinc-600">Assign photographers week by week with live rollout counts, host control, Hold, and commentary.</div>
                   </div>
-                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-7 py-3 text-sm font-black uppercase tracking-wide text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-[#DDE8D2] active:translate-y-0">Launch Schedule Live!</button>
+                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="schedule-live-launch-button inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-7 py-3 text-sm font-black uppercase tracking-wide text-zinc-950 shadow-lg shadow-red-200/60 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-red-50 active:translate-y-0">✨ Launch Schedule Live!</button>
                 </div>
               </div>
             ) : null}
@@ -6600,7 +6635,7 @@ export default function SchedulerApp() {
               <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} onPermanentDelete={handlePermanentDeleteEvent} canRestore={isAdminUser} canPermanentDelete={isAdminUser} />
             </div>
           </>}
-          {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
+          {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} onAddEvent={openAddEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
           {activeTab === 'Calendar View' && <>
             <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} />
             <div className="mt-4 flex flex-col gap-2 rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/40 p-3 text-sm text-zinc-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
