@@ -699,6 +699,48 @@ function getEventDateKeys(event) {
   return keys;
 }
 
+function isMultiDayScheduleEvent(event = {}) {
+  return Boolean(event?.date && event?.endDate && event.endDate !== event.date);
+}
+
+function getScheduleLiveDayAssignments(event = {}) {
+  const raw = event.scheduleLiveDayAssignments ?? event.schedule_live_day_assignments ?? {};
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+}
+
+function getScheduleLiveAssignmentForDate(event = {}, date = '') {
+  const dayAssignments = getScheduleLiveDayAssignments(event);
+  const assignment = date ? dayAssignments[date] : null;
+  return assignment && typeof assignment === 'object' ? assignment : {};
+}
+
+function getScheduleLivePhotographersForDate(event = {}, date = '') {
+  if (date && isMultiDayScheduleEvent(event)) {
+    return uniqueCanonicalPhotographers(getScheduleLiveAssignmentForDate(event, date).photographers || []);
+  }
+  return uniqueCanonicalPhotographers(event.photographers || []);
+}
+
+function getScheduleLiveAssistantsForDate(event = {}, date = '') {
+  if (date && isMultiDayScheduleEvent(event)) {
+    const assignment = getScheduleLiveAssignmentForDate(event, date);
+    return Array.isArray(assignment.assistants) ? assignment.assistants.filter(Boolean) : [];
+  }
+  return Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
+}
+
+function setScheduleLiveAssignmentForDate(event = {}, date = '', patch = {}) {
+  const dayAssignments = { ...getScheduleLiveDayAssignments(event) };
+  const current = { ...(dayAssignments[date] || {}) };
+  dayAssignments[date] = { ...current, ...patch };
+  return { ...event, scheduleLiveDayAssignments: dayAssignments };
+}
+
+function scheduleLiveDateMeetsPhotographerRequirement(event = {}, date = '') {
+  return getScheduleLivePhotographersForDate(event, date).length >= getRequiredPhotographerCount(event);
+}
+
+
 function getEventDateKeysInRange(event, start, end) {
   return getEventDateKeys(event).filter(date => (!start || date >= start) && (!end || date <= end));
 }
@@ -940,11 +982,12 @@ function addMonths(key, delta) {
 
 function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }) {
   const mobileViewCompact = activeTab === 'Mobile View' || activeTab === 'Calendar View';
+  const showMobileSearch = activeTab === 'Calendar View';
   const primaryTabs = visibleTabs.filter(tab => tab !== 'Admin');
   const showAdminTab = visibleTabs.includes('Admin');
   return (
     <header className={`sticky top-0 z-50 border-b border-zinc-200/70 bg-cream shadow-sm ${mobileViewCompact ? 'sm:py-0' : ''}`}>
-      <div className={`mx-auto max-w-7xl px-4 sm:px-6 ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-3 sm:py-4'}`}>
+      <div className={`mx-auto max-w-7xl ${mobileViewCompact ? 'px-2 sm:px-6' : 'px-4 sm:px-6'} ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-3 sm:py-4'}`}>
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-3 sm:gap-4'}`}>
           <div>
             <div className="flex items-center gap-3 sm:items-start sm:gap-4">
@@ -956,7 +999,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
             </div>
           </div>
           <div className={`flex w-full flex-col lg:w-auto lg:min-w-[560px] ${mobileViewCompact ? 'gap-2 sm:gap-3' : 'gap-3'}`}>
-            <label className={`${mobileViewCompact ? 'hidden sm:block' : 'block'} relative`}>
+            <label className={`${mobileViewCompact && !showMobileSearch ? 'hidden sm:block' : 'block'} relative`}>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
               <input
                 value={query}
@@ -1421,11 +1464,11 @@ function getMakeupSourcePictureDay(event, events) {
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0] || null;
 }
 
-function ScheduleLiveEventCard({ event, events, photographers, assistants = [], onClickEvent, onAssignPhotographer, onRemovePhotographer, onAssignAssistant, onRemoveAssistant, onToggleHold, onToggleComplete, onUpdateRequirements, canEdit = true, draggedPhotographer, setDraggedPhotographer }) {
+function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographers, assistants = [], onClickEvent, onAssignPhotographer, onRemovePhotographer, onAssignAssistant, onRemoveAssistant, onToggleHold, onToggleComplete, onUpdateRequirements, canEdit = true, draggedPhotographer, setDraggedPhotographer }) {
   const [expandedInfo, setExpandedInfo] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState(false);
-  const assigned = uniqueCanonicalPhotographers(event.photographers || []);
-  const assignedAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
+  const assigned = getScheduleLivePhotographersForDate(event, occurrenceDate);
+  const assignedAssistants = getScheduleLiveAssistantsForDate(event, occurrenceDate);
   const requiredPhotographers = getRequiredPhotographerCount(event);
   const requiredAssistants = getRequiredAssistantCount(event);
   const needsMorePhotographers = assigned.length < requiredPhotographers;
@@ -1434,17 +1477,17 @@ function ScheduleLiveEventCard({ event, events, photographers, assistants = [], 
   const makeupPhotographers = uniqueCanonicalPhotographers(makeupSource?.photographers || []);
   const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
   const isMarkedComplete = event.status === SCHEDULE_LIVE_COMPLETE_STATUS;
-  const isAutoComplete = eventMeetsPhotographerRequirement(event) && requiredAssistants >= 0 && !isHeld;
+  const isAutoComplete = scheduleLiveDateMeetsPhotographerRequirement(event, occurrenceDate) && requiredAssistants >= 0 && !isHeld;
   const isComplete = isMarkedComplete || isAutoComplete;
 
   const assign = (name) => {
     if (!canEdit || !name) return;
-    onAssignPhotographer(event, canonicalPhotographerName(name));
+    onAssignPhotographer(event, canonicalPhotographerName(name), occurrenceDate);
   };
 
   const assignAssistant = (name) => {
     if (!canEdit || !name) return;
-    onAssignAssistant?.(event, name);
+    onAssignAssistant?.(event, name, occurrenceDate);
   };
 
   return (
@@ -1472,13 +1515,13 @@ function ScheduleLiveEventCard({ event, events, photographers, assistants = [], 
         {assigned.length ? assigned.map(name => (
           <span key={name} className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2 py-1 text-[11px] font-bold text-zinc-800">
             {name}
-            {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
+            {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name, occurrenceDate)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
           </span>
         )) : null}
         {assignedAssistants.length ? assignedAssistants.map(name => (
           <span key={`assistant-${name}`} className="inline-flex items-center gap-1 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2 py-1 text-[11px] font-bold text-zinc-800">
             Asst: {name}
-            {canEdit ? <button type="button" onClick={() => onRemoveAssistant?.(event, name)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
+            {canEdit ? <button type="button" onClick={() => onRemoveAssistant?.(event, name, occurrenceDate)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
           </span>
         )) : null}
         {needsMorePhotographers ? <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700">Needs {requiredPhotographers - assigned.length} Photographer{requiredPhotographers - assigned.length === 1 ? '' : 's'}</span> : null}
@@ -1667,29 +1710,53 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
     saveLiveState(prev => ({ ...prev, weekStart: addDays(getMondayStart(prev.weekStart), delta * 7) }));
   };
 
-  const assignPhotographer = async (event, photographer) => {
+  const assignPhotographer = async (event, photographer, occurrenceDate = '') => {
     if (!canEdit || !photographer) return;
-    const nextPhotographers = Array.from(new Set([...uniqueCanonicalPhotographers(event.photographers || []), canonicalPhotographerName(photographer)]));
-    const nextEvent = { ...event, photographers: nextPhotographers };
-    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
+    const cleanName = canonicalPhotographerName(photographer);
+    let nextEvent;
+    if (occurrenceDate && isMultiDayScheduleEvent(event)) {
+      const currentForDay = getScheduleLivePhotographersForDate(event, occurrenceDate);
+      const nextPhotographers = Array.from(new Set([...currentForDay, cleanName]));
+      nextEvent = setScheduleLiveAssignmentForDate(event, occurrenceDate, { photographers: nextPhotographers, assistants: getScheduleLiveAssistantsForDate(event, occurrenceDate) });
+    } else {
+      const nextPhotographers = Array.from(new Set([...uniqueCanonicalPhotographers(event.photographers || []), cleanName]));
+      nextEvent = { ...event, photographers: nextPhotographers };
+    }
+    await onSchedule({ ...nextEvent, status: scheduleLiveDateMeetsPhotographerRequirement(nextEvent, occurrenceDate) ? 'Scheduled' : 'Needs Photographers Assigned' });
     setSelectedPhotographer('');
   };
 
-  const removePhotographer = async (event, photographer) => {
+  const removePhotographer = async (event, photographer, occurrenceDate = '') => {
     if (!canEdit) return;
-    const nextPhotographers = uniqueCanonicalPhotographers(event.photographers || []).filter(name => name !== canonicalPhotographerName(photographer));
-    const nextEvent = { ...event, photographers: nextPhotographers };
-    await onSchedule({ ...nextEvent, status: eventMeetsPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
+    let nextEvent;
+    if (occurrenceDate && isMultiDayScheduleEvent(event)) {
+      const nextPhotographers = getScheduleLivePhotographersForDate(event, occurrenceDate).filter(name => name !== canonicalPhotographerName(photographer));
+      nextEvent = setScheduleLiveAssignmentForDate(event, occurrenceDate, { photographers: nextPhotographers, assistants: getScheduleLiveAssistantsForDate(event, occurrenceDate) });
+    } else {
+      const nextPhotographers = uniqueCanonicalPhotographers(event.photographers || []).filter(name => name !== canonicalPhotographerName(photographer));
+      nextEvent = { ...event, photographers: nextPhotographers };
+    }
+    await onSchedule({ ...nextEvent, status: scheduleLiveDateMeetsPhotographerRequirement(nextEvent, occurrenceDate) ? 'Scheduled' : 'Needs Photographers Assigned' });
   };
 
-  const assignAssistant = async (event, assistant) => {
+  const assignAssistant = async (event, assistant, occurrenceDate = '') => {
     if (!canEdit || !assistant) return;
+    if (occurrenceDate && isMultiDayScheduleEvent(event)) {
+      const nextAssistants = Array.from(new Set([...getScheduleLiveAssistantsForDate(event, occurrenceDate), assistant]));
+      await onSchedule(setScheduleLiveAssignmentForDate(event, occurrenceDate, { photographers: getScheduleLivePhotographersForDate(event, occurrenceDate), assistants: nextAssistants }));
+      return;
+    }
     const nextAssistants = Array.from(new Set([...(event.assistants || []).filter(Boolean), assistant]));
     await onSchedule({ ...event, assistants: nextAssistants });
   };
 
-  const removeAssistant = async (event, assistant) => {
+  const removeAssistant = async (event, assistant, occurrenceDate = '') => {
     if (!canEdit) return;
+    if (occurrenceDate && isMultiDayScheduleEvent(event)) {
+      const nextAssistants = getScheduleLiveAssistantsForDate(event, occurrenceDate).filter(name => name !== assistant);
+      await onSchedule(setScheduleLiveAssignmentForDate(event, occurrenceDate, { photographers: getScheduleLivePhotographersForDate(event, occurrenceDate), assistants: nextAssistants }));
+      return;
+    }
     const nextAssistants = (event.assistants || []).filter(name => name !== assistant);
     await onSchedule({ ...event, assistants: nextAssistants });
   };
@@ -1765,12 +1832,12 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
               </div>
               <div className="space-y-2">
                 {dayEvents.length ? dayEvents.map(event => (
-                  <button key={event.id} type="button" onClick={() => onClickEvent(event)} className={`w-full rounded-2xl border p-3 text-left shadow-sm ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>
+                  <button key={`${event.id}-${date}`} type="button" onClick={() => onClickEvent(event)} className={`w-full rounded-2xl border p-3 text-left shadow-sm ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>
                     <div className="truncate text-sm font-black">{event.title}</div>
                     <div className="mt-1 text-xs font-semibold opacity-75">{getEventTimeLabel(event)}</div>
                     <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
-                      <div><span className="font-black">Photogs:</span> {displayPhotographerAssignment(event)}</div>
-                      <div><span className="font-black">Assistants:</span> {displayAssistants(event)}</div>
+                      <div><span className="font-black">Photogs:</span> {getScheduleLivePhotographersForDate(event, date).length ? getScheduleLivePhotographersForDate(event, date).join(', ') : 'Unassigned'}</div>
+                      <div><span className="font-black">Assistants:</span> {getScheduleLiveAssistantsForDate(event, date).length ? getScheduleLiveAssistantsForDate(event, date).join(', ') : 'None'}</div>
                     </div>
                   </button>
                 )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/70 p-4 text-center text-sm text-zinc-500">No events this day.</div>}
@@ -1953,7 +2020,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
                   </div>
                   <div className="space-y-2">
-                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={event.id} event={event} events={events} photographers={photographers} assistants={assistants} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onAssignAssistant={assignAssistant} onRemoveAssistant={removeAssistant} onToggleHold={toggleHold} onToggleComplete={toggleComplete} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
+                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={`${event.id}-${date}`} event={event} occurrenceDate={date} events={events} photographers={photographers} assistants={assistants} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onAssignAssistant={assignAssistant} onRemoveAssistant={removeAssistant} onToggleHold={toggleHold} onToggleComplete={toggleComplete} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
                   </div>
                 </div>;
               })}
@@ -4099,6 +4166,7 @@ function eventToSupabaseRow(event = {}) {
     no_assistant: Boolean(event.noAssistant),
     required_photographers: getRequiredPhotographerCount(event),
     required_assistants: getRequiredAssistantCount(event),
+    schedule_live_day_assignments: event.scheduleLiveDayAssignments || event.schedule_live_day_assignments || null,
     irm: event.irm === '' || event.irm === undefined || event.irm === null ? null : Number(event.irm),
     rain_info: event.rainInfo || null,
     history: event.history || null,
@@ -4127,6 +4195,7 @@ function supabaseRowToEvent(row = {}) {
     noAssistant: Boolean(row.no_assistant),
     requiredPhotographers: row.required_photographers ?? null,
     requiredAssistants: row.required_assistants ?? null,
+    scheduleLiveDayAssignments: row.schedule_live_day_assignments || {},
     features: [],
     irm: row.irm ?? null,
     time: row.time || 'TBD',
@@ -6604,7 +6673,7 @@ export default function SchedulerApp() {
         .schedule-live-launch-button { animation: scheduleLiveLaunchShine 2.6s ease-in-out infinite; }
       `}</style>
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
-      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-6 ${['Calendar View','Mobile View','Schedule Live!'].includes(activeTab) ? 'px-1.5 sm:px-6' : 'px-3 sm:px-6'} pb-28 pt-4 sm:pb-6 sm:pt-6`}>
+      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : activeTab === 'Schedule Live!' ? 'px-1 sm:px-6' : 'px-3 sm:px-6'} pb-28 pt-4 sm:pb-6 sm:pt-6`}>
         <LoginRequiredNotice />
         {activeTab === 'Overview' ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
         {activeTab === 'Calendar View' && localManualEvents.some(event => event.localBackupOnly) ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
