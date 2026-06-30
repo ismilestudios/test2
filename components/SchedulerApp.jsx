@@ -2251,6 +2251,27 @@ function getRolloutCount(event) {
   return Math.max(getAssignedPhotographerCount(event), getRequiredPhotographerCount(event));
 }
 
+function getRolloutCountForDate(events = [], dateKey = todayKey()) {
+  return events
+    .filter(event => isDateInEventRange(event, dateKey))
+    .reduce((total, event) => total + getRolloutCount(event), 0);
+}
+
+function getRolloutCountForDateRange(events = [], startKey, endKey, { weekdaysOnly = false } = {}) {
+  if (!startKey || !endKey) return 0;
+  let total = 0;
+  const cursor = new Date(`${startKey}T12:00:00`);
+  const end = new Date(`${endKey}T12:00:00`);
+  while (cursor <= end) {
+    const day = cursor.getDay();
+    if (!weekdaysOnly || (day !== 0 && day !== 6)) {
+      total += getRolloutCountForDate(events, cursor.toISOString().slice(0, 10));
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return total;
+}
+
 function getCapacityTone(rollouts) {
   if (rollouts >= WEEKLY_ROLLOUT_CAPACITY) return {
     label: 'Overloaded',
@@ -2684,7 +2705,7 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
     const scheduled = events.filter(event => isDateInEventRange(event, key));
     const weekEvents = events.filter(event => event && event.date && event.date <= weekEnd && (event.endDate || event.date) >= weekStart);
     const dayRollouts = scheduled.reduce((total, event) => total + getRolloutCount(event), 0);
-    const weekRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+    const weekRollouts = getRolloutCountForDateRange(events, weekStart, weekEnd, { weekdaysOnly: true });
     const remainingWeekRollouts = Math.max(0, WEEKLY_ROLLOUT_CAPACITY - weekRollouts);
     const capacity = getCapacityTone(weekRollouts);
     dates.push({ date: key, scheduledCount: scheduled.length, scheduled, dayRollouts, weekRollouts, remainingWeekRollouts, capacity, weekStart, weekEnd });
