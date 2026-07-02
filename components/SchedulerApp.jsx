@@ -1248,19 +1248,11 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
 function CurrentWeeklyRolloutCard({ events }) {
   const today = todayKey();
   const { start, end } = weekBounds(today);
-  const weekEvents = events.filter(event => event && event.date >= start && event.date <= end);
-  const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+  const weekEvents = events.filter(event => event && event.date <= end && (event.endDate || event.date) >= start);
+  const weeklyRollouts = getRolloutCountForDateRange(events, start, end);
   const capacity = getCapacityTone(weeklyRollouts);
   const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
-  const photographerSummary = Array.from(
-    weekEvents.reduce((counts, event) => {
-      if (!isRolloutEvent(event)) return counts;
-      uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
-        counts.set(name, (counts.get(name) || 0) + 1);
-      });
-      return counts;
-    }, new Map())
-  ).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const photographerSummary = getPhotographerRolloutSummaryForDateRange(events, start, end);
 
   return (
     <div tabIndex={0} className={`group relative rounded-3xl border p-4 shadow-sm outline-none ${capacity.className}`}>
@@ -1277,20 +1269,7 @@ function CurrentWeeklyRolloutCard({ events }) {
         <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
       </div>
 
-      <div className="pointer-events-none absolute right-3 top-full z-30 mt-3 w-72 translate-y-1 rounded-3xl border border-zinc-200 bg-white p-4 text-zinc-900 opacity-0 shadow-2xl transition group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100">
-        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">This week's photographer load</div>
-        <div className="mt-1 text-sm font-semibold text-zinc-900">{shortDate(start)} – {shortDate(end)}</div>
-        <div className="mt-3 space-y-2">
-          {photographerSummary.length ? photographerSummary.map(([name, count]) => (
-            <div key={name} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-100 bg-cream/70 px-3 py-2 text-sm">
-              <span className="truncate font-medium">{name}</span>
-              <span className="shrink-0 text-xs font-semibold text-zinc-500">{count} school{count === 1 ? '' : 's'}</span>
-            </div>
-          )) : (
-            <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-500">No photographers assigned this week yet.</div>
-          )}
-        </div>
-      </div>
+      <RolloutBreakdownTooltip start={start} end={end} summary={photographerSummary} />
     </div>
   );
 }
@@ -1433,7 +1412,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
               <h2 className="text-sm font-semibold text-zinc-800">{column.title}</h2>
               <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
             </div>
-            <div className="space-y-2">{columnEvents.map(event => {
+            <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
               return <EventCard key={event.id} event={event} onClick={onClick} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
             })}</div>
@@ -2236,7 +2215,7 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
                 );
               })}
               <div className="pointer-events-none absolute left-0 right-0 z-10 grid grid-cols-7 gap-x-0 gap-y-0.5 px-0.5" style={{ top: eventLayerTop }}>
-                {segments.slice(0, 8).map(segment => {
+                {segments.map(segment => {
                   const { event, segmentStart, segmentEnd, isMultiDay } = segment;
                   const startsOnTrueStart = segmentStart === event.date;
                   const endsOnTrueEnd = segmentEnd === (event.endDate || event.date);
@@ -2482,6 +2461,42 @@ function getCapacityTone(rollouts) {
   };
 }
 
+function getPhotographerRolloutSummaryForDateRange(events = [], startKey, endKey) {
+  const counts = new Map();
+  (events || []).forEach(event => {
+    if (!event || !isRolloutEvent(event) || !startKey || !endKey) return;
+    const eventStart = event.date || '';
+    const eventEnd = event.endDate || event.date || '';
+    if (!eventStart || eventStart > endKey || eventEnd < startKey) return;
+    const datesInRange = getEventDateKeysInRange(event, startKey, endKey);
+    const photographers = uniqueCanonicalPhotographers(event.photographers || []);
+    if (!photographers.length) return;
+    photographers.forEach(name => {
+      counts.set(name, (counts.get(name) || 0) + datesInRange.length);
+    });
+  });
+  return Array.from(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function RolloutBreakdownTooltip({ title = "This week's photographer load", start, end, summary = [] }) {
+  return (
+    <div className="pointer-events-none absolute right-3 top-full z-30 mt-3 w-72 translate-y-1 rounded-3xl border border-zinc-200 bg-white p-4 text-zinc-900 opacity-0 shadow-2xl transition group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100">
+      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</div>
+      <div className="mt-1 text-sm font-semibold text-zinc-900">{shortDate(start)} – {shortDate(end)}</div>
+      <div className="mt-3 space-y-2">
+        {summary.length ? summary.map(([name, count]) => (
+          <div key={name} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-100 bg-cream/70 px-3 py-2 text-sm">
+            <span className="truncate font-medium">{name}</span>
+            <span className="shrink-0 text-xs font-semibold text-zinc-500">{count} rollout{count === 1 ? '' : 's'}</span>
+          </div>
+        )) : (
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-500">No photographers assigned this week yet.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function getPhotographerWeekStats(events, date, photographer) {
   const { start, end } = weekBounds(date || todayKey());
@@ -2565,7 +2580,8 @@ function WeekView({ events, selectedDate, onClick }) {
   const { start, end } = weekBounds(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const weekEvents = events.filter(event => event && event.date && event.date <= end && (event.endDate || event.date) >= start);
-  const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+  const weeklyRollouts = getRolloutCountForDateRange(events, start, end);
+  const photographerSummary = getPhotographerRolloutSummaryForDateRange(events, start, end);
   const capacity = getCapacityTone(weeklyRollouts);
   const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
   const segments = buildMonthWeekSegments(events, days, null);
@@ -2578,7 +2594,7 @@ function WeekView({ events, selectedDate, onClick }) {
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-sm font-semibold text-zinc-800">Week of {shortDate(start)} – {shortDate(end)}</h2>
-        <div className={`rounded-2xl border px-4 py-3 ${capacity.className}`}>
+        <div tabIndex={0} className={`group relative rounded-2xl border px-4 py-3 outline-none ${capacity.className}`}>
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Weekly Rollouts</div>
@@ -2589,6 +2605,7 @@ function WeekView({ events, selectedDate, onClick }) {
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
             <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
           </div>
+          <RolloutBreakdownTooltip start={start} end={end} summary={photographerSummary} />
         </div>
       </div>
 
@@ -3070,8 +3087,8 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
   );
 }
 
-function SchedulingModal({ school, photographers, assistants, events = [], onClose, onSave }) {
-  const [date, setDate] = useState('2026-09-01');
+function SchedulingModal({ school, photographers, assistants, events = [], onClose, onSave, defaultDate = '2026-09-01' }) {
+  const [date, setDate] = useState(defaultDate || '2026-09-01');
   const [isTwoDay, setIsTwoDay] = useState(false);
   const [endDate, setEndDate] = useState('');
   const [arrivalTime, setArrivalTime] = useState('');
@@ -3136,14 +3153,14 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Fall 2026 First Date</div>
-                <input type="date" min="2026-09-01" max="2026-11-30" value={date} onChange={(e) => { setDate(e.target.value); if (isTwoDay && (!endDate || endDate < e.target.value)) setEndDate(addDays(e.target.value, 1)); }} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <input type="date" min="2026-08-01" max="2026-12-31" value={date} onChange={(e) => { setDate(e.target.value); if (isTwoDay && (!endDate || endDate < e.target.value)) setEndDate(addDays(e.target.value, 1)); }} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">End Date</div>
                   <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Multi-day' : 'One-day'}</button>
                 </div>
-                <input type="date" min="2026-09-01" max="2026-11-30" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
+                <input type="date" min="2026-08-01" max="2026-12-31" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
@@ -3835,7 +3852,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         </div>
         <div className="grid max-h-[520px] gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
           {availability.map(day => (
-            <div key={day.date} className={`rounded-2xl border p-3 ${day.capacity.className || 'border-zinc-200 bg-cream/75 text-zinc-800'}`}>
+            <button key={day.date} type="button" onClick={() => { if (!canEdit) return; setAddingEventDefaultDate(day.date); setAddingEvent(true); }} className={`rounded-2xl border p-3 text-left transition ${canEdit ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-soft focus:outline-none focus:ring-4 focus:ring-[#AEBB9E]/30' : ''} ${day.capacity.className || 'border-zinc-200 bg-cream/75 text-zinc-800'}`} title={canEdit ? `Add an event on ${formatDate(day.date)}` : undefined}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold">{formatDate(day.date)}</div>
@@ -3850,11 +3867,11 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
                 <div className={`${day.capacity.barClassName || 'bg-emerald-500'} h-full rounded-full`} style={{ width: `${Math.min(100, Math.round((day.weekRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100))}%` }} />
               </div>
               <div className="mt-3 text-xs leading-relaxed opacity-70">Currently Booked: {day.scheduled.map(event => event.title).join(', ') || '—'}</div>
-            </div>
+            </button>
           ))}
         </div>
       </section>
-      {canEdit ? <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} /> : null}
+      {canEdit ? <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} defaultDate={addingEventDefaultDate} /> : null}
       {canEdit && noFallUndo ? (
         <div className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-zinc-950 px-4 py-3 text-sm text-white shadow-2xl sm:bottom-6">
           <div className="flex items-center justify-between gap-3">
@@ -3863,7 +3880,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
           </div>
         </div>
       ) : null}
-      {canEdit && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} schools={schoolsList} onClose={() => setAddingEvent(false)} onSave={onSchedule} sourceLabel="Carrie View" />}
+      {canEdit && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={events} schools={schoolsList} onClose={() => setAddingEvent(false)} onSave={onSchedule} defaultDate={addingEventDefaultDate} sourceLabel="Carrie View" />}
       {canEdit && addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={saveSchool} />}
     </div>
   );
@@ -5264,7 +5281,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   const createdByLabel = `${addedMeta.name}${addedMeta.addedAt ? ` · ${formatEventMetaDateTime(addedMeta.addedAt)}` : ''}`;
   const editedLabel = editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : '';
 
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-cream shadow-2xl"><div className="border-b border-zinc-200 p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-3 text-2xl font-semibold text-zinc-950">{event.title}</h2><p className="mt-1 text-sm text-zinc-500">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-3 grid gap-1 text-xs leading-5 text-zinc-500"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-4 overflow-auto p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div>{canEditNotes && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1 text-[11px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Edit Picture Day Notes</button> : null}</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-3 overflow-auto p-3 sm:space-y-4 sm:p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div>{canEditNotes && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1 text-[11px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Edit Picture Day Notes</button> : null}</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
