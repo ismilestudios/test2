@@ -4136,6 +4136,168 @@ function MergeSchoolModal({ sourceSchool, schools, onClose, onMerge }) {
 }
 
 
+function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
+  if (!school) return null;
+
+  const addressLine = [school.address, [school.city, school.stateZip].filter(Boolean).join(', ')].filter(Boolean).join('\n');
+  const schoolNoteHistory = getNoteHistory(school.noteAttribution);
+  const visiblePlainSchoolNotes = getVisiblePlainSchoolNotes(school.notes);
+  const plainSchoolNoteCount = countPlainSchoolNoteBlocks(visiblePlainSchoolNotes);
+  const totalSchoolNoteCount = schoolNoteHistory.length + plainSchoolNoteCount;
+  const grouped = (school.history || []).reduce((acc, event) => {
+    if (!event || !event.date) return acc;
+    const season = getSeasonLabel(event.date);
+    acc[season] ||= [];
+    acc[season].push(event);
+    return acc;
+  }, {});
+  const seasons = ['Fall 2026', 'Spring 2026', 'Fall 2025', 'Spring 2025'];
+  const allHistory = (school.history || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  const pictureInfoHistory = getPictureDayInfoHistory(school.history || []);
+  const photographerHistory = getSchoolPhotographerHistory(school.history || []);
+  const primaryName = [school.contactFirst, school.contactLast].filter(Boolean).join(' ');
+  const secondaryName = [school.secondaryContactFirst, school.secondaryContactLast].filter(Boolean).join(' ');
+
+  return (
+    <section className="flex h-[calc(100vh-7.5rem)] min-h-[560px] flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/90 shadow-sm">
+      <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 px-3 py-2.5 backdrop-blur">
+        <button type="button" onClick={onBack} className="mb-2 inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-cream/80 px-3 py-1.5 text-xs font-black text-zinc-700">
+          <ChevronLeft size={14} /> Back to Schools
+        </button>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="text-base font-black leading-tight text-zinc-950">{school.name}</h2>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-[10px] text-zinc-800">IRM {school.irm}</Pill> : <Pill className="border-zinc-200 bg-white text-[10px] text-zinc-600">No IRM</Pill>}
+              <Pill className="border-zinc-200 bg-white text-[10px] text-zinc-600">{(school.history || []).length} record{(school.history || []).length === 1 ? '' : 's'}</Pill>
+              {school.noFallSchedulingFall2026 ? <Pill className="border-slate-200 bg-slate-50 text-[10px] text-slate-700">No Fall Scheduling</Pill> : null}
+            </div>
+          </div>
+          {(onEdit || onMerge) ? (
+            <div className="flex shrink-0 gap-1.5">
+              {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-full bg-zinc-950 px-3 py-1.5 text-xs font-black text-white">Edit</button> : null}
+              {onMerge ? <button type="button" onClick={() => onMerge(school)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-1.5 text-xs font-black text-zinc-900">Merge</button> : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div className="grid gap-2">
+          <div className="rounded-2xl border border-zinc-200 bg-cream/80 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Address</div>
+              {school.address ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([school.address, school.city, school.stateZip].filter(Boolean).join('\n'))}`} target="_blank" rel="noreferrer" className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-2.5 py-1 text-[11px] font-black text-zinc-900">Maps</a> : null}
+            </div>
+            <div className="mt-1 whitespace-pre-wrap text-sm font-semibold leading-5 text-zinc-800">{addressLine || '—'}</div>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
+              <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Primary Contact</div>
+              <div className="mt-1 text-sm font-black text-zinc-900">{primaryName || '—'}</div>
+              {school.contactTitle ? <div className="text-xs font-semibold text-zinc-500">{school.contactTitle}</div> : null}
+              {school.contactPhone ? <div className="mt-1 text-sm font-semibold text-zinc-700">{school.contactPhone}</div> : null}
+              {school.contactEmail ? <div className="break-words text-xs font-semibold text-zinc-600">{school.contactEmail}</div> : null}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {school.contactPhone ? <a href={`tel:${school.contactPhone}`} className="rounded-full border border-zinc-200 bg-cream/80 px-3 py-1.5 text-xs font-black text-zinc-800">Call</a> : null}
+                {school.contactEmail ? <a href={`mailto:${school.contactEmail}`} className="rounded-full border border-zinc-200 bg-cream/80 px-3 py-1.5 text-xs font-black text-zinc-800">Email</a> : null}
+              </div>
+            </div>
+
+            {[school.secondaryContactFirst, school.secondaryContactLast, school.secondaryContactEmail, school.secondaryContactTitle].some(Boolean) ? (
+              <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
+                <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Secondary Contact</div>
+                <div className="mt-1 text-sm font-black text-zinc-900">{secondaryName || '—'}</div>
+                {school.secondaryContactTitle ? <div className="text-xs font-semibold text-zinc-500">{school.secondaryContactTitle}</div> : null}
+                {school.secondaryContactEmail ? <div className="break-words text-xs font-semibold text-zinc-600">{school.secondaryContactEmail}</div> : null}
+                {school.secondaryContactEmail ? <a href={`mailto:${school.secondaryContactEmail}`} className="mt-2 inline-flex rounded-full border border-zinc-200 bg-cream/80 px-3 py-1.5 text-xs font-black text-zinc-800">Email</a> : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-black uppercase tracking-wide text-zinc-500">School Notes ({totalSchoolNoteCount})</div>
+              {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-full border border-zinc-200 bg-cream/80 px-2.5 py-1 text-[11px] font-black text-zinc-800">Add Note</button> : null}
+            </div>
+            <div className="mt-2 max-h-56 overflow-y-auto rounded-2xl border border-zinc-100 bg-cream/60 p-2">
+              <NoteHistoryList entries={schoolNoteHistory} />
+              {visiblePlainSchoolNotes ? (
+                <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-zinc-700">
+                  <div className="mb-1 font-black uppercase tracking-wide text-zinc-500">{getPlainSchoolNoteLabel(visiblePlainSchoolNotes)}</div>
+                  {visiblePlainSchoolNotes}
+                </div>
+              ) : schoolNoteHistory.length ? null : <div className="text-xs font-semibold text-zinc-400">No notes yet.</div>}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
+            <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Recent / Upcoming History</div>
+            <div className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1">
+              {allHistory.length ? allHistory.slice(0, 18).map(event => (
+                <button key={`mobile-history-${event.id}`} type="button" onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-cream/70 p-2 text-left">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-black text-zinc-500">{formatDate(event.date)} · {event.season || getSeasonLabel(event.date)}</div>
+                      <div className="mt-0.5 truncate text-sm font-black text-zinc-950">{event.title}</div>
+                      <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">Assigned: {event.photographers?.length ? event.photographers.join(', ') : '—'}</div>
+                    </div>
+                    <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} shrink-0 text-[9px]`}>{event.type}</Pill>
+                  </div>
+                </button>
+              )) : <div className="rounded-xl border border-dashed border-zinc-200 bg-cream/60 p-3 text-xs font-semibold text-zinc-400">No imported records yet.</div>}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
+            <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Season Snapshot</div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {seasons.map(season => {
+                const seasonEvents = grouped[season] || [];
+                return (
+                  <div key={`mobile-season-${season}`} className="rounded-xl border border-zinc-200 bg-cream/70 p-2">
+                    <div className="text-xs font-black text-zinc-800">{season}</div>
+                    <div className="mt-1 text-[11px] font-semibold text-zinc-500">{seasonEvents.length} record{seasonEvents.length === 1 ? '' : 's'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-zinc-500"><History size={14} /> Photographer History</div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {photographerHistory.length ? photographerHistory.slice(0, 8).map(item => (
+                <div key={`mobile-photo-history-${item.name}`} className="rounded-xl border border-zinc-100 bg-cream/70 p-2">
+                  <div className="truncate text-sm font-black text-zinc-950">{item.name}</div>
+                  <div className="text-[11px] font-semibold text-zinc-500">{item.count} assignment{item.count === 1 ? '' : 's'}</div>
+                  {item.lastDate ? <div className="mt-1 truncate text-[11px] text-zinc-600">Last: {shortDate(item.lastDate)}</div> : null}
+                </div>
+              )) : <div className="col-span-2 text-xs font-semibold text-zinc-400">No photographer history imported yet.</div>}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-zinc-500"><Pencil size={14} /> Picture Day Info</div>
+            <div className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1">
+              {pictureInfoHistory.length ? pictureInfoHistory.map(event => (
+                <button key={`mobile-picture-info-${event.id}`} type="button" onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-cream/70 p-2 text-left">
+                  <div className="text-[11px] font-black text-zinc-500">{event.season} · {shortDate(event.date)}</div>
+                  <div className="mt-0.5 truncate text-xs font-black text-zinc-900">{event.title}</div>
+                  {event.notes ? <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-[11px] leading-4 text-zinc-600">{event.notes}</div> : null}
+                </button>
+              )) : <div className="text-xs font-semibold text-zinc-400">No picture day info imported yet.</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+
 function splitStateZip(value = '') {
   const trimmed = String(value || '').trim();
   const parts = trimmed.split(/\s+/);
@@ -4418,6 +4580,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   const [mergingSchool, setMergingSchool] = useState(null);
   const [addingSchool, setAddingSchool] = useState(false);
   const [message, setMessage] = useState('');
+  const [mobileSchoolOpen, setMobileSchoolOpen] = useState(false);
 
   const mergedSourcesByTarget = useMemo(() => {
     const map = {};
@@ -4561,7 +4724,69 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
           {message ? <div>{message}</div> : null}
         </div>
       ) : null}
-      <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
+      <div className="md:hidden">
+        {mobileSchoolOpen && selected ? (
+          <MobileSchoolDetail
+            school={selected}
+            onBack={() => setMobileSchoolOpen(false)}
+            onClickEvent={onClickEvent}
+            onEdit={canEditSchools ? setEditingSchool : null}
+            onMerge={canMergeSchools ? setMergingSchool : null}
+          />
+        ) : (
+          <section className="flex h-[calc(100vh-7.5rem)] min-h-[560px] flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/90 p-3 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-zinc-950">School List</h2>
+                <p className="mt-0.5 text-xs font-semibold text-zinc-500">Search, tap a school, then use the field-friendly detail page.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {canEditSchools ? (
+                  <button type="button" onClick={() => setAddingSchool(true)} className="inline-flex items-center justify-center gap-1 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-3 py-1.5 text-xs font-black text-zinc-900 shadow-sm">
+                    <Plus size={14} /> Add
+                  </button>
+                ) : null}
+                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filtered.length}</Pill>
+              </div>
+            </div>
+            <div className="mt-3">
+              <input
+                type="text"
+                value={schoolListQuery}
+                onChange={(event) => setSchoolListQuery(event.target.value)}
+                placeholder="Search schools, contacts, notes, history..."
+                className="w-full rounded-2xl border border-zinc-200 bg-white/95 px-4 py-3 text-base font-semibold text-zinc-800 shadow-sm outline-none ring-sage/30 placeholder:text-zinc-400 focus:ring-4"
+              />
+            </div>
+            <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 pb-3">
+              {filtered.map(school => (
+                <button
+                  key={school.originalName || school.name}
+                  type="button"
+                  onClick={() => { setSelectedName(school.name); setMobileSchoolOpen(true); }}
+                  className="w-full rounded-2xl border border-zinc-200 bg-cream/80 p-3 text-left shadow-sm transition active:scale-[0.99]"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-black text-zinc-950">{school.name}</div>
+                      <div className="mt-1 truncate text-xs font-semibold text-zinc-500">{[school.contactFirst, school.contactLast].filter(Boolean).join(' ') || school.city || 'School List record'}</div>
+                    </div>
+                    <ChevronRight size={16} className="mt-0.5 shrink-0 text-zinc-400" />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Pill className="border-zinc-200 bg-white text-[10px] text-zinc-600">{school.history.length} record{school.history.length === 1 ? '' : 's'}</Pill>
+                    {school.irm ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-[10px] text-zinc-800">IRM {school.irm}</Pill> : null}
+                    {school.mergedFrom?.length ? <Pill className="border-zinc-200 bg-white text-[10px] text-zinc-600">{school.mergedFrom.length} merged</Pill> : null}
+                  </div>
+                </button>
+              ))}
+              {!filtered.length ? <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-5 text-center text-sm font-semibold text-zinc-500">No schools match that search.</div> : null}
+            </div>
+          </section>
+        )}
+      </div>
+
+      <div className="hidden gap-4 md:grid xl:grid-cols-[340px_1fr]">
         <section className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
@@ -4595,15 +4820,15 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
           </div>
         </section>
         <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={canEditSchools ? setEditingSchool : null} onMerge={canMergeSchools ? setMergingSchool : null} />
-        <AnimatePresence>
-          {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
-          {addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={async (schoolValues) => {
-            const saved = await saveSchool(schoolValues.originalName || schoolValues.name, schoolValues);
-            if (saved !== false) setAddingSchool(false);
-          }} />}
-          {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={activeSchools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
-        </AnimatePresence>
       </div>
+      <AnimatePresence>
+        {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
+        {addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={async (schoolValues) => {
+          const saved = await saveSchool(schoolValues.originalName || schoolValues.name, schoolValues);
+          if (saved !== false) setAddingSchool(false);
+        }} />}
+        {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={activeSchools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
+      </AnimatePresence>
     </div>
   );
 }
@@ -4983,6 +5208,7 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
   const [assistantInput, setAssistantInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [mobileSchoolOpen, setMobileSchoolOpen] = useState(false);
   const [directoryQuery, setDirectoryQuery] = useState('');
 
   const activeStaffMembers = useMemo(() => {
