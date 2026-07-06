@@ -794,6 +794,20 @@ function getMultiDayMainStaffingStatus(event = {}) {
   return parts.length ? parts.join(' · ') : 'Fully Staffed';
 }
 
+function getMultiDayPhotographerDisplay(event = {}) {
+  if (!isMultiDayScheduleEvent(event)) return null;
+  const dates = getEventDateKeys(event);
+  if (!dates.length) return null;
+  const daily = dates.map(date => ({ date, names: getScheduleLivePhotographersForDate(event, date).filter(Boolean) }));
+  const firstNames = daily[0]?.names || [];
+  const sameEveryDay = daily.every(item => item.names.length === firstNames.length && item.names.every((name, index) => name === firstNames[index]));
+  if (sameEveryDay && firstNames.length) return `${firstNames.join(', ')} — all days`;
+  const filled = daily.filter(item => item.names.length);
+  if (filled.length) return filled.map(item => `${shortDate(item.date)}: ${item.names.join(', ')}`).join(' · ');
+  const status = getMultiDayMainStaffingStatus(event);
+  return status || '—';
+}
+
 function getEventDateKeysInRange(event, start, end) {
   return getEventDateKeys(event).filter(date => (!start || date >= start) && (!end || date <= end));
 }
@@ -848,7 +862,7 @@ function displayStatus(status) {
 
 function displayPhotographerAssignment(event) {
   if (isMultiDayScheduleEvent(event)) {
-    return getMultiDayMainStaffingStatus(event) || '—';
+    return getMultiDayPhotographerDisplay(event) || getMultiDayMainStaffingStatus(event) || '—';
   }
   const assigned = explicitCurrentPhotographerAssignments(event?.photographers || []);
   if (isTimeOffEvent(event)) return assigned.length ? assigned.join(', ') : '—';
@@ -1098,7 +1112,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search schools, photographers, assistants, notes..."
+                placeholder="Search schools, events, contacts, notes..."
                 className="w-full rounded-2xl border border-zinc-200 bg-white/80 py-3 pl-10 pr-4 text-sm outline-none ring-sage/30 transition focus:ring-4"
               />
             </label>
@@ -1412,7 +1426,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
               <h2 className="text-sm font-semibold text-zinc-800">{column.title}</h2>
               <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
             </div>
-            <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">{columnEvents.map(event => {
+            <div className="space-y-2 md:max-h-[430px] md:overflow-y-auto md:pr-1">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
               return <EventCard key={event.id} event={event} onClick={onClick} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
             })}</div>
@@ -2588,7 +2602,7 @@ function WeekView({ events, selectedDate, onClick }) {
   const visibleRows = Math.max(4, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
   const hasHolidayInWeek = days.some(date => getHolidayLabels(date).length);
   const eventLayerTop = hasHolidayInWeek ? 64 : 44;
-  const rowMinHeight = Math.max(320, eventLayerTop + 24 + (visibleRows * 38));
+  const rowMinHeight = Math.max(220, eventLayerTop + 16 + (visibleRows * 34));
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
@@ -2616,7 +2630,7 @@ function WeekView({ events, selectedDate, onClick }) {
           </div>
           <div className="mt-2 relative grid grid-cols-7 gap-2 overflow-hidden" style={{ minHeight: rowMinHeight }}>
             {days.map(date => (
-              <div key={date} className="min-h-[320px] rounded-2xl border border-zinc-200 bg-cream/80 p-2">
+              <div key={date} className="min-h-[220px] sm:min-h-[320px] rounded-2xl border border-zinc-200 bg-cream/80 p-2">
                 <div className="mb-1 text-xs font-semibold text-zinc-500">{Number(date.slice(-2))}</div>
                 <div className="relative z-20"><HolidayText date={date} /></div>
               </div>
@@ -4159,7 +4173,7 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
   const secondaryName = [school.secondaryContactFirst, school.secondaryContactLast].filter(Boolean).join(' ');
 
   return (
-    <section className="flex h-[calc(100vh-7.5rem)] min-h-[560px] flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/90 shadow-sm">
+    <section className="flex h-[calc(100dvh-4.75rem)] min-h-[520px] max-w-full flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/90 shadow-sm">
       <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 px-3 py-2.5 backdrop-blur">
         <button type="button" onClick={onBack} className="mb-2 inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-cream/80 px-3 py-1.5 text-xs font-black text-zinc-700">
           <ChevronLeft size={14} /> Back to Schools
@@ -4582,6 +4596,10 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   const [message, setMessage] = useState('');
   const [mobileSchoolOpen, setMobileSchoolOpen] = useState(false);
 
+  useEffect(() => {
+    if (selectedName) setMobileSchoolOpen(true);
+  }, [selectedName]);
+
   const mergedSourcesByTarget = useMemo(() => {
     const map = {};
     (schools || []).forEach((school) => {
@@ -4717,7 +4735,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   };
 
   return (
-    <div className="space-y-3">
+    <div className="max-w-full overflow-x-hidden space-y-3">
       {(schoolsMessage || message) ? (
         <div className="rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 text-sm text-zinc-700 shadow-sm">
           {schoolsMessage ? <div>{schoolsMessage}</div> : null}
@@ -4734,11 +4752,10 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
             onMerge={canMergeSchools ? setMergingSchool : null}
           />
         ) : (
-          <section className="flex h-[calc(100vh-7.5rem)] min-h-[560px] flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/90 p-3 shadow-sm">
+          <section className="flex h-[calc(100dvh-4.75rem)] min-h-[520px] max-w-full flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/90 p-3 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-black text-zinc-950">School List</h2>
-                <p className="mt-0.5 text-xs font-semibold text-zinc-500">Search, tap a school, then use the field-friendly detail page.</p>
+                <h2 className="text-base font-black text-zinc-950">Schools</h2>
               </div>
               <div className="flex items-center gap-2">
                 {canEditSchools ? (
@@ -5058,13 +5075,13 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
           <h2 className="text-lg font-semibold text-zinc-950">Calendar View</h2>
           <p className="mt-1 text-sm text-zinc-600">Switch between month, week, and day layouts while staying on one clean calendar page.</p>
         </div>
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+        <div className="flex flex-row items-center justify-between gap-2 sm:flex-col sm:items-end">
           <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:inline-flex sm:w-auto">
             {['Month', 'Week', 'Day'].map(mode => (
               <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}>{mode}</button>
             ))}
           </div>
-          {canEdit ? <button type="button" onClick={() => onAddEvent?.()} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add Event</button> : null}
+          {canEdit ? <button type="button" onClick={() => onAddEvent?.()} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:gap-2 sm:rounded-2xl sm:px-4 sm:text-sm"><Plus size={14} className="sm:hidden" /><Plus size={16} className="hidden sm:block" /> <span className="sm:inline">Add</span><span className="hidden sm:inline"> Event</span></button> : null}
         </div>
       </div>
       <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} showKey />
@@ -5209,6 +5226,10 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [mobileSchoolOpen, setMobileSchoolOpen] = useState(false);
+
+  useEffect(() => {
+    if (selectedName) setMobileSchoolOpen(true);
+  }, [selectedName]);
   const [directoryQuery, setDirectoryQuery] = useState('');
 
   const activeStaffMembers = useMemo(() => {
@@ -5373,7 +5394,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
         <Pill className="border-zinc-200 bg-white text-zinc-600">{recentEvents.length} recent</Pill>
       </div>
 
-      <div className="mt-4 max-h-[504px] space-y-2 overflow-y-auto pr-1">
+      <div className="mt-4 space-y-2 md:max-h-[504px] md:overflow-y-auto md:pr-1">
         {recentEvents.length ? recentEvents.map(event => (
           <button key={event.supabaseId || event.id} type="button" onClick={() => onClick?.(event)} className="block w-full rounded-2xl border border-zinc-200 bg-cream/75 p-3 text-left transition hover:bg-white hover:shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -5427,7 +5448,7 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
         <Pill className="border-zinc-200 bg-white text-zinc-600">{modifiedEvents.length} modified</Pill>
       </div>
 
-      <div className="mt-4 max-h-[504px] space-y-2 overflow-y-auto pr-1">
+      <div className="mt-4 space-y-2 md:max-h-[504px] md:overflow-y-auto md:pr-1">
         {modifiedEvents.length ? modifiedEvents.map(event => {
           const edited = getEventLastEditedMeta(event);
           const editedAt = edited?.editedAt || event.updatedAt;
@@ -5831,6 +5852,27 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
   const [manualSchoolSelections, setManualSchoolSelections] = useState({});
   const [linkingEventId, setLinkingEventId] = useState('');
   const [unlinkedMessage, setUnlinkedMessage] = useState('');
+  const [skippedUnlinkedEventIds, setSkippedUnlinkedEventIds] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(window.localStorage.getItem('schedulerSkippedUnlinkedEventIds') || '[]'); } catch { return []; }
+  });
+
+  const skipUnlinkedEvent = (event) => {
+    const id = event?.supabaseId || event?.id;
+    if (!id) return;
+    setSkippedUnlinkedEventIds(prev => {
+      const next = Array.from(new Set([...(prev || []), id]));
+      if (typeof window !== 'undefined') window.localStorage.setItem('schedulerSkippedUnlinkedEventIds', JSON.stringify(next));
+      return next;
+    });
+    setUnlinkedMessage(`Skipped ${event.title}. It will stay unlinked and hidden from this repair list on this browser.`);
+  };
+
+  const restoreSkippedUnlinkedEvents = () => {
+    setSkippedUnlinkedEventIds([]);
+    if (typeof window !== 'undefined') window.localStorage.removeItem('schedulerSkippedUnlinkedEventIds');
+    setUnlinkedMessage('Skipped unlinked events are showing again.');
+  };
 
   const activeStaffMembers = useMemo(() => groupStaffMembers(staffMembers?.length ? staffMembers : builtInStaffMembers()), [staffMembers]);
 
@@ -5841,6 +5883,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
     const seen = new Set();
     return (unlinked || [])
       .filter(event => event && event.supabaseId && event.active !== false)
+      .filter(event => !skippedUnlinkedEventIds.includes(event.supabaseId || event.id))
       .filter(event => {
         if (!search) return true;
         const text = [event.title, event.canonicalSchool, event.type, event.date].filter(Boolean).join(' ').toLowerCase();
@@ -5858,7 +5901,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
       })
       .sort((a, b) => String(b.event.date || '').localeCompare(String(a.event.date || '')) || String(a.event.title || '').localeCompare(String(b.event.title || '')))
       .slice(0, 75);
-  }, [unlinked, activeVisibleSchools, unlinkedSearch]);
+  }, [unlinked, activeVisibleSchools, unlinkedSearch, skippedUnlinkedEventIds]);
 
   const linkUnlinkedEventToSchool = async (event, schoolId) => {
     const selectedSchool = activeVisibleSchools.find(school => school.id === schoolId);
@@ -6291,7 +6334,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h3 className="font-semibold text-zinc-950">Unlinked Events</h3>
+            <h3 className="font-semibold text-zinc-950">Unlinked Events</h3>{skippedUnlinkedEventIds.length ? <button type="button" onClick={restoreSkippedUnlinkedEvents} className="mt-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-600">Show skipped ({skippedUnlinkedEventIds.length})</button> : null}
             <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">Admin-only repair tool for events that do not have a true School List link yet. Suggestions use name matching; linking only updates the selected event record.</p>
           </div>
           <input value={unlinkedSearch} onChange={event => setUnlinkedSearch(event.target.value)} placeholder="Search unlinked events..." className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] md:w-72" />
@@ -6317,7 +6360,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
                           {activeVisibleSchools.map(school => <option key={school.id || school.name} value={school.id}>{school.name}</option>)}
                         </select>
                       </td>
-                      <td className="px-3 py-2 text-right"><button type="button" disabled={!selectedSchoolId || linkingEventId === event.supabaseId} onClick={() => linkUnlinkedEventToSchool(event, selectedSchoolId)} className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-zinc-800 disabled:bg-zinc-300">{linkingEventId === event.supabaseId ? 'Linking...' : 'Link Event'}</button></td>
+                      <td className="px-3 py-2 text-right"><div className="flex flex-col items-end gap-1.5"><button type="button" disabled={!selectedSchoolId || linkingEventId === event.supabaseId} onClick={() => linkUnlinkedEventToSchool(event, selectedSchoolId)} className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-zinc-800 disabled:bg-zinc-300">{linkingEventId === event.supabaseId ? 'Linking...' : 'Link Event'}</button><button type="button" onClick={() => skipUnlinkedEvent(event)} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-600 hover:bg-zinc-50">Skip</button></div></td>
                     </tr>
                   );
                 }) : <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-zinc-500">No unlinked events match this search.</td></tr>}
