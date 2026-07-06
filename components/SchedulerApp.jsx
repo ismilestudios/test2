@@ -716,7 +716,10 @@ function getScheduleLiveAssignmentForDate(event = {}, date = '') {
 
 function getScheduleLivePhotographersForDate(event = {}, date = '') {
   if (date && isMultiDayScheduleEvent(event)) {
-    return uniqueCanonicalPhotographers(getScheduleLiveAssignmentForDate(event, date).photographers || []);
+    const assignment = getScheduleLiveAssignmentForDate(event, date);
+    const dayPhotographers = Array.isArray(assignment.photographers) ? assignment.photographers : [];
+    const fallbackPhotographers = Array.isArray(event.photographers) ? event.photographers : [];
+    return uniqueCanonicalPhotographers(dayPhotographers.length ? dayPhotographers : fallbackPhotographers);
   }
   return uniqueCanonicalPhotographers(event.photographers || []);
 }
@@ -724,7 +727,9 @@ function getScheduleLivePhotographersForDate(event = {}, date = '') {
 function getScheduleLiveAssistantsForDate(event = {}, date = '') {
   if (date && isMultiDayScheduleEvent(event)) {
     const assignment = getScheduleLiveAssignmentForDate(event, date);
-    return Array.isArray(assignment.assistants) ? assignment.assistants.filter(Boolean) : [];
+    const dayAssistants = Array.isArray(assignment.assistants) ? assignment.assistants.filter(Boolean) : [];
+    const fallbackAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
+    return dayAssistants.length ? dayAssistants : fallbackAssistants;
   }
   return Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
 }
@@ -801,7 +806,7 @@ function getMultiDayPhotographerDisplay(event = {}) {
   const daily = dates.map(date => ({ date, names: getScheduleLivePhotographersForDate(event, date).filter(Boolean) }));
   const firstNames = daily[0]?.names || [];
   const sameEveryDay = daily.every(item => item.names.length === firstNames.length && item.names.every((name, index) => name === firstNames[index]));
-  if (sameEveryDay && firstNames.length) return `${firstNames.join(', ')} — all days`;
+  if (sameEveryDay && firstNames.length) return `${firstNames.join(', ')} — All Days`;
   const filled = daily.filter(item => item.names.length);
   if (filled.length) return filled.map(item => `${shortDate(item.date)}: ${item.names.join(', ')}`).join(' · ');
   const status = getMultiDayMainStaffingStatus(event);
@@ -1426,7 +1431,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
               <h2 className="text-sm font-semibold text-zinc-800">{column.title}</h2>
               <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
             </div>
-            <div className="space-y-2 md:max-h-[430px] md:overflow-y-auto md:pr-1">{columnEvents.map(event => {
+            <div className="space-y-2 max-h-[360px] overflow-y-auto overscroll-contain pr-1 md:max-h-[430px]">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
               return <EventCard key={event.id} event={event} onClick={onClick} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
             })}</div>
@@ -4017,16 +4022,19 @@ function EditSchoolModal({ school, onClose, onSave }) {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-4 backdrop-blur-sm" onClick={onClose}>
-      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="mx-auto mt-2 max-h-[95vh] max-w-2xl overflow-auto rounded-[2rem] bg-cream p-4 shadow-2xl sm:mt-6 sm:p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-zinc-950">Edit School</h2>
-            <p className="mt-1 text-sm text-zinc-600">Edits save to Supabase. School Notes should remain attached to this school record.</p>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-stretch justify-center bg-zinc-950/25 p-2 backdrop-blur-sm sm:block sm:p-4" onClick={onClose}>
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="flex h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:mx-auto sm:mt-6 sm:h-auto sm:max-h-[95vh] sm:rounded-[2rem]">
+        <div className="shrink-0 border-b border-zinc-200 bg-cream px-4 py-3 sm:px-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-black leading-tight text-zinc-950 sm:text-xl sm:font-semibold">Edit School</h2>
+              <p className="mt-1 text-xs leading-5 text-zinc-600 sm:text-sm">Edits save to Supabase. School Notes should remain attached to this school record.</p>
+            </div>
+            <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
           </div>
-          <button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button>
         </div>
-        <div className="mt-5 grid gap-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <div className="grid gap-4">
           <label className="text-sm font-medium text-zinc-700">School Name
             <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E]" />
           </label>
@@ -4098,11 +4106,14 @@ function EditSchoolModal({ school, onClose, onSave }) {
               <span className="mt-1 block text-xs leading-5 text-zinc-500">Hide this school from Carrie View’s Fall 2026 To Be Scheduled list. This is reversible.</span>
             </span>
           </label>
+          </div>
         </div>
-        {saveStatus ? <div className="mt-4 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/50 px-3 py-2 text-sm font-semibold text-zinc-800">{saveStatus}</div> : null}
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={saving} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
-          <button type="button" onClick={handleSave} disabled={saving} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : 'Save Changes'}</button>
+        <div className="shrink-0 border-t border-zinc-200 bg-cream/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-5">
+          {saveStatus ? <div className="mb-3 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/50 px-3 py-2 text-sm font-semibold text-zinc-800">{saveStatus}</div> : null}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={onClose} disabled={saving} className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+            <button type="button" onClick={handleSave} disabled={saving} className="rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving…' : 'Save Changes'}</button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
