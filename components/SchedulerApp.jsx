@@ -3778,7 +3778,11 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
       return;
     }
 
-    const row = schoolToSupabaseRow(schoolValues);
+    const previousSchool = (schoolsList || []).find(school =>
+      (schoolValues?.id && school.id === schoolValues.id) ||
+      (school.originalName || school.name) === (schoolValues.originalName || schoolValues.name)
+    ) || {};
+    const row = schoolValues?.id ? buildSafeSchoolUpdateRow(previousSchool, schoolValues) : schoolToSupabaseRow(schoolValues);
     const result = await runSchoolMutationWithColumnFallback(
       async (payload) => schoolValues?.id
         ? await supabase.from('schools').update(payload).eq('id', schoolValues.id).select().single()
@@ -4370,6 +4374,58 @@ function schoolToSupabaseRow(school = {}) {
   };
 }
 
+const SCHOOL_DATA_FIELDS = [
+  'district', 'irm', 'address', 'city', 'state', 'zip', 'state_zip', 'notes', 'school_notes_attribution',
+  'contact_first', 'contact_last', 'contact_phone', 'contact_email', 'contact_title',
+  'secondary_contact_first', 'secondary_contact_last', 'secondary_contact_email', 'secondary_contact_title',
+  'reference_images', 'no_fall_scheduling_fall_2026'
+];
+
+function isMeaningfullyBlankSchoolValue(value) {
+  if (value === undefined || value === null) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  return typeof value === 'string' && value.trim() === '';
+}
+
+function buildSafeSchoolUpdateRow(previousSchool = {}, nextSchool = {}, options = {}) {
+  const previousRow = schoolToSupabaseRow(previousSchool || {});
+  const nextRow = schoolToSupabaseRow({ ...(previousSchool || {}), ...(nextSchool || {}) });
+  const payload = { updated_at: new Date().toISOString() };
+
+  // Existing School List rows are canonical. Never let old event-derived/built-in
+  // data, incomplete modal state, or a fallback school object blank out a field
+  // that already has real Supabase data. Users can still replace a field with a
+  // new value; this only blocks accidental blank/null regressions.
+  if (options.includeIdentity !== false) {
+    payload.original_name = previousRow.original_name || nextRow.original_name;
+    payload.name = nextRow.name || previousRow.name;
+  }
+
+  SCHOOL_DATA_FIELDS.forEach((field) => {
+    const nextValue = nextRow[field];
+    const previousValue = previousRow[field];
+    if (isMeaningfullyBlankSchoolValue(nextValue) && !isMeaningfullyBlankSchoolValue(previousValue)) {
+      payload[field] = previousValue;
+    } else {
+      payload[field] = nextValue;
+    }
+  });
+
+  // Merge/active status is intentionally protected. Normal edits should preserve
+  // it; merge operations update it through buildSchoolMergeRow below.
+  payload.merged_into = previousRow.merged_into || null;
+  payload.active = previousRow.active !== false;
+  return payload;
+}
+
+function buildSchoolMergeRow(sourceSchool = {}, targetOriginalName = '') {
+  return {
+    merged_into: targetOriginalName,
+    active: false,
+    updated_at: new Date().toISOString()
+  };
+}
+
 function supabaseRowToSchool(row = {}) {
   return {
     id: row.id,
@@ -4420,23 +4476,35 @@ function schoolSortTimestamp(school = {}) {
   return Number.isFinite(value) ? value : 0;
 }
 
+function chooseCanonicalLoadedSchool(current, candidate) {
+  if (!current) return candidate;
+  const candidateMerged = Boolean(candidate?.mergedInto) || candidate?.active === false;
+  const currentMerged = Boolean(current?.mergedInto) || current?.active === false;
+
+  // If duplicate school rows exist for the same original_name, a merged/inactive
+  // row must win. Otherwise an older active duplicate can make a merged school
+  // appear to “unmerge” after a reload.
+  if (candidateMerged !== currentMerged) return candidateMerged ? candidate : current;
+
+  const candidateTime = schoolSortTimestamp(candidate);
+  const currentTime = schoolSortTimestamp(current);
+  if (candidateTime !== currentTime) return candidateTime > currentTime ? candidate : current;
+
+  const candidateScore = getSchoolCompletenessScore(candidate);
+  const currentScore = getSchoolCompletenessScore(current);
+  return candidateScore >= currentScore ? candidate : current;
+}
+
 function dedupeLoadedSchools(rows = []) {
   const byKey = new Map();
   (rows || []).map(supabaseRowToSchool).forEach((school) => {
-    const key = normalizeSchoolMatchKey(school.originalName || school.name);
+    const keys = Array.from(new Set([
+      school.id ? `id:${school.id}` : '',
+      `original:${normalizeSchoolMatchKey(school.originalName || school.name)}`
+    ].filter(Boolean)));
+    const key = keys.find(item => item.startsWith('original:')) || keys[0];
     if (!key) return;
-    const current = byKey.get(key);
-    if (!current) {
-      byKey.set(key, school);
-      return;
-    }
-    const schoolTime = schoolSortTimestamp(school);
-    const currentTime = schoolSortTimestamp(current);
-    const schoolScore = getSchoolCompletenessScore(school);
-    const currentScore = getSchoolCompletenessScore(current);
-    if (schoolTime > currentTime || (schoolTime === currentTime && schoolScore >= currentScore)) {
-      byKey.set(key, school);
-    }
+    byKey.set(key, chooseCanonicalLoadedSchool(byKey.get(key), school));
   });
   return Array.from(byKey.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -4522,7 +4590,7 @@ function normalizeImportedCanonicalSchool(row = {}) {
     ['rosendale', 'Rosendale Elementary School (Niskayuna School District)'], ['craig', 'Craig Elementary School (Niskayuna School District)'], ['glencliff', 'Glencliff Elementary School (Niskayuna School District)'],
     ['skano', 'Skano Elementary School (Shenendehowa School District)'], ['arongen', 'Arongen Elementary School (Shenendehowa School District)'], ['karigon', 'Karigon Elementary School (Shenendehowa School District)'], ['okte', 'Okte Elementary School (Shenendehowa School District)'], ['shatekon', 'Shatekon Elementary School (Shenendehowa School District)'], ['tesago', 'Tesago Elementary School (Shenendehowa School District)'], ['chango', 'Chango Elementary School (Shenendehowa School District)'],
     ['jefferson', 'Jefferson Elementary School (Schalmont School District)'], ['waterford halfmoon elementary', 'Waterford Halfmoon Elem'], ['waterford halfmoon ms', 'Waterford MS/HS'], ['waterford halfmoon', 'Waterford MS/HS'],
-    ['duanesburg elementary', "D'burg Elementary"], ['duanesburg ms', "D'burg MS/HS"], ['green tech', 'Green Tech MS/HS'], ['hoosic valley ms', 'Hoosic Valley MS/HS'], ['hoosic ms', 'Hoosic Valley MS/HS'], ['hudson valley consortium', 'Hudson Valley Consortium'],
+    ['duanesburg elementary', 'Duanesburg Elementary'], ['duanesburg ms', 'Duanesburg MS/HS'], ['green tech', 'Green Tech MS/HS'], ['hoosic valley ms', 'Hoosic Valley MS/HS'], ['hoosic ms', 'Hoosic Valley MS/HS'], ['hudson valley consortium', 'Hudson Valley Consortium'],
     ['albany academy', 'The Academies (AA/G)'], ['academy', 'The Academies (AA/G)'], ['northville', 'Northville'], ['loudonville christian', 'Loudonville Christian'], ['little achiever', 'Little Achievers'], ['pooh', 'Poohs Corner'], ['heatly', 'Heatly School'], ['learning garden latham', 'Learning Garden Latham'], ['learning garden slingerlands', 'Learning Garden Slingerlands'], ['wildwood', 'Wildwood']
   ];
   const found = aliasPairs.find(([needle]) => lower.includes(needle));
@@ -4670,7 +4738,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       notes: newNote ? appendPlainSchoolNote(previous.notes || cleanValues.notes || '', authEmail, newNote) : (cleanValues.notes ?? previous.notes ?? ''),
       noteAttribution: newNote ? appendNoteHistory(previous.noteAttribution || cleanValues.noteAttribution, authEmail, newNote) : (previous.noteAttribution || cleanValues.noteAttribution || null)
     };
-    const row = schoolToSupabaseRow(nextSchool);
+    const row = buildSafeSchoolUpdateRow(previous, nextSchool);
 
     // Save School List edits back to the exact Supabase row when an id exists.
     // This is intentionally id-first so renamed schools keep updating the same
@@ -4724,7 +4792,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       return;
     }
 
-    const mergePayload = { merged_into: targetOriginalName, active: false, updated_at: new Date().toISOString() };
+    const mergePayload = buildSchoolMergeRow(source, targetOriginalName);
     const { data, error, removedColumns } = await runSchoolMutationWithColumnFallback(
       async (payload) => source.id
         ? await supabase.from('schools').update(payload).eq('id', source.id).select().single()
