@@ -4907,8 +4907,9 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
 
   const today = todayKey();
   const allActiveEvents = useMemo(() => (events || []).filter(event => event?.active !== false), [events]);
-  const productionEvents = useMemo(() => allActiveEvents
-    .filter(event => event.type !== 'Call or Meeting' && event.type !== 'Edit Day'), [allActiveEvents]);
+  // Mobile View should mirror Overview WWPT and Staff Schedule coverage: all active event types
+  // (including Call or Meeting / Edit Day) are eligible to appear when dated/assigned.
+  const productionEvents = useMemo(() => allActiveEvents, [allActiveEvents]);
 
   const todayEvents = productionEvents
     .filter(event => isDateInEventRange(event, today))
