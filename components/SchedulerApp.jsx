@@ -4673,6 +4673,11 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   const [mergingSchool, setMergingSchool] = useState(null);
   const [addingSchool, setAddingSchool] = useState(false);
   const [message, setMessage] = useState('');
+  const [mobileSchoolOpen, setMobileSchoolOpen] = useState(false);
+
+  useEffect(() => {
+    if (selectedName) setMobileSchoolOpen(true);
+  }, [selectedName]);
 
   const mergedSourcesByTarget = useMemo(() => {
     const map = {};
