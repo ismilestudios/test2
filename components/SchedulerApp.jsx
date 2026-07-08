@@ -4673,11 +4673,6 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   const [mergingSchool, setMergingSchool] = useState(null);
   const [addingSchool, setAddingSchool] = useState(false);
   const [message, setMessage] = useState('');
-  const [mobileSchoolOpen, setMobileSchoolOpen] = useState(false);
-
-  useEffect(() => {
-    if (selectedName) setMobileSchoolOpen(true);
-  }, [selectedName]);
 
   const mergedSourcesByTarget = useMemo(() => {
     const map = {};
@@ -5305,11 +5300,6 @@ function TeamMembers({ photographers, assistants, staffMembers = [], setPhotogra
   const [assistantInput, setAssistantInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-  const [mobileSchoolOpen, setMobileSchoolOpen] = useState(false);
-
-  useEffect(() => {
-    if (selectedName) setMobileSchoolOpen(true);
-  }, [selectedName]);
   const [directoryQuery, setDirectoryQuery] = useState('');
 
   const activeStaffMembers = useMemo(() => {
