@@ -2891,8 +2891,16 @@ function getPictureDayInfoHistory(history = []) {
 }
 
 function isCarrieFall2026ScheduledEvent(event) {
-  if (!event || event.removed) return false;
-  if (!event.date || event.date < '2026-09-01' || event.date > '2026-11-30') return false;
+  if (!event || event.removed || event.active === false) return false;
+
+  // Carrie's Fall booking workspace intentionally covers the full operational
+  // season shown in Date Availability: August through December. Previously this
+  // check only recognized September-November, so valid August/December events
+  // (especially Seniors) stayed incorrectly in To Be Scheduled.
+  const eventStart = String(event.date || '');
+  const eventEnd = String(event.endDate || event.date || '');
+  if (!eventStart || eventStart > '2026-12-31' || eventEnd < '2026-08-01') return false;
+
   const internalOnlyTypes = new Set(['Call or Meeting', 'Time Off', 'Personal Appointment', 'Edit Day', 'Rain Date']);
   return !internalOnlyTypes.has(event.type);
 }
@@ -5066,6 +5074,8 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   const [selectedStaff, setSelectedStaff] = useState('Stephanie');
   const [viewMode, setViewMode] = useState('Day');
   const [plainViewMode, setPlainViewMode] = useState('Week');
+  const [plainViewCopied, setPlainViewCopied] = useState(false);
+  const plainViewCopyRef = useRef(null);
 
   const today = todayKey();
   const allActiveEvents = useMemo(() => (events || []).filter(event => event?.active !== false), [events]);
@@ -5138,6 +5148,21 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   }, [sortedPlainViewEvents]);
 
   const plainViewLabel = plainViewMode === 'Month' ? monthLabel(monthKey(selectedDate)) : plainViewMode === 'Week' ? `${shortDate(weekBounds(selectedDate).start)} – ${shortDate(weekBounds(selectedDate).end)}` : formatDate(selectedDate);
+
+  const copyPlainView = async () => {
+    const text = plainViewCopyRef.current?.innerText || '';
+    if (!text.trim()) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setPlainViewCopied(true);
+      window.setTimeout(() => setPlainViewCopied(false), 1600);
+    } catch (error) {
+      // Preserve normal highlight/copy as the fallback when clipboard access is
+      // unavailable (for example, browser permission restrictions).
+      setPlainViewCopied(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-md space-y-3 sm:max-w-2xl">
       <section className="rounded-[1.5rem] border border-[#AEBB9E] bg-[#DDE8D2]/55 p-3 shadow-sm sm:rounded-[2rem] sm:p-4">
@@ -5196,7 +5221,10 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
             <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Plain View</div>
             <div className="mt-1 text-sm font-semibold text-zinc-600">Spreadsheet-style production schedule.</div>
           </div>
-          <div className="rounded-full border border-zinc-200 bg-cream/80 px-2.5 py-1 text-[11px] font-black text-zinc-500">{sortedPlainViewEvents.length}</div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={copyPlainView} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-black text-zinc-600 transition hover:bg-zinc-50">{plainViewCopied ? 'Copied' : 'Copy Schedule'}</button>
+            <div className="rounded-full border border-zinc-200 bg-cream/80 px-2.5 py-1 text-[11px] font-black text-zinc-500">{sortedPlainViewEvents.length}</div>
+          </div>
         </div>
 
         <div className="mt-3 grid grid-cols-3 rounded-2xl border border-zinc-200 bg-cream/80 p-1">
@@ -5209,7 +5237,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
           <button type="button" onClick={() => movePlainView(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-black">Next</button>
         </div>
 
-        <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+        <div ref={plainViewCopyRef} className="mt-3 select-text overflow-hidden rounded-2xl border border-zinc-200 bg-white">
           <div className="grid grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-200 bg-zinc-50 text-[10px] font-black uppercase tracking-wide text-zinc-500">
             <div className="px-2 py-2">Date</div>
             <div className="px-2 py-2">Event</div>
@@ -5225,14 +5253,14 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
                   const photogs = getScheduleLivePhotographersForDate(event, occurrenceDate).join(', ') || 'TBD';
                   const assistantsLabel = getScheduleLiveAssistantsForDate(event, occurrenceDate).join(', ') || '—';
                   return (
-                    <button key={event.id} type="button" onClick={() => onClick(event)} className="grid w-full grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45">
+                    <div key={`${event.id}-${occurrenceDate}`} role="button" tabIndex={0} onClick={() => onClick(event)} onKeyDown={(keyEvent) => { if (keyEvent.key === 'Enter' || keyEvent.key === ' ') onClick(event); }} className="grid w-full cursor-pointer select-text grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45">
                       <div className="px-2 py-1.5 font-semibold italic text-zinc-600">{shortDate(event.instanceDate || date || event.date)}</div>
                       <div className="min-w-0 px-2 py-1.5">
                         <div className="truncate font-black text-zinc-950">{event.title}</div>
                       </div>
                       <div className="px-2 py-1.5 font-semibold text-zinc-800">{photogs}</div>
                       <div className="px-2 py-1.5 font-semibold text-zinc-800">{assistantsLabel}</div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
