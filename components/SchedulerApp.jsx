@@ -927,24 +927,15 @@ function isTimeOffEvent(event = {}) {
 }
 
 function isNeedsPhotographerAssignment(event) {
-  if (isTimeOffEvent(event)) return false;
-  const status = String(event?.status || '').trim().toLowerCase();
+  if (!event || isTimeOffEvent(event)) return false;
+  const status = String(event.status || '').trim().toLowerCase();
   if (status === 'schedule live complete') return false;
-  const assignedCount = getAssignedPhotographerCount(event);
-  const requiredCount = getRequiredPhotographerCount(event);
-  const placeholderStatuses = new Set([
-    '',
-    'needs photographer assigned',
-    'needs photographers assigned',
-    'need photographer assigned',
-    'need photographers assigned',
-    'needs photographer(s) assigned',
-    'need photographer(s) assigned',
-    'unassigned',
-    'photographer unassigned'
-  ]);
 
-  return assignedCount < requiredCount || placeholderStatuses.has(status);
+  // Staffing data is authoritative. Older imported/status values can remain stale
+  // after photographers are assigned, especially for multi-day events. The
+  // Overview column must therefore evaluate the actual assignment for every day
+  // instead of using the parent event status as an additional reason to include it.
+  return !eventMeetsPerDayPhotographerRequirement(event);
 }
 
 
