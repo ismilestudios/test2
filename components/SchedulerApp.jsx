@@ -4803,7 +4803,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   const filtered = q ? activeSchools.filter(school => [school.name, school.notes, school.address, school.city, school.contactFirst, school.contactLast, school.contactEmail, school.secondaryContactFirst, school.secondaryContactLast, school.secondaryContactEmail, ...school.history.map(e => `${e.title} ${e.notes}`)].join(' ').toLowerCase().includes(q)) : activeSchools;
   const selected = activeSchools.find(school => school.name === selectedName || school.originalName === selectedName) || resolveSchoolListMatch(selectedName, activeSchools) || filtered[0] || null;
 
-  const saveSchool = async (originalName, values) => {
+  const saveSchool = async (originalName, values, options = {}) => {
     const supabase = createClient();
     if (!hasSupabaseEnv() || !supabase) {
       const msg = 'Supabase is not connected yet. School edits cannot be saved.';
@@ -4813,10 +4813,23 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     }
 
     try {
-      const previous = (schools || []).find(school =>
+      const isCreating = options.mode === 'create';
+      const requestedIdentityKey = normalizeSchoolMatchKey(values?.originalName || values?.name || originalName);
+      const existingSchool = (schools || []).find(school =>
         (values?.id && school.id === values.id) ||
-        (school.originalName || school.name) === originalName
-      ) || {};
+        normalizeSchoolMatchKey(school.originalName || school.name) === requestedIdentityKey
+      ) || null;
+
+      // Adding a school is deliberately separate from editing one. A create must
+      // never turn into an update/upsert of a similarly named canonical row.
+      if (isCreating && existingSchool) {
+        const msg = `A School List row named “${existingSchool.name || existingSchool.originalName}” already exists. No new row was created and the existing row was not changed.`;
+        setMessage(msg);
+        if (typeof window !== 'undefined') window.alert(msg);
+        return false;
+      }
+
+      const previous = isCreating ? {} : (existingSchool || {});
     const newNote = String(values.newNote || '').trim();
     const { newNote: _discardNewNote, ...cleanValues } = values;
     const nextSchool = {
@@ -4831,11 +4844,14 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     };
     const row = buildSafeSchoolUpdateRow(previous, nextSchool);
 
-    // Save School List edits back to the exact Supabase row when an id exists.
-    // This is intentionally id-first so renamed schools keep updating the same
-    // canonical row instead of creating a duplicate with the old imported name.
+    // Existing schools remain exact-ID updates. Brand-new schools use an
+    // insert-only path and must return a canonical Supabase row with its generated
+    // id. There is intentionally no name-based update and no upsert fallback.
     const result = await runSchoolMutationWithColumnFallback(
       async (payload) => {
+        if (isCreating) {
+          return await supabase.from('schools').insert(payload).select().single();
+        }
         if (!previous.id) {
           return { data: null, error: { message: 'Canonical School List row id is missing. Reload the School List before editing; no fallback upsert was attempted.' } };
         }
@@ -4856,6 +4872,20 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     }
 
     const savedSchool = supabaseRowToSchool(data);
+    if (!savedSchool.id) {
+      const msg = isCreating
+        ? 'Supabase did not return a canonical id for the new School List row. The row was not added to the local list; reload before trying again.'
+        : 'Supabase did not return the canonical School List row id after saving. Reload before editing again.';
+      setMessage(msg);
+      if (typeof window !== 'undefined') window.alert(msg);
+      return false;
+    }
+    if (isCreating && (savedSchool.active === false || savedSchool.mergedInto)) {
+      const msg = 'The new School List row was returned in an unexpected inactive or merged state. Reload the School List and review the row before continuing.';
+      setMessage(msg);
+      if (typeof window !== 'undefined') window.alert(msg);
+      return false;
+    }
     setSchools(prev => {
       const without = (prev || []).filter(school => {
         if (savedSchool.id && school.id) return school.id !== savedSchool.id;
@@ -4865,7 +4895,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     });
     setSelectedName(savedSchool.name || originalName);
     setEditingSchool(null);
-    setMessage(removedColumns?.length ? `School changes saved to Supabase. Skipped unavailable column${removedColumns.length === 1 ? '' : 's'}: ${removedColumns.join(', ')}.` : 'School changes saved to Supabase.');
+    setMessage(removedColumns?.length ? `${isCreating ? 'New school added' : 'School changes saved'} to Supabase. Skipped unavailable column${removedColumns.length === 1 ? '' : 's'}: ${removedColumns.join(', ')}.` : (isCreating ? 'New school added to Supabase and confirmed with a canonical row id.' : 'School changes saved to Supabase.'));
     return true;
     } catch (error) {
       const msg = `Could not save school: ${error?.message || 'Unknown error'}`;
@@ -5022,7 +5052,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       <AnimatePresence>
         {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
         {addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={async (schoolValues) => {
-          const saved = await saveSchool(schoolValues.originalName || schoolValues.name, schoolValues);
+          const saved = await saveSchool(schoolValues.originalName || schoolValues.name, schoolValues, { mode: 'create' });
           if (saved !== false) setAddingSchool(false);
         }} />}
         {mergingSchool && <MergeSchoolModal sourceSchool={mergingSchool} schools={activeSchools} onClose={() => setMergingSchool(null)} onMerge={mergeSchool} />}
