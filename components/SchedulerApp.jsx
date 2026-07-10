@@ -1696,7 +1696,12 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   const [commentText, setCommentText] = useState('');
   const [draggedPhotographer, setDraggedPhotographer] = useState('');
   const [selectedPhotographer, setSelectedPhotographer] = useState('');
+  const [operationalEvents, setOperationalEvents] = useState(() => events || []);
   const liveStateRef = useRef(liveState);
+
+  useEffect(() => {
+    setOperationalEvents(events || []);
+  }, [events]);
 
   useEffect(() => {
     liveStateRef.current = liveState;
@@ -1704,8 +1709,11 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
 
   const currentUserName = displayNameFromEmail(authEmail || '');
   const isHost = liveState.hostEmail && authEmail && liveState.hostEmail === authEmail;
-  const canHost = isAdminUser;
-  const canControlWeek = isHost || (!liveState.hostEmail && canHost);
+  // Schedule Live is a collaborative operational workspace. Admins and
+  // photographers receive the same in-room controls; broader Admin permissions
+  // elsewhere in the app remain unchanged.
+  const canHost = canEdit;
+  const canControlWeek = canEdit;
 
   const saveLiveState = async (updater) => {
     const baseState = liveStateRef.current || liveState;
@@ -1783,12 +1791,14 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
 
   const days = getScheduleLiveDays(liveState.weekStart, liveState.showWeekends);
   const weekEnd = days[days.length - 1];
-  const weekEvents = (events || []).filter(event => event && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && event.status !== SCHEDULE_LIVE_HOLD_STATUS);
-  const heldEvents = (events || []).filter(event => event && event.status === SCHEDULE_LIVE_HOLD_STATUS && monthKey(event.date) === monthKey(liveState.weekStart));
-  const weeklyRollouts = weekEvents.reduce((total, event) => total + getRolloutCount(event), 0);
+  const weekEvents = (operationalEvents || []).filter(event => event && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && event.status !== SCHEDULE_LIVE_HOLD_STATUS);
+  const heldEvents = (operationalEvents || []).filter(event => event && event.status === SCHEDULE_LIVE_HOLD_STATUS && monthKey(event.date) === monthKey(liveState.weekStart));
+  // Count each occurrence/day and use its actual per-day staffing assignment.
+  // This makes multi-day events and live assignment changes reflect immediately.
+  const weeklyRollouts = days.reduce((total, dateKey) => total + getRolloutCountForDate(weekEvents, dateKey), 0);
   const capacity = getCapacityTone(weeklyRollouts);
   const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
-  const progress = getScheduleLiveProgress(events, liveState.weekStart);
+  const progress = getScheduleLiveProgress(operationalEvents, liveState.weekStart);
   const activeUsers = Object.values(liveState.activeUsers || {})
     .filter(user => user?.seenAt && Date.now() - new Date(user.seenAt).getTime() < 120000)
     .sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -1800,6 +1810,21 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   weekEvents.forEach(event => uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
     countsByPhotographer[name] = (countsByPhotographer[name] || 0) + 1;
   }));
+
+  const saveEventOptimistically = async (previousEvent, nextEvent) => {
+    const matches = item => item && (item.supabaseId === previousEvent.supabaseId || item.id === previousEvent.id);
+    setOperationalEvents(prev => (prev || []).map(item => matches(item) ? nextEvent : item));
+    setStatusMessage('Saving Schedule Live change…');
+    const saved = await onSchedule(nextEvent);
+    if (!saved) {
+      setOperationalEvents(prev => (prev || []).map(item => matches(item) ? previousEvent : item));
+      setStatusMessage('That change could not be saved. It was rolled back—please check your login or permissions and try again.');
+      return false;
+    }
+    setOperationalEvents(prev => (prev || []).map(item => matches(item) ? saved : item));
+    setStatusMessage('Schedule Live change saved.');
+    return saved;
+  };
 
   const changeWeek = (delta) => {
     if (!canControlWeek) return;
@@ -1818,7 +1843,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
       const nextPhotographers = Array.from(new Set([...uniqueCanonicalPhotographers(event.photographers || []), cleanName]));
       nextEvent = { ...event, photographers: nextPhotographers };
     }
-    await onSchedule({ ...nextEvent, status: scheduleLiveDateMeetsPhotographerRequirement(nextEvent, occurrenceDate) ? 'Scheduled' : 'Needs Photographers Assigned' });
+    await saveEventOptimistically(event, { ...nextEvent, status: scheduleLiveDateMeetsPhotographerRequirement(nextEvent, occurrenceDate) ? 'Scheduled' : 'Needs Photographers Assigned' });
     setSelectedPhotographer('');
   };
 
@@ -1832,29 +1857,29 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
       const nextPhotographers = uniqueCanonicalPhotographers(event.photographers || []).filter(name => name !== canonicalPhotographerName(photographer));
       nextEvent = { ...event, photographers: nextPhotographers };
     }
-    await onSchedule({ ...nextEvent, status: scheduleLiveDateMeetsPhotographerRequirement(nextEvent, occurrenceDate) ? 'Scheduled' : 'Needs Photographers Assigned' });
+    await saveEventOptimistically(event, { ...nextEvent, status: scheduleLiveDateMeetsPhotographerRequirement(nextEvent, occurrenceDate) ? 'Scheduled' : 'Needs Photographers Assigned' });
   };
 
   const assignAssistant = async (event, assistant, occurrenceDate = '') => {
     if (!canEdit || !assistant) return;
     if (occurrenceDate && isMultiDayScheduleEvent(event)) {
       const nextAssistants = Array.from(new Set([...getScheduleLiveAssistantsForDate(event, occurrenceDate), assistant]));
-      await onSchedule(setScheduleLiveAssignmentForDate(event, occurrenceDate, { photographers: getScheduleLivePhotographersForDate(event, occurrenceDate), assistants: nextAssistants }));
+      await saveEventOptimistically(event, setScheduleLiveAssignmentForDate(event, occurrenceDate, { photographers: getScheduleLivePhotographersForDate(event, occurrenceDate), assistants: nextAssistants }));
       return;
     }
     const nextAssistants = Array.from(new Set([...(event.assistants || []).filter(Boolean), assistant]));
-    await onSchedule({ ...event, assistants: nextAssistants });
+    await saveEventOptimistically(event, { ...event, assistants: nextAssistants });
   };
 
   const removeAssistant = async (event, assistant, occurrenceDate = '') => {
     if (!canEdit) return;
     if (occurrenceDate && isMultiDayScheduleEvent(event)) {
       const nextAssistants = getScheduleLiveAssistantsForDate(event, occurrenceDate).filter(name => name !== assistant);
-      await onSchedule(setScheduleLiveAssignmentForDate(event, occurrenceDate, { photographers: getScheduleLivePhotographersForDate(event, occurrenceDate), assistants: nextAssistants }));
+      await saveEventOptimistically(event, setScheduleLiveAssignmentForDate(event, occurrenceDate, { photographers: getScheduleLivePhotographersForDate(event, occurrenceDate), assistants: nextAssistants }));
       return;
     }
     const nextAssistants = (event.assistants || []).filter(name => name !== assistant);
-    await onSchedule({ ...event, assistants: nextAssistants });
+    await saveEventOptimistically(event, { ...event, assistants: nextAssistants });
   };
 
   const updateRequirements = async (event, counts = {}) => {
@@ -1862,19 +1887,19 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
     const requiredPhotographers = Math.max(1, Math.min(6, Number(counts.requiredPhotographers ?? getRequiredPhotographerCount(event)) || 1));
     const requiredAssistants = Math.max(0, Math.min(6, Number(counts.requiredAssistants ?? getRequiredAssistantCount(event)) || 0));
     const nextEvent = { ...event, requiredPhotographers, requiredAssistants, noAssistant: requiredAssistants === 0 };
-    await onSchedule({ ...nextEvent, status: eventMeetsPerDayPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
+    await saveEventOptimistically(event, { ...nextEvent, status: eventMeetsPerDayPhotographerRequirement(nextEvent) ? 'Scheduled' : 'Needs Photographers Assigned' });
   };
 
   const toggleHold = async (event) => {
     if (!canEdit) return;
     const isHeld = event.status === SCHEDULE_LIVE_HOLD_STATUS;
-    await onSchedule({ ...event, status: isHeld ? (eventMeetsPerDayPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
+    await saveEventOptimistically(event, { ...event, status: isHeld ? (eventMeetsPerDayPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_HOLD_STATUS });
   };
 
   const toggleComplete = async (event) => {
     if (!canEdit) return;
     const isComplete = event.status === SCHEDULE_LIVE_COMPLETE_STATUS;
-    await onSchedule({ ...event, status: isComplete ? (eventMeetsPerDayPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_COMPLETE_STATUS });
+    await saveEventOptimistically(event, { ...event, status: isComplete ? (eventMeetsPerDayPhotographerRequirement(event) ? 'Scheduled' : 'Needs Photographers Assigned') : SCHEDULE_LIVE_COMPLETE_STATUS });
   };
 
   const addCommentary = async () => {
@@ -2116,7 +2141,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
                   </div>
                   <div className="space-y-2">
-                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={`${event.id}-${date}`} event={event} occurrenceDate={date} events={events} photographers={photographers} assistants={assistants} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onAssignAssistant={assignAssistant} onRemoveAssistant={removeAssistant} onToggleHold={toggleHold} onToggleComplete={toggleComplete} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
+                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={`${event.id}-${date}`} event={event} occurrenceDate={date} events={operationalEvents} photographers={photographers} assistants={assistants} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onAssignAssistant={assignAssistant} onRemoveAssistant={removeAssistant} onToggleHold={toggleHold} onToggleComplete={toggleComplete} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
                   </div>
                 </div>;
               })}
@@ -2441,10 +2466,18 @@ function getRolloutCount(event) {
   return Math.max(getAssignedPhotographerCount(event), getRequiredPhotographerCount(event));
 }
 
+function getRolloutCountForOccurrence(event = {}, dateKey = '') {
+  if (!isRolloutEvent(event) || !dateKey || !isDateInEventRange(event, dateKey)) return 0;
+  const assigned = isMultiDayScheduleEvent(event)
+    ? getScheduleLivePhotographersForDate(event, dateKey).length
+    : getAssignedPhotographerCount(event);
+  return Math.max(assigned, getRequiredPhotographerCount(event));
+}
+
 function getRolloutCountForDate(events = [], dateKey = todayKey()) {
   return events
     .filter(event => isDateInEventRange(event, dateKey))
-    .reduce((total, event) => total + getRolloutCount(event), 0);
+    .reduce((total, event) => total + getRolloutCountForOccurrence(event, dateKey), 0);
 }
 
 function getRolloutCountForDateRange(events = [], startKey, endKey, { weekdaysOnly = false } = {}) {
@@ -4552,6 +4585,11 @@ function normalizeImportedEventType(row = {}) {
   const title = String(row.title || '').toLowerCase();
   const date = String(row.date || '');
   const isGoogleImport = row.source === 'google_calendar_import';
+  // Once a user deliberately changes an imported event to one of the Scheduler's
+  // operational types, the saved event_type is authoritative. Do not let the
+  // historical Google-import title heuristics change it back during readback.
+  const authoritativeTypes = new Set(['Time Off', 'Personal Appointment', 'Edit Day', 'Call or Meeting']);
+  if (authoritativeTypes.has(rawType)) return rawType;
   if (!isGoogleImport) return rawType || 'Special Event';
   if (title.includes('rain date') || /\brain\b/.test(title)) return 'Rain Date';
   if (title.includes('makeup') || title.includes('make up') || title.includes('retake') || rawType === 'makeup/retake') return 'Makeup Day';
