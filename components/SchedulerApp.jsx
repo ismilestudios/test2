@@ -2941,7 +2941,7 @@ function getSchoolsToSchedule(events = EVENTS) {
 }
 
 function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
-  const allSchools = (schoolsList && schoolsList.length ? schoolsList : SCHOOLS).filter(Boolean);
+  const allSchools = (Array.isArray(schoolsList) ? schoolsList : []).filter(Boolean);
 
   const mergedSourcesByTarget = {};
   allSchools.forEach((school) => {
@@ -4580,7 +4580,7 @@ function dedupeLoadedSchools(rows = []) {
   return Array.from(byKey.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function runSchoolMutationWithColumnFallback(buildMutation, row, maxRetries = 6) {
+async function runSchoolMutationWithColumnFallback(buildMutation, row, maxRetries = 6, options = {}) {
   let payload = { ...(row || {}) };
   const removedColumns = [];
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -4591,6 +4591,13 @@ async function runSchoolMutationWithColumnFallback(buildMutation, row, maxRetrie
     const missingColumn = getMissingSupabaseColumn(result.error);
     if (!missingColumn || !(missingColumn in payload)) {
       return { ...result, removedColumns };
+    }
+    if ((options.protectedColumns || []).includes(missingColumn)) {
+      return {
+        ...result,
+        error: { ...result.error, message: `${result.error.message} This integrity-critical field was not removed from the save payload.` },
+        removedColumns
+      };
     }
     removedColumns.push(missingColumn);
     const { [missingColumn]: _discard, ...nextPayload } = payload;
@@ -4820,10 +4827,15 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     // This is intentionally id-first so renamed schools keep updating the same
     // canonical row instead of creating a duplicate with the old imported name.
     const result = await runSchoolMutationWithColumnFallback(
-      async (payload) => previous.id
-        ? await supabase.from('schools').update(payload).eq('id', previous.id).select().single()
-        : await supabase.from('schools').upsert(payload, { onConflict: 'original_name' }).select().single(),
-      row
+      async (payload) => {
+        if (!previous.id) {
+          return { data: null, error: { message: 'Canonical School List row id is missing. Reload the School List before editing; no fallback upsert was attempted.' } };
+        }
+        return await supabase.from('schools').update(payload).eq('id', previous.id).select().single();
+      },
+      row,
+      6,
+      { protectedColumns: ['original_name', 'name', 'notes', 'address', 'contact_first', 'contact_last', 'contact_email', 'merged_into', 'active'] }
     );
 
     const { data, error, removedColumns } = result;
@@ -4873,7 +4885,9 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       async (payload) => source.id
         ? await supabase.from('schools').update(payload).eq('id', source.id).select().single()
         : await supabase.from('schools').update(payload).eq('original_name', sourceOriginalName).select().single(),
-      mergePayload
+      mergePayload,
+      6,
+      { protectedColumns: ['merged_into', 'active'] }
     );
 
     if (error) {
@@ -4882,6 +4896,10 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
     }
 
     const savedSource = supabaseRowToSchool(data);
+    if (savedSource.active !== false || savedSource.mergedInto !== targetOriginalName) {
+      setMessage('Merge was not confirmed by Supabase. No local merge was applied. Please reload and try again.');
+      return;
+    }
     setSchools(prev => (prev || []).map(school => (school.originalName || school.name) === sourceOriginalName ? savedSource : school));
     const target = activeSchools.find(school => (school.originalName || school.name) === targetOriginalName);
     setSelectedName(target?.name || targetOriginalName);
@@ -6678,7 +6696,7 @@ export default function SchedulerApp() {
   const [addingEvent, setAddingEvent] = useState(false);
   const [addingEventDefaultDate, setAddingEventDefaultDate] = useState(todayKey());
   const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
-  const [schools, setSchools] = useState(SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
+  const [schools, setSchools] = useState([]);
   const [schoolsMessage, setSchoolsMessage] = useState('Loading schools from Supabase...');
   const [authReady, setAuthReady] = useState(false);
   const [authEmail, setAuthEmail] = useState(null);
@@ -6832,13 +6850,15 @@ export default function SchedulerApp() {
 
   const loadSchoolsFromSupabase = async () => {
     if (!hasSupabaseEnv()) {
-      setSchoolsMessage('Supabase is not connected yet. Using the built-in school list.');
+      setSchools([]);
+      setSchoolsMessage('Supabase is not connected. School List data is not being loaded; built-in historical data will not be substituted.');
       return;
     }
 
     const supabase = createClient();
     if (!supabase) {
-      setSchoolsMessage('Supabase client was not available. Using the built-in school list.');
+      setSchools([]);
+      setSchoolsMessage('Supabase client was not available. School List data is not being loaded; built-in historical data will not be substituted.');
       return;
     }
 
@@ -6849,32 +6869,24 @@ export default function SchedulerApp() {
 
     if (error) {
       console.warn('Could not load schools from Supabase', error);
-      setSchoolsMessage(`Could not load schools from Supabase: ${error.message}. Using the built-in list for now.`);
+      setSchoolsMessage(`Could not load schools from Supabase: ${error.message}. Existing in-memory School List data was preserved; no historical fallback was applied.`);
       return;
     }
 
     if (!data?.length) {
-      const seedRows = SCHOOLS.map(school => schoolToSupabaseRow({ ...school, originalName: school.name, active: true }));
-      const { data: seeded, error: seedError } = await supabase
-        .from('schools')
-        .upsert(seedRows, { onConflict: 'original_name' })
-        .select();
-
-      if (seedError) {
-        console.warn('Could not seed schools into Supabase', seedError);
-        setSchoolsMessage(`Supabase school table is empty, but seeding failed: ${seedError.message}. Run supabase/schools_migration.sql and refresh.`);
-        return;
-      }
-
-      const seededSchools = dedupeLoadedSchools(seeded || []);
-      setSchools(seededSchools.length ? seededSchools : SCHOOLS.map(school => ({ ...school, originalName: school.name, active: true })));
-      setSchoolsMessage('Seeded the starter School List into Supabase.');
+      // DATA-INTEGRITY GUARD: Never seed or upsert the built-in historical school
+      // list at runtime. An empty SELECT can be caused by auth/RLS timing or a
+      // temporary permissions problem; treating it as an empty table previously
+      // re-applied old names, blank contacts/notes, and active=true over canonical
+      // Supabase rows. Keep the UI empty and surface the problem instead.
+      setSchools([]);
+      setSchoolsMessage('CRITICAL: Supabase returned zero School List rows. Automatic starter-data seeding is disabled to protect saved names, merges, contacts, addresses, and notes. Refresh after confirming login/permissions.');
       return;
     }
 
     const loadedSchools = dedupeLoadedSchools(data || []);
     setSchools(loadedSchools);
-    setSchoolsMessage('School List is loading from Supabase.');
+    setSchoolsMessage(`Loaded ${loadedSchools.length} protected School List row${loadedSchools.length === 1 ? '' : 's'} from Supabase.`);
   };
 
   const loadTeamMembersFromSupabase = async () => {
