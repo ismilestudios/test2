@@ -799,18 +799,66 @@ function getMultiDayMainStaffingStatus(event = {}) {
   return parts.length ? parts.join(' · ') : 'Fully Staffed';
 }
 
+function getEventStaffingByDate(event = {}, role = 'photographers') {
+  const dates = getEventDateKeys(event);
+  const eventDates = dates.length ? dates : (event?.date ? [event.date] : []);
+  return eventDates.map(date => ({
+    date,
+    names: role === 'assistants'
+      ? getScheduleLiveAssistantsForDate(event, date).filter(Boolean)
+      : getScheduleLivePhotographersForDate(event, date).filter(Boolean)
+  }));
+}
+
+function sameStaffEveryDay(daily = []) {
+  if (!daily.length) return false;
+  const first = daily[0]?.names || [];
+  return daily.every(item => {
+    const names = item?.names || [];
+    return names.length === first.length && names.every((name, index) => name === first[index]);
+  });
+}
+
+function formatStaffingDisplay(event = {}, role = 'photographers') {
+  const daily = getEventStaffingByDate(event, role);
+  if (!daily.length) return role === 'assistants' ? '—' : 'TBD';
+
+  const multiDay = isMultiDayScheduleEvent(event);
+  const firstNames = daily[0]?.names || [];
+  if (multiDay && firstNames.length && sameStaffEveryDay(daily)) {
+    return `${firstNames.join(', ')} — All Days`;
+  }
+
+  if (multiDay) {
+    return daily
+      .map(item => `${shortDate(item.date)}: ${item.names.length ? item.names.join(', ') : (role === 'assistants' ? '—' : 'TBD')}`)
+      .join('\n');
+  }
+
+  return firstNames.length ? firstNames.join(', ') : (role === 'assistants' ? '—' : 'TBD');
+}
+
 function getMultiDayPhotographerDisplay(event = {}) {
   if (!isMultiDayScheduleEvent(event)) return null;
-  const dates = getEventDateKeys(event);
-  if (!dates.length) return null;
-  const daily = dates.map(date => ({ date, names: getScheduleLivePhotographersForDate(event, date).filter(Boolean) }));
-  const firstNames = daily[0]?.names || [];
-  const sameEveryDay = daily.every(item => item.names.length === firstNames.length && item.names.every((name, index) => name === firstNames[index]));
-  if (sameEveryDay && firstNames.length) return `${firstNames.join(', ')} — All Days`;
-  const filled = daily.filter(item => item.names.length);
-  if (filled.length) return filled.map(item => `${shortDate(item.date)}: ${item.names.join(', ')}`).join(' · ');
-  const status = getMultiDayMainStaffingStatus(event);
-  return status || '—';
+  return formatStaffingDisplay(event, 'photographers');
+}
+
+function findPhotographerMentionedInTitle(title = '', availablePhotographers = []) {
+  const cleanTitle = String(title || '').toLowerCase();
+  if (!cleanTitle) return '';
+  const candidates = uniqueCanonicalPhotographers(availablePhotographers || [])
+    .flatMap(name => {
+      const aliases = [name];
+      if (name === 'Stephanie') aliases.push('Steph');
+      return aliases.map(alias => ({ name, alias }));
+    })
+    .sort((a, b) => b.alias.length - a.alias.length);
+  const matches = candidates.filter(({ alias }) => {
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^a-z])${escaped.toLowerCase()}([^a-z]|$)`, 'i').test(cleanTitle);
+  });
+  const uniqueMatches = Array.from(new Set(matches.map(match => match.name)));
+  return uniqueMatches.length === 1 ? uniqueMatches[0] : '';
 }
 
 function getEventDateKeysInRange(event, start, end) {
@@ -866,12 +914,9 @@ function displayStatus(status) {
 }
 
 function displayPhotographerAssignment(event) {
-  if (isMultiDayScheduleEvent(event)) {
-    return getMultiDayPhotographerDisplay(event) || getMultiDayMainStaffingStatus(event) || '—';
-  }
-  const assigned = explicitCurrentPhotographerAssignments(event?.photographers || []);
-  if (isTimeOffEvent(event)) return assigned.length ? assigned.join(', ') : '—';
-  if (assigned.length) return assigned.join(', ');
+  const display = formatStaffingDisplay(event, 'photographers');
+  if (display !== 'TBD') return display;
+  if (isTimeOffEvent(event)) return '—';
   const required = Math.max(1, getRequiredPhotographerCount(event));
   return `Needs ${required} photographer${required === 1 ? '' : 's'} assigned`;
 }
@@ -936,15 +981,8 @@ function isRainWatchEvent(event = {}) {
 function displayAssistants(event) {
   if (isTimeOffEvent(event)) return '—';
   if (event?.noAssistant) return 'No Assistant';
-  if (isMultiDayScheduleEvent(event)) {
-    const summary = getMultiDayStaffingSummary(event);
-    if (!summary) return '—';
-    if (summary.incompleteAssistantDates.length) return `Needs Assistants (${summary.incompleteAssistantDates.length} of ${summary.totalDates} day${summary.totalDates === 1 ? '' : 's'} incomplete)`;
-    const required = getRequiredAssistantCount(event);
-    return required > 0 ? 'Assistants fully staffed' : '—';
-  }
-  const assigned = Array.isArray(event?.assistants) ? event.assistants.filter(Boolean) : [];
-  if (assigned.length) return assigned.join(', ');
+  const display = formatStaffingDisplay(event, 'assistants');
+  if (display !== '—' && !display.split('\n').every(line => line.endsWith(': —'))) return display;
   const required = Math.max(0, getRequiredAssistantCount(event));
   if (required > 0) return `Needs ${required} assistant${required === 1 ? '' : 's'} assigned`;
   return '—';
@@ -3362,14 +3400,23 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       return;
     }
     const cleanAssignmentDates = getEventDateKeys({ date, endDate: cleanEndDate || date });
+    const titleMatchedPhotographer = isInternalBlockingEvent
+      ? findPhotographerMentionedInTitle(cleanTitle, photographers)
+      : '';
     const cleanDayAssignments = isTwoDay ? cleanAssignmentDates.reduce((map, day) => {
       const current = dayAssignments?.[day] || {};
+      const currentPhotographers = uniqueCanonicalPhotographers(current.photographers || []);
       map[day] = {
-        photographers: uniqueCanonicalPhotographers(current.photographers || []),
+        photographers: currentPhotographers.length
+          ? currentPhotographers
+          : (titleMatchedPhotographer ? [titleMatchedPhotographer] : []),
         assistants: Array.isArray(current.assistants) ? current.assistants.filter(Boolean) : []
       };
       return map;
     }, {}) : {};
+    const cleanSelectedPhotographers = selectedPhotographers.length
+      ? selectedPhotographers
+      : (titleMatchedPhotographer ? [titleMatchedPhotographer] : []);
     const multiDayMeetsRequirement = isTwoDay ? cleanAssignmentDates.every(day => (cleanDayAssignments[day]?.photographers || []).length >= (Number(requiredPhotographers) || 1)) : false;
     const event = {
       id: isDuplicate ? `custom-${Date.now()}` : (initialEvent?.id || `custom-${Date.now()}`),
@@ -3381,7 +3428,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       schoolId: isInternalBlockingEvent ? null : (matchedSchool?.id || null),
       type: eventType,
       status: isInternalBlockingEvent ? 'Scheduled' : (isTwoDay ? (multiDayMeetsRequirement ? 'Scheduled' : 'Needs Photographers Assigned') : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned')),
-      photographers: isTwoDay ? [] : selectedPhotographers,
+      photographers: isTwoDay ? [] : cleanSelectedPhotographers,
       assistants: isTwoDay || isInternalBlockingEvent || noAssistant ? [] : selectedAssistants,
       scheduleLiveDayAssignments: isTwoDay ? cleanDayAssignments : {},
       requiredPhotographers: isInternalBlockingEvent ? 0 : (Number(requiredPhotographers) || 1),
@@ -5025,8 +5072,10 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
     const selected = String(selectedStaff || '').trim();
     const canonical = canonicalPhotographerName(selected);
     const assigned = productionEvents.filter(event => {
-      const photogMatch = uniqueCanonicalPhotographers(event.photographers || []).includes(canonical);
-      const assistantMatch = (event.assistants || []).map(name => String(name || '').trim()).includes(selected);
+      const staffing = getEventStaffingByDate(event, 'photographers');
+      const assistantStaffing = getEventStaffingByDate(event, 'assistants');
+      const photogMatch = staffing.some(day => uniqueCanonicalPhotographers(day.names || []).includes(canonical));
+      const assistantMatch = assistantStaffing.some(day => (day.names || []).map(name => String(name || '').trim()).includes(selected));
       return photogMatch || assistantMatch;
     });
     if (viewMode === 'Month') {
@@ -5163,8 +5212,9 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
               <div key={date}>
                 {plainViewMode !== 'Day' ? <div className="border-b border-zinc-100 bg-cream/80 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-zinc-500">{formatDate(date)}</div> : null}
                 {dayEvents.map(event => {
-                  const photogs = uniqueCanonicalPhotographers(event.photographers || []).join(', ') || 'TBD';
-                  const assistantsLabel = (event.assistants || []).filter(Boolean).join(', ') || '—';
+                  const occurrenceDate = event.instanceDate || date || event.date;
+                  const photogs = getScheduleLivePhotographersForDate(event, occurrenceDate).join(', ') || 'TBD';
+                  const assistantsLabel = getScheduleLiveAssistantsForDate(event, occurrenceDate).join(', ') || '—';
                   return (
                     <button key={event.id} type="button" onClick={() => onClick(event)} className="grid w-full grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45">
                       <div className="px-2 py-1.5 font-semibold italic text-zinc-600">{shortDate(event.instanceDate || date || event.date)}</div>
