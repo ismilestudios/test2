@@ -350,15 +350,8 @@ function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.', canEdit =
         const editedLabel = entry.editedAt ? `Edited by ${entry.editedName || displayNameFromEmail(entry.editedEmail || '')} • ${formatAttributionTime(entry.editedAt)} ${formatShortAttributionDate(entry.editedAt)}` : '';
         return (
           <div key={entry.id} className={isEditing ? 'rounded-2xl border border-[#AEBB9E] bg-white/80 p-3' : ''}>
-            <div className="flex items-center justify-between gap-3">
-              <AttributionPill attribution={entry} />
-              {canEdit && onEditNote ? (
-                <button type="button" onClick={() => { setEditingId(entry.id); setDraftText(entry.text); }} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-600 transition hover:bg-zinc-50">Edit</button>
-              ) : null}
-            </div>
-            {editedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{editedLabel}</div> : null}
             {isEditing ? (
-              <div className="mt-3 space-y-2">
+              <div className="space-y-2">
                 <textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} rows={4} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
                 <div className="flex justify-end gap-2">
                   <button type="button" onClick={() => { setEditingId(null); setDraftText(''); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button>
@@ -366,7 +359,18 @@ function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.', canEdit =
                 </div>
               </div>
             ) : (
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{entry.text}</div>
+              <>
+                <div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{entry.text}</div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <AttributionPill attribution={entry} />
+                    {editedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{editedLabel}</div> : null}
+                  </div>
+                  {canEdit && onEditNote ? (
+                    <button type="button" onClick={() => { setEditingId(entry.id); setDraftText(entry.text); }} className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-600 transition hover:bg-zinc-50">Edit</button>
+                  ) : null}
+                </div>
+              </>
             )}
           </div>
         );
@@ -1122,28 +1126,28 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
       onClick={() => (onAction ? onAction(event) : onClick(event))}
       className="w-full rounded-2xl border border-zinc-200/80 bg-white/85 p-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:p-3"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
+          <div className="text-sm font-semibold leading-5 text-zinc-900 sm:truncate">{event.title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-4 text-zinc-500 sm:text-xs">
             <span className="font-semibold text-zinc-600">{formatDate(event.date)}</span>
             <span>{getEventTimeLabel(event)}</span>
-            {event.canonicalSchool ? <span className="truncate">{event.canonicalSchool}</span> : null}
+            {event.canonicalSchool ? <span className="min-w-0 break-words sm:truncate">{event.canonicalSchool}</span> : null}
           </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
-          {getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}
+        <div className="flex flex-wrap items-center gap-1 sm:shrink-0 sm:flex-col sm:items-end">
+          <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} text-[10px] sm:text-xs`}>{event.type}</Pill>
+          {getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-[10px] text-amber-900 sm:text-xs">IRM {getEventIrm(event)}</Pill> : null}
         </div>
       </div>
       {!compact && (
-        <div className="mt-2 space-y-0.5 text-[11px] leading-4 text-zinc-600 sm:mt-3 sm:space-y-1 sm:text-xs">
+        <div className="mt-1.5 space-y-0.5 text-[10px] leading-4 text-zinc-600 sm:mt-3 sm:space-y-1 sm:text-xs">
           <div>Photographers Assigned: {displayPhotographerAssignment(event)}</div>
           <div>Assistants: {event.assistants.length ? event.assistants.join(', ') : '—'}</div>
         </div>
       )}
       {onAction && actionLabel ? (
-        <div className="mt-3 flex justify-end">
+        <div className="mt-2 flex justify-end sm:mt-3">
           <span className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2] px-3 py-1.5 text-xs font-bold text-zinc-900">{actionLabel}</span>
         </div>
       ) : null}
@@ -1480,22 +1484,22 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
   ];
 
   return (
-    <div className="space-y-2 sm:space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {canEdit ? (
         <div className="flex justify-end">
           <button type="button" onClick={onAddEvent} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add Event</button>
         </div>
       ) : null}
-      <div className="grid gap-2 sm:gap-4 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
       {overviewColumns.map(column => {
         const columnEvents = events.filter(column.filter);
         return (
-          <div key={column.key} className="rounded-3xl border border-zinc-200/80 bg-white/45 p-2 sm:p-3">
-            <div className="mb-1.5 flex items-center justify-between sm:mb-3">
-              <h2 className="text-sm font-semibold text-zinc-800">{column.title}</h2>
+          <div key={column.key} className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/45 p-2.5 sm:p-3">
+            <div className="mb-2 flex items-center justify-between gap-2 sm:mb-3">
+              <h2 className="min-w-0 text-[13px] font-semibold leading-4 text-zinc-800 sm:text-sm">{column.title}</h2>
               <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
             </div>
-            <div className="space-y-1.5 sm:space-y-2 md:max-h-[430px] md:overflow-y-auto md:overscroll-contain md:pr-1">{columnEvents.map(event => {
+            <div className="space-y-2 md:max-h-[430px] md:overflow-y-auto md:overscroll-contain md:pr-1">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
               return <EventCard key={event.id} event={event} onClick={onClick} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
             })}</div>
@@ -3924,8 +3928,8 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="-mx-1.5 space-y-4 sm:mx-0">
+      <div className="px-1.5 sm:px-0 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Carrie View</h2>
           <p className="mt-1 text-sm text-zinc-600">Scheduling workspace for schools, new events, and School List records.</p>
@@ -5354,7 +5358,7 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
           {canEdit ? <button type="button" onClick={() => onAddEvent?.()} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:gap-2 sm:rounded-2xl sm:px-4 sm:text-sm"><Plus size={14} className="sm:hidden" /><Plus size={16} className="hidden sm:block" /> <span className="sm:inline">Add</span><span className="hidden sm:inline"> Event</span></button> : null}
         </div>
       </div>
-      <CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} showKey />
+      <div className="px-1.5 sm:px-0"><CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} showKey /></div>
       {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={canEdit ? onAddEvent : null} />}
       {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} />}
       {viewMode === 'Day' && <DayView events={events} selectedDate={selectedDate} onClick={onClick} />}
@@ -5812,7 +5816,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
     if (saved) setEditingNotesOnly(false);
   };
 
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:block sm:space-y-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-2xl bg-zinc-900 px-3 py-2.5 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:w-full sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:w-full sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-2.5 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:px-4 sm:py-3">View {event.canonicalSchool} in School List →</button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</>}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:block sm:space-y-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:w-full sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:w-full sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-2.5 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:px-4 sm:py-3">View {event.canonicalSchool} in School List →</button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</>}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -7442,14 +7446,12 @@ export default function SchedulerApp() {
       `}</style>
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
       {initialLoading ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-cream/95 px-6 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-[2rem] border border-[#AEBB9E] bg-white/90 p-8 text-center shadow-2xl">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#DDE8D2] border-t-zinc-900" />
-            <div className="mt-5 text-xl font-black tracking-tight text-zinc-950">Please wait! Scheduler is loading :)</div>
-          </div>
+        <div className="mx-2 mt-2 flex items-center justify-center gap-2 rounded-2xl border border-[#AEBB9E] bg-white/90 px-4 py-2.5 text-center shadow-sm sm:mx-auto sm:max-w-7xl">
+          <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#DDE8D2] border-t-zinc-900" />
+          <div className="text-sm font-black tracking-tight text-zinc-950">Please wait! Scheduler is loading :)</div>
         </div>
       ) : null}
-      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-3 sm:space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : activeTab === 'Schedule Live!' ? 'px-1 sm:px-6' : 'px-2 sm:px-6'} pb-28 pt-3 sm:pb-6 sm:pt-6`}>
+      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-3 sm:space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : activeTab === 'Schedule Live!' ? 'px-1 sm:px-6' : 'px-2 sm:px-6'} ${activeTab === 'Overview' ? 'pb-36' : 'pb-28'} pt-3 sm:pb-6 sm:pt-6`}>
         <LoginRequiredNotice />
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         {activeTab === 'Overview' && !query.trim() ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
