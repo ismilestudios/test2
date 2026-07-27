@@ -6,7 +6,7 @@ import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoun
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
-import { SCHEDULER_VERSION } from '../lib/schedulerVersion';
+import { SCHEDULER_VERSION, SCHEDULER_LAST_UPDATED } from '../lib/schedulerVersion';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
 const WEEKLY_ROLLOUT_CAPACITY = 21;
@@ -248,6 +248,12 @@ function getNoteHistory(attribution) {
     }))
     .filter(entry => entry.text)
     .sort((a, b) => new Date(b.savedAt || b.date || 0).getTime() - new Date(a.savedAt || a.date || 0).getTime());
+}
+
+function getPictureDayNoteCount(event = {}) {
+  const attributedCount = getNoteHistory(event.noteAttribution).length;
+  const hasPlainImportedNote = Boolean(String(event.notes || '').trim());
+  return attributedCount + (hasPlainImportedNote ? 1 : 0);
 }
 
 function appendNoteHistory(attribution, email, text) {
@@ -1114,7 +1120,7 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
     <motion.button
       layout
       onClick={() => (onAction ? onAction(event) : onClick(event))}
-      className="w-full rounded-2xl border border-zinc-200/80 bg-white/85 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
+      className="w-full rounded-2xl border border-zinc-200/80 bg-white/85 p-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft sm:p-3"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -1131,7 +1137,7 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
         </div>
       </div>
       {!compact && (
-        <div className="mt-3 space-y-1 text-xs text-zinc-600">
+        <div className="mt-2 space-y-0.5 text-[11px] leading-4 text-zinc-600 sm:mt-3 sm:space-y-1 sm:text-xs">
           <div>Photographers Assigned: {displayPhotographerAssignment(event)}</div>
           <div>Assistants: {event.assistants.length ? event.assistants.join(', ') : '—'}</div>
         </div>
@@ -1165,6 +1171,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
               <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm sm:h-20 sm:w-20 sm:rounded-3xl"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain sm:h-[4.5rem] sm:w-[4.5rem]" /></span>
               <div className="min-w-0 sm:pt-1">
                 <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
+                <div className="mt-0.5 text-[11px] font-semibold text-zinc-500 sm:text-xs">Last Updated: {SCHEDULER_LAST_UPDATED}</div>
                 <p className="mt-2 hidden max-w-xl text-sm leading-6 text-zinc-600 sm:block"><span>A calm internal workspace for school picture days,</span><br /><span>staffing, notes, and historical reference.</span></p>
               </div>
             </div>
@@ -1303,7 +1310,7 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
         </div>
       </div>
       <div className="mt-3 space-y-2">
-        {dayEvents.length ? dayEvents.slice(0, 4).map(event => (
+        {dayEvents.length ? dayEvents.map(event => (
           <button
             key={event.id}
             type="button"
@@ -1316,7 +1323,6 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
             </div>
           </button>
         )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-400">Nothing currently scheduled.</div>}
-        {dayEvents.length > 4 ? <div className="text-xs font-medium text-zinc-500">+ {dayEvents.length - 4} more</div> : null}
       </div>
     </div>
   );
@@ -1364,11 +1370,11 @@ function OperationalSummary({ events, onClickEvent }) {
 
 function OverviewControls({ viewMode, setViewMode, month, setMonth, selectedDate, setSelectedDate }) {
   return (
-    <div className="mb-4 space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="mb-2 space-y-2 sm:mb-4 sm:space-y-4">
+      <div className="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Overview</h2>
-          <p className="mt-1 text-sm text-zinc-600">Review open scheduling needs by month, week, or day.</p>
+          <p className="mt-0.5 text-xs text-zinc-600 sm:mt-1 sm:text-sm">Review open scheduling needs by month, week, or day.</p>
         </div>
         <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:inline-flex sm:w-auto">
           {['Month', 'Week', 'Day'].map(mode => (
@@ -1474,22 +1480,22 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4">
       {canEdit ? (
         <div className="flex justify-end">
           <button type="button" onClick={onAddEvent} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add Event</button>
         </div>
       ) : null}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-2 sm:gap-4 lg:grid-cols-3">
       {overviewColumns.map(column => {
         const columnEvents = events.filter(column.filter);
         return (
-          <div key={column.key} className="rounded-3xl border border-zinc-200/80 bg-white/45 p-3">
-            <div className="mb-3 flex items-center justify-between">
+          <div key={column.key} className="rounded-3xl border border-zinc-200/80 bg-white/45 p-2 sm:p-3">
+            <div className="mb-1.5 flex items-center justify-between sm:mb-3">
               <h2 className="text-sm font-semibold text-zinc-800">{column.title}</h2>
               <Pill className="border-zinc-200 bg-white text-zinc-600">{columnEvents.length}</Pill>
             </div>
-            <div className="space-y-2 max-h-[360px] overflow-y-auto overscroll-contain pr-1 md:max-h-[430px]">{columnEvents.map(event => {
+            <div className="space-y-1.5 sm:space-y-2 md:max-h-[430px] md:overflow-y-auto md:overscroll-contain md:pr-1">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
               return <EventCard key={event.id} event={event} onClick={onClick} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
             })}</div>
@@ -2324,7 +2330,7 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
                   const roundedClass = isMultiDay
                     ? `${startsOnTrueStart ? 'rounded-l-full' : 'rounded-l-sm'} ${endsOnTrueEnd ? 'rounded-r-full' : 'rounded-r-sm'}`
                     : 'rounded-full';
-                  const labelPrefix = event.localBackupOnly ? '⚠ ' : isMultiDay ? '↳ ' : '';
+                  const labelPrefix = event.localBackupOnly ? '⚠ ' : '';
                   return (
                     <button
                       key={`${event.id}-${segmentStart}-${segmentEnd}`}
@@ -2406,7 +2412,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
                     const roundedClass = isMultiDay
                       ? `${startsOnTrueStart ? 'rounded-l-xl' : 'rounded-l-sm'} ${endsOnTrueEnd ? 'rounded-r-xl' : 'rounded-r-sm'}`
                       : 'rounded-xl';
-                    const labelPrefix = event.localBackupOnly ? '⚠ ' : isMultiDay ? '↳ ' : '';
+                    const labelPrefix = event.localBackupOnly ? '⚠ ' : '';
                     return (
                       <button
                         key={`${event.id}-${segmentStart}-${segmentEnd}`}
@@ -2739,7 +2745,7 @@ function WeekView({ events, selectedDate, onClick }) {
                 const roundedClass = isMultiDay
                   ? `${startsOnTrueStart ? 'rounded-l-xl' : 'rounded-l-sm'} ${endsOnTrueEnd ? 'rounded-r-xl' : 'rounded-r-sm'}`
                   : 'rounded-xl';
-                const labelPrefix = event.localBackupOnly ? '⚠ ' : isMultiDay ? '↳ ' : '';
+                const labelPrefix = event.localBackupOnly ? '⚠ ' : '';
                 return (
                   <button
                     key={`${event.id}-${segmentStart}-${segmentEnd}`}
@@ -3651,7 +3657,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
             </label>
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(noteAttribution).length})</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(noteAttribution).length + (String(notes || '').trim() ? 1 : 0)})</div>
                 {canEditNotes ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-800">Admin note editing enabled</Pill> : null}
               </div>
               <div className="mt-3"><NoteHistoryList entries={getNoteHistory(noteAttribution)} canEdit={canEditNotes} onEditNote={(noteId, text) => setNoteAttribution(prev => editNoteHistory(prev, noteId, authEmail, text))} /></div>
@@ -5780,18 +5786,37 @@ function RemovedEventsModule({ events, onRestore, onPermanentDelete, canRestore 
   );
 }
 
-function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, canRemove = true, canEdit = true, canEditNotes = false }) {
+function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, onSavePictureDayNotes, canRemove = true, canEdit = true, canEditNotes = false }) {
+  const [editingNotesOnly, setEditingNotesOnly] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  useEffect(() => {
+    setEditingNotesOnly(false);
+    setNotesDraft(String(event?.notes || ''));
+    setSavingNotes(false);
+  }, [event?.id, event?.supabaseId]);
+
   if (!event) return null;
   const addedMeta = getEventAddedMeta(event);
   const editedMeta = getEventLastEditedMeta(event);
   const createdByLabel = `${addedMeta.name}${addedMeta.addedAt ? ` · ${formatEventMetaDateTime(addedMeta.addedAt)}` : ''}`;
   const editedLabel = editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : '';
+  const noteCount = getPictureDayNoteCount(event);
 
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-3 overflow-auto p-3 sm:space-y-4 sm:p-5">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="w-full rounded-2xl border border-[#AEBB9E] bg-white/80 px-4 py-3 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70">Duplicate Event</button> : null}{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-3 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft">View {event.canonicalSchool} in School List →</button> : null}<div className="grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid gap-3 sm:grid-cols-2"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Pencil size={14} />Picture Day Notes ({getNoteHistory(event.noteAttribution).length})</div>{canEditNotes && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1 text-[11px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2]">Edit Picture Day Notes</button> : null}</div><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+  const saveNotesOnly = async () => {
+    if (!onSavePictureDayNotes || savingNotes) return;
+    setSavingNotes(true);
+    const saved = await onSavePictureDayNotes(event, notesDraft);
+    setSavingNotes(false);
+    if (saved) setEditingNotesOnly(false);
+  };
+
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:block sm:space-y-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="rounded-2xl bg-zinc-900 px-3 py-2.5 text-left text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:w-full sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-left text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:w-full sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="w-full rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-2.5 text-left text-sm font-semibold text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:px-4 sm:py-3">View {event.canonicalSchool} in School List →</button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div> : null}</>}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
-  return <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Icon size={14} />{title}</div><div className={`mt-2 whitespace-pre-wrap text-zinc-800 ${large ? 'text-sm leading-6' : 'text-sm font-medium'}`}>{value}</div></div>;
+  return <div className="min-w-0 rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:gap-2 sm:text-xs"><Icon size={14} />{title}</div><div className={`mt-1.5 whitespace-pre-wrap break-words text-zinc-800 sm:mt-2 ${large ? 'text-sm leading-6' : 'text-xs font-medium leading-5 sm:text-sm'}`}>{value}</div></div>;
 }
 
 
@@ -6788,6 +6813,7 @@ export default function SchedulerApp() {
   const [authReady, setAuthReady] = useState(false);
   const [authEmail, setAuthEmail] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState('assistant');
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
     setLocalManualEvents(loadLocalManualEvents());
@@ -7057,6 +7083,7 @@ export default function SchedulerApp() {
       loadTeamMembersFromSupabase();
       loadSchoolsFromSupabase();
       loadEventsFromSupabase();
+      window.setTimeout(() => setInitialLoading(false), 500);
       return;
     }
 
@@ -7066,6 +7093,7 @@ export default function SchedulerApp() {
       loadTeamMembersFromSupabase();
       loadSchoolsFromSupabase();
       loadEventsFromSupabase();
+      window.setTimeout(() => setInitialLoading(false), 500);
       return;
     }
 
@@ -7080,6 +7108,7 @@ export default function SchedulerApp() {
 
       if (!data.session) {
         setEventsMessage(`Please log in to load shared Supabase events${localBackup.length ? ` (${localBackup.length} browser backup event${localBackup.length === 1 ? '' : 's'} visible)` : ''}.`);
+        setInitialLoading(false);
         return;
       }
 
@@ -7088,6 +7117,7 @@ export default function SchedulerApp() {
         loadSchoolsFromSupabase(),
         loadEventsFromSupabase()
       ]);
+      if (!cancelled) setInitialLoading(false);
 
       // One short follow-up read catches Supabase session hydration/readback timing races.
       window.setTimeout(() => {
@@ -7411,13 +7441,20 @@ export default function SchedulerApp() {
         .schedule-live-launch-button { animation: scheduleLiveLaunchShine 2.6s ease-in-out infinite; }
       `}</style>
       <Header query={query} setQuery={setQuery} activeTab={activeTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
-      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : activeTab === 'Schedule Live!' ? 'px-1 sm:px-6' : 'px-3 sm:px-6'} pb-28 pt-4 sm:pb-6 sm:pt-6`}>
+      {initialLoading ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-cream/95 px-6 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-[2rem] border border-[#AEBB9E] bg-white/90 p-8 text-center shadow-2xl">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#DDE8D2] border-t-zinc-900" />
+            <div className="mt-5 text-xl font-black tracking-tight text-zinc-950">Please wait! Scheduler is loading :)</div>
+          </div>
+        </div>
+      ) : null}
+      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-3 sm:space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : activeTab === 'Schedule Live!' ? 'px-1 sm:px-6' : 'px-2 sm:px-6'} pb-28 pt-3 sm:pb-6 sm:pt-6`}>
         <LoginRequiredNotice />
-        {activeTab === 'Overview' ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
-        {activeTab === 'Calendar View' && localManualEvents.some(event => event.localBackupOnly) ? <div className="rounded-3xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 shadow-sm">Some manual events are being shown from this browser's safety backup because Supabase readback has not verified them yet. Run the verification SQL below if this appears unexpectedly.</div> : null}
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
-        <section className={activeTab === 'Schedule Live!' ? 'rounded-none border-0 bg-transparent p-0 shadow-none' : `rounded-[2rem] border border-zinc-200/80 bg-white/35 ${['Calendar View','Mobile View'].includes(activeTab) ? 'p-1.5 sm:p-4' : 'p-3 sm:p-4'} shadow-soft`}>
-          {activeTab === 'Overview' && <>
+        {activeTab === 'Overview' && !query.trim() ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
+        <section className={activeTab === 'Schedule Live!' ? 'rounded-none border-0 bg-transparent p-0 shadow-none' : `rounded-[2rem] border border-zinc-200/80 bg-white/35 ${['Calendar View','Mobile View'].includes(activeTab) ? 'p-0.5 sm:p-4' : 'p-2 sm:p-4'} shadow-soft`}>
+          {activeTab === 'Overview' && !query.trim() && <>
             {canEditScheduler ? (
               <div className="mb-4 rounded-[1.75rem] border border-red-200 bg-gradient-to-r from-red-100 via-white to-white p-4 shadow-soft">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -7465,8 +7502,8 @@ export default function SchedulerApp() {
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} canAdmin={isAdminUser} />
       {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} authEmail={authEmail} canEditNotes={isAdminUser} />}
       {canEditScheduler && quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
-      <Drawer event={selectedEventForDisplay} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} canRemove={isAdminUser} canEdit={canEditScheduler} canEditNotes={isAdminUser} onViewSchool={openLinkedSchoolFromEvent} />
-      {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setEditingEvent(null)} onSave={handleScheduleEvent} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
+      <Drawer event={selectedEventForDisplay} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} onSavePictureDayNotes={async (event, notes) => { const saved = await handleScheduleEvent({ ...event, notes }); if (saved) setSelected(saved); return saved; }} canRemove={isAdminUser} canEdit={canEditScheduler} canEditNotes={isAdminUser} onViewSchool={openLinkedSchoolFromEvent} />
+      {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setEditingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setSelected(saved); return saved; }} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
       {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
     </main>
   );
