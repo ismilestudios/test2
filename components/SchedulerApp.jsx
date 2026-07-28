@@ -483,11 +483,10 @@ function CalendarColorKey() {
   ];
 
   return (
-    <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white/75 px-3 py-2 shadow-sm">
-      <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Key</span>
+    <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-zinc-200 bg-white/75 px-2 py-1.5 shadow-sm sm:gap-2 sm:px-3 sm:py-2">
+      <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:mr-1 sm:text-xs">Key</span>
       {items.map(([label, className]) => (
-        <span key={label} className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-zinc-700">
-          <span className={`h-3 w-3 rounded-full border ${className}`} />
+        <span key={label} className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-semibold leading-4 sm:px-2.5 sm:py-1 sm:text-xs ${className}`}>
           {label}
         </span>
       ))}
@@ -1195,7 +1194,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-3 sm:gap-4'}`}>
           <div>
             <div className="flex items-center gap-3 sm:items-start sm:gap-4">
-              <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm sm:h-20 sm:w-20 sm:rounded-3xl"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain sm:h-[4.5rem] sm:w-[4.5rem]" /></span>
+              <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm sm:h-24 sm:w-24 sm:rounded-3xl"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain sm:h-[5.5rem] sm:w-[5.5rem]" /></span>
               <div className="min-w-0 sm:pt-1">
                 <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
                 <div className="mt-0.5 text-[11px] font-semibold text-zinc-500 sm:text-xs">Last Updated: {SCHEDULER_LAST_UPDATED}</div>
@@ -2344,7 +2343,8 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
           const dates = weekDays.map(cell => cell.date);
           const segments = buildMonthWeekSegments(events, dates, null);
           const visibleRows = Math.max(2, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
-          const eventLayerTop = 22;
+          const hasHolidayInWeek = dates.some(date => getHolidayLabels(date).length);
+          const eventLayerTop = hasHolidayInWeek ? 34 : 22;
           const rowMinHeight = Math.max(72, eventLayerTop + 3 + (visibleRows * 19));
           return (
             <div key={`mobile-week-${weekIndex}`} className="relative grid grid-cols-7 overflow-hidden rounded-xl border border-zinc-100" style={{ minHeight: rowMinHeight }}>
@@ -2361,9 +2361,9 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
                     className={`relative min-h-[72px] border-r border-zinc-100 p-1 text-left last:border-r-0 ${isSelected ? 'bg-[#DDE8D2]/70' : cell.inCurrentMonth ? 'bg-white/45' : 'bg-zinc-50/70 opacity-60'}`}
                     title={holidays.length ? holidays.join(', ') : undefined}
                   >
-                    <div className="absolute left-1 top-1 z-20 flex items-center gap-1">
-                      <span className={`text-[10px] font-black leading-none ${isSelected ? 'text-zinc-950' : cell.inCurrentMonth ? 'text-zinc-650' : 'text-zinc-400'}`}>{Number(date.slice(-2))}</span>
-                      {holidays.length ? <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" aria-label={holidays.join(', ')} /> : null}
+                    <div className="absolute inset-x-1 top-1 z-20 min-w-0">
+                      <span className={`block text-[10px] font-black leading-none ${isSelected ? 'text-zinc-950' : cell.inCurrentMonth ? 'text-zinc-650' : 'text-zinc-400'}`}>{Number(date.slice(-2))}</span>
+                      {holidays.length ? <span className="mt-1 block truncate text-[7px] font-semibold leading-2.5 text-zinc-500" aria-label={holidays.join(', ')}>{holidays.join(', ')}</span> : null}
                     </div>
                   </button>
                 );
@@ -2382,7 +2382,7 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
                       key={`${event.id}-${segmentStart}-${segmentEnd}`}
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onClick(event); }}
-                      className={`pointer-events-auto relative min-w-0 overflow-hidden truncate border px-1 py-0.5 text-left text-[8px] font-bold leading-3 ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-2' : ''} ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                      className={`pointer-events-auto relative min-w-0 overflow-hidden truncate border px-1 py-0.5 text-left text-[8.5px] font-bold leading-3 ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-2' : ''} ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
                       style={{ gridColumn: `${segment.startCol + 1} / span ${segment.span}`, gridRow: segment.row + 1 }}
                       title={isMultiDay ? `${event.title} • ${getEventDateLabel(event)}` : event.title}
                     >
@@ -2465,7 +2465,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
                         type="button"
                         onDoubleClick={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); onClick(event); }}
-                        className={`pointer-events-auto relative min-w-0 overflow-hidden truncate border px-2 py-1.5 text-left text-[10px] font-medium shadow-[0_1px_0_rgba(255,255,255,0.65)_inset] ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-3' : ''} ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
+                        className={`pointer-events-auto relative min-w-0 overflow-hidden truncate border px-2 py-1.5 text-left text-[11px] font-medium shadow-[0_1px_0_rgba(255,255,255,0.65)_inset] ${event.type === 'Studio Assigned Schools (SAS)' ? 'pl-3' : ''} ${roundedClass} ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}
                         style={{ gridColumn: `${segment.startCol + 1} / span ${segment.span}`, gridRow: segment.row + 1 }}
                         title={isMultiDay ? `${event.title} • ${getEventDateLabel(event)}` : event.title}
                       >
@@ -4413,7 +4413,7 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
               <div className="text-xs font-black uppercase tracking-wide text-zinc-500">School Notes ({totalSchoolNoteCount})</div>
               {onEdit ? <button type="button" onClick={() => onEdit(school)} className="rounded-full border border-zinc-200 bg-cream/80 px-2.5 py-1 text-[11px] font-black text-zinc-800">Add Note</button> : null}
             </div>
-            <div className="mt-2 max-h-56 overflow-y-auto rounded-2xl border border-zinc-100 bg-cream/60 p-2">
+            <div className="mt-2 rounded-2xl border border-zinc-100 bg-cream/60 p-2">
               <NoteHistoryList entries={schoolNoteHistory} />
               {visiblePlainSchoolNotes ? (
                 <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-zinc-700">
@@ -4426,9 +4426,9 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
 
           <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
             <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Recent / Upcoming History</div>
-            <div className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1">
+            <div className="mt-2 space-y-2">
               {allHistory.length ? allHistory.slice(0, 18).map(event => (
-                <button key={`mobile-history-${event.id}`} type="button" onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-cream/70 p-2 text-left">
+                <button key={`mobile-history-${event.id}`} type="button" onClick={() => onClickEvent(event)} className="w-full rounded-2xl border border-zinc-200 bg-cream/70 p-3 text-left">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-[11px] font-black text-zinc-500">{formatDate(event.date)} · {event.season || getSeasonLabel(event.date)}</div>
@@ -4472,12 +4472,12 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
 
           <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-zinc-500"><Pencil size={14} /> Picture Day Info</div>
-            <div className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1">
+            <div className="mt-2 space-y-2">
               {pictureInfoHistory.length ? pictureInfoHistory.map(event => (
-                <button key={`mobile-picture-info-${event.id}`} type="button" onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-cream/70 p-2 text-left">
+                <button key={`mobile-picture-info-${event.id}`} type="button" onClick={() => onClickEvent(event)} className="w-full rounded-2xl border border-zinc-200 bg-cream/70 p-3 text-left">
                   <div className="text-[11px] font-black text-zinc-500">{event.season} · {shortDate(event.date)}</div>
-                  <div className="mt-0.5 truncate text-xs font-black text-zinc-900">{event.title}</div>
-                  {event.notes ? <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-[11px] leading-4 text-zinc-600">{event.notes}</div> : null}
+                  <div className="mt-1 whitespace-normal break-words text-xs font-black leading-4 text-zinc-900">{event.title}</div>
+                  {event.notes ? <div className="mt-1.5 whitespace-pre-wrap break-words text-[11px] leading-4 text-zinc-600">{event.notes}</div> : null}
                 </button>
               )) : <div className="text-xs font-semibold text-zinc-400">No picture day info imported yet.</div>}
             </div>
@@ -5166,11 +5166,13 @@ function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelecte
   const label = viewMode === 'Month' ? monthLabel(month) : viewMode === 'Week' ? `${shortDate(start)} – ${shortDate(end)}` : formatDate(selectedDate);
   return (
     <div className="mb-4 flex flex-col items-center justify-center gap-3">
-      <div className="grid w-full grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 sm:flex sm:w-auto sm:justify-center">
-        <button type="button" onClick={() => move(-1)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white/85 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft" aria-label="Previous"><ChevronLeft size={20} /></button>
-        <div className="min-w-0 rounded-full border border-zinc-200 bg-white/90 px-4 py-2 text-center text-sm font-semibold text-zinc-900 shadow-sm sm:min-w-[280px] sm:px-6 sm:text-base">{label}</div>
-        <button type="button" onClick={() => move(1)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white/85 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft" aria-label="Next"><ChevronRight size={20} /></button>
-        <button type="button" onClick={goToday} className="col-span-3 mx-auto rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] sm:col-span-1 sm:mx-0">Today</button>
+      <div className="grid w-full grid-cols-[38px_minmax(0,1fr)_38px] items-center gap-1.5 sm:flex sm:w-auto sm:justify-center sm:gap-2">
+        <button type="button" onClick={() => move(-1)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white/85 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft sm:h-11 sm:w-11" aria-label="Previous"><ChevronLeft size={18} className="sm:hidden" /><ChevronLeft size={20} className="hidden sm:block" /></button>
+        <div className="flex min-w-0 items-center justify-center gap-1.5 sm:gap-2">
+          <div className="min-w-0 truncate rounded-full border border-zinc-200 bg-white/90 px-2.5 py-1.5 text-center text-xs font-semibold text-zinc-900 shadow-sm sm:min-w-[280px] sm:px-6 sm:py-2 sm:text-base">{label}</div>
+          <button type="button" onClick={goToday} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-2.5 py-1.5 text-xs font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] sm:px-4 sm:py-2 sm:text-sm">Today</button>
+        </div>
+        <button type="button" onClick={() => move(1)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white/85 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft sm:h-11 sm:w-11" aria-label="Next"><ChevronRight size={18} className="sm:hidden" /><ChevronRight size={20} className="hidden sm:block" /></button>
       </div>
       {showKey ? <CalendarColorKey /> : null}
     </div>
@@ -5389,12 +5391,8 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
 function CalendarView({ viewMode, setViewMode, events, month, setMonth, selectedDate, setSelectedDate, onClick, onAddEvent, canEdit = true }) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-950">Calendar View</h2>
-          <p className="mt-1 text-sm text-zinc-600">Switch between month, week, and day layouts while staying on one clean calendar page.</p>
-        </div>
-        <div className="flex flex-row items-center justify-between gap-2 sm:flex-col sm:items-end">
+      <div className="flex justify-end">
+        <div className="flex w-full flex-row items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
           <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:inline-flex sm:w-auto">
             {['Month', 'Week', 'Day'].map(mode => (
               <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}>{mode}</button>
@@ -5862,7 +5860,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
     if (saved) setEditingNotesOnly(false);
   };
 
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:block sm:space-y-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:w-full sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:w-full sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex min-h-[58px] w-full flex-col items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2.5 text-center text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:min-h-[64px] sm:px-5 sm:py-3">
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:gap-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex min-h-[58px] w-full flex-col items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2.5 text-center text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:min-h-[64px] sm:px-5 sm:py-3">
   <span className="max-w-full break-words text-sm font-bold leading-snug">View {event.canonicalSchool}</span>
   <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-600 sm:text-xs">in School List <ChevronRight size={14} aria-hidden="true" /></span>
 </button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div>{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
@@ -6860,7 +6858,7 @@ export default function SchedulerApp() {
   const [eventsMessage, setEventsMessage] = useState('Loading events from Supabase...');
   const [addingEvent, setAddingEvent] = useState(false);
   const [addingEventDefaultDate, setAddingEventDefaultDate] = useState(todayKey());
-  const [selectedSchoolName, setSelectedSchoolName] = useState(SCHOOLS[0]?.name || '');
+  const [selectedSchoolName, setSelectedSchoolName] = useState('');
   const [schools, setSchools] = useState([]);
   const [schoolsMessage, setSchoolsMessage] = useState('Loading schools from Supabase...');
   const [authReady, setAuthReady] = useState(false);
