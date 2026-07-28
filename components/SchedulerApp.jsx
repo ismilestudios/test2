@@ -483,13 +483,15 @@ function CalendarColorKey() {
   ];
 
   return (
-    <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-zinc-200 bg-white/75 px-2 py-1.5 shadow-sm sm:gap-2 sm:px-3 sm:py-2">
-      <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:mr-1 sm:text-xs">Key</span>
-      {items.map(([label, className]) => (
-        <span key={label} className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-semibold leading-4 sm:px-2.5 sm:py-1 sm:text-xs ${className}`}>
-          {label}
-        </span>
-      ))}
+    <div className="w-full max-w-full rounded-2xl border border-zinc-200 bg-white/75 px-2.5 py-2 shadow-sm sm:px-4 sm:py-3">
+      <div className="text-left text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs">Key</div>
+      <div className="mt-1.5 flex flex-wrap items-center justify-start gap-1.5 sm:mt-2 sm:gap-2">
+        {items.map(([label, className]) => (
+          <span key={label} className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-semibold leading-4 sm:px-2.5 sm:py-1 sm:text-xs ${className}`}>
+            {label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1193,12 +1195,12 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
       <div className={`mx-auto max-w-7xl ${mobileViewCompact ? 'px-2 sm:px-6' : 'px-4 sm:px-6'} ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-3 sm:py-4'}`}>
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-3 sm:gap-4'}`}>
           <div>
-            <div className="flex items-center gap-3 sm:items-start sm:gap-4">
-              <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm sm:h-24 sm:w-24 sm:rounded-3xl"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain sm:h-[5.5rem] sm:w-[5.5rem]" /></span>
-              <div className="min-w-0 sm:pt-1">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm sm:h-28 sm:w-28 sm:rounded-3xl"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain sm:h-[6.5rem] sm:w-[6.5rem]" /></span>
+              <div className="min-w-0">
                 <h1 className={`${mobileViewCompact ? 'text-xl sm:text-3xl' : 'text-3xl'} font-semibold tracking-tight text-zinc-950`}>Scheduler v{SCHEDULER_VERSION}</h1>
                 <div className="mt-0.5 text-[11px] font-semibold text-zinc-500 sm:text-xs">Last Updated: {SCHEDULER_LAST_UPDATED}</div>
-                <p className="mt-2 hidden max-w-xl text-sm leading-6 text-zinc-600 sm:block"><span>A calm internal workspace for school picture days,</span><br /><span>staffing, notes, and historical reference.</span></p>
+                <p className="mt-2 hidden max-w-[31rem] text-sm leading-5 text-zinc-600 sm:block">A calm internal workspace for school picture days,<br />staffing, notes, and historical reference.</p>
               </div>
             </div>
           </div>
@@ -2543,7 +2545,10 @@ function getRequiredPhotographerCount(event = {}) {
   if (isTimeOffEvent(event)) return 0;
   const explicit = Number(event.requiredPhotographers ?? event.required_photographers);
   if (Number.isFinite(explicit) && explicit > 0) return Math.max(1, Math.min(6, explicit));
-  return Math.max(1, parseRequiredPhotographerCountFromTitle(event.title), getAssignedPhotographerCount(event));
+  // Rollout demand belongs to the scheduled event itself, not to whoever is
+  // currently assigned. Assigning or removing a photographer must never change
+  // the week's total scheduled workload.
+  return Math.max(1, parseRequiredPhotographerCountFromTitle(event.title));
 }
 
 function getRequiredAssistantCount(event = {}) {
@@ -2570,12 +2575,12 @@ function eventMeetsPhotographerRequirement(event = {}) {
 
 function getRolloutCount(event) {
   if (!isRolloutEvent(event)) return 0;
-  return getAssignedPhotographerCount(event);
+  return getRequiredPhotographerCount(event);
 }
 
 function getRolloutCountForOccurrence(event = {}, dateKey = '') {
   if (!isRolloutEvent(event) || !dateKey || !isDateInEventRange(event, dateKey)) return 0;
-  return getScheduleLivePhotographersForDate(event, dateKey).length;
+  return getRequiredPhotographerCount(event);
 }
 
 function getRolloutCountForDate(events = [], dateKey = todayKey()) {
@@ -2619,19 +2624,25 @@ function getCapacityTone(rollouts) {
 
 function getPhotographerRolloutSummaryForDateRange(events = [], startKey, endKey) {
   const counts = new Map();
+  let unassigned = 0;
   (events || []).forEach(event => {
     if (!event || !isRolloutEvent(event) || !startKey || !endKey) return;
     const eventStart = event.date || '';
     const eventEnd = event.endDate || event.date || '';
     if (!eventStart || eventStart > endKey || eventEnd < startKey) return;
     getEventDateKeysInRange(event, startKey, endKey).forEach(dateKey => {
-      getScheduleLivePhotographersForDate(event, dateKey).forEach(name => {
+      const required = getRequiredPhotographerCount(event);
+      const assigned = getScheduleLivePhotographersForDate(event, dateKey);
+      assigned.slice(0, required).forEach(name => {
         const canonical = canonicalPhotographerName(name);
         counts.set(canonical, (counts.get(canonical) || 0) + 1);
       });
+      unassigned += Math.max(0, required - assigned.length);
     });
   });
-  return Array.from(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const summary = Array.from(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (unassigned > 0) summary.push(['Unassigned', unassigned]);
+  return summary;
 }
 
 function RolloutBreakdownTooltip({ title = "This week's photographer load", start, end, summary = [] }) {
@@ -5145,7 +5156,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
   );
 }
 
-function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelectedDate, showKey = false }) {
+function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelectedDate, showKey = false, compact = false }) {
   const goToday = () => {
     const today = todayKey();
     setSelectedDate(today);
@@ -5165,7 +5176,7 @@ function CalendarNavigator({ viewMode, month, setMonth, selectedDate, setSelecte
   const { start, end } = weekBounds(selectedDate);
   const label = viewMode === 'Month' ? monthLabel(month) : viewMode === 'Week' ? `${shortDate(start)} – ${shortDate(end)}` : formatDate(selectedDate);
   return (
-    <div className="mb-4 flex flex-col items-center justify-center gap-3">
+    <div className={`${compact ? 'mb-0' : 'mb-4'} flex flex-col items-center justify-center gap-3`}>
       <div className="grid w-full grid-cols-[38px_minmax(0,1fr)_38px] items-center gap-1.5 sm:flex sm:w-auto sm:justify-center sm:gap-2">
         <button type="button" onClick={() => move(-1)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white/85 text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-soft sm:h-11 sm:w-11" aria-label="Previous"><ChevronLeft size={18} className="sm:hidden" /><ChevronLeft size={20} className="hidden sm:block" /></button>
         <div className="flex min-w-0 items-center justify-center gap-1.5 sm:gap-2">
@@ -5389,26 +5400,38 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
 }
 
 function CalendarView({ viewMode, setViewMode, events, month, setMonth, selectedDate, setSelectedDate, onClick, onAddEvent, canEdit = true }) {
+  const viewSwitcher = (
+    <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:w-auto">
+      {['Month', 'Week', 'Day'].map(mode => (
+        <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}>{mode}</button>
+      ))}
+    </div>
+  );
+  const addButton = canEdit ? (
+    <button type="button" onClick={() => onAddEvent?.()} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:gap-2 sm:rounded-2xl sm:px-4 sm:text-sm"><Plus size={14} className="sm:hidden" /><Plus size={16} className="hidden sm:block" /> <span className="sm:inline">Add</span><span className="hidden sm:inline"> Event</span></button>
+  ) : null;
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <div className="flex w-full flex-row items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
-          <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:inline-flex sm:w-auto">
-            {['Month', 'Week', 'Day'].map(mode => (
-              <button key={mode} type="button" onClick={() => setViewMode(mode)} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${viewMode === mode ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-700 hover:bg-white'}`}>{mode}</button>
-            ))}
-          </div>
-          {canEdit ? <button type="button" onClick={() => onAddEvent?.()} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:gap-2 sm:rounded-2xl sm:px-4 sm:text-sm"><Plus size={14} className="sm:hidden" /><Plus size={16} className="hidden sm:block" /> <span className="sm:inline">Add</span><span className="hidden sm:inline"> Event</span></button> : null}
-        </div>
+      <div className="flex items-center justify-between gap-2 sm:hidden">
+        {viewSwitcher}
+        {addButton}
       </div>
-      <div className="px-1.5 sm:px-0"><CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} showKey /></div>
+      <div className="px-1.5 sm:hidden"><CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} /></div>
+
+      <div className="hidden grid-cols-[1fr_auto_1fr] items-center gap-4 sm:grid">
+        <div className="justify-self-start">{viewSwitcher}</div>
+        <CalendarNavigator compact viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+        <div className="justify-self-end">{addButton}</div>
+      </div>
+
+      <div className="px-1.5 sm:px-0"><CalendarColorKey /></div>
       {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={canEdit ? onAddEvent : null} />}
       {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} />}
       {viewMode === 'Day' && <DayView events={events} selectedDate={selectedDate} onClick={onClick} />}
     </div>
   );
 }
-
 
 function normalizeMemberName(value) {
   return value.trim().replace(/\s+/g, ' ');
