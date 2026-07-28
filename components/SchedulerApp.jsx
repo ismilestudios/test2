@@ -483,9 +483,9 @@ function CalendarColorKey() {
   ];
 
   return (
-    <div className="w-full max-w-full rounded-2xl border border-zinc-200 bg-white/75 px-2.5 py-2 shadow-sm sm:px-4 sm:py-3">
-      <div className="text-left text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs">Key</div>
-      <div className="mt-1.5 flex flex-wrap items-center justify-start gap-1.5 sm:mt-2 sm:gap-2">
+    <div className="w-full max-w-full rounded-2xl border border-zinc-200 bg-white/75 px-2.5 py-2 shadow-sm sm:px-4 sm:py-2.5">
+      <div className="text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs">Key</div>
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5 sm:mt-1.5 sm:gap-2">
         {items.map(([label, className]) => (
           <span key={label} className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-semibold leading-4 sm:px-2.5 sm:py-1 sm:text-xs ${className}`}>
             {label}
@@ -5420,9 +5420,9 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
       <div className="px-1.5 sm:hidden"><CalendarNavigator viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} /></div>
 
       <div className="hidden grid-cols-[1fr_auto_1fr] items-center gap-4 sm:grid">
-        <div className="justify-self-start">{viewSwitcher}</div>
+        <div className="justify-self-start">{addButton}</div>
         <CalendarNavigator compact viewMode={viewMode} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
-        <div className="justify-self-end">{addButton}</div>
+        <div className="justify-self-end">{viewSwitcher}</div>
       </div>
 
       <div className="px-1.5 sm:px-0"><CalendarColorKey /></div>
