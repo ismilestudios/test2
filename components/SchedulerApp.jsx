@@ -1895,14 +1895,61 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
 
     loadSession();
 
+    const syncChangedEventIntoScheduleLive = async (payload) => {
+      if (cancelled || !supabase) return;
+      const eventId = payload?.new?.id || payload?.old?.id;
+      if (!eventId) {
+        await reloadEvents?.();
+        return;
+      }
+
+      // Re-read the committed Supabase row before changing another user's
+      // Schedule Live board. The realtime message is only the signal; Supabase
+      // remains the source of truth for the actual event state.
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error) {
+        console.warn('Schedule Live realtime event readback failed', error);
+        await reloadEvents?.();
+        return;
+      }
+
+      setOperationalEvents(prev => {
+        const current = prev || [];
+        if (!data || data.active === false) {
+          return current.filter(item => item?.supabaseId !== eventId && item?.id !== eventId);
+        }
+        const incoming = supabaseRowToEvent(data);
+        const matchIndex = current.findIndex(item => item?.supabaseId === eventId || item?.id === eventId);
+        if (matchIndex < 0) return [...current, incoming].sort((a, b) => String(a?.date || '').localeCompare(String(b?.date || '')));
+        return current.map((item, index) => index === matchIndex ? incoming : item);
+      });
+
+      // Keep the parent event cache fresh too. This does not add realtime to
+      // any other view—the subscription only exists while Schedule Live is mounted.
+      await reloadEvents?.();
+    };
+
     const channel = hasSupabaseEnv() && supabase
       ? supabase.channel('schedule-live-room')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_live_sessions', filter: `id=eq.${SCHEDULE_LIVE_SESSION_ID}` }, payload => {
           const nextData = payload?.new?.data;
           if (nextData && !cancelled) { const incoming = cleanScheduleLiveState({ ...scheduleLiveDefaultState(todayKey()), ...nextData }); liveStateRef.current = incoming; setLiveState(incoming); }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => reloadEvents?.())
-        .subscribe()
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
+          void syncChangedEventIntoScheduleLive(payload);
+        })
+        .subscribe((status, error) => {
+          if (error) console.warn('Schedule Live realtime subscription error', error);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setStatusMessage('Schedule Live realtime connection was interrupted. Saved changes are safe; refresh if another screen stops updating.');
+          }
+        })
       : null;
 
     const heartbeat = window.setInterval(() => {
