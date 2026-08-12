@@ -1967,6 +1967,11 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   const days = getScheduleLiveDays(liveState.weekStart, liveState.showWeekends);
   const weekEnd = days[days.length - 1];
   const weekEvents = (operationalEvents || []).filter(event => event && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && isRolloutEvent(event));
+  // Availability context is intentionally Schedule-Live-only. These internal
+  // events are shown above production cards so schedulers can see conflicts,
+  // but they remain excluded from rollouts and Scheduling Complete.
+  const scheduleLiveAvailabilityTypes = new Set(['Time Off', 'Personal Appointment', 'Call or Meeting']);
+  const availabilityEvents = (operationalEvents || []).filter(event => event && event.active !== false && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && scheduleLiveAvailabilityTypes.has(event.type));
   const heldEvents = (operationalEvents || []).filter(event => event && event.status === SCHEDULE_LIVE_HOLD_STATUS && monthKey(event.date) === monthKey(liveState.weekStart));
   // Count each occurrence/day and use its actual per-day staffing assignment.
   // This makes multi-day events and live assignment changes reflect immediately.
@@ -2122,6 +2127,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
 
         {days.map(date => {
           const dayEvents = weekEvents.filter(event => isDateInEventRange(event, date)).sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+          const dayAvailability = availabilityEvents.filter(event => isDateInEventRange(event, date)).sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
           return (
             <section key={`mobile-live-${date}`} className="rounded-[1.5rem] border border-zinc-200 bg-white/80 p-3 shadow-sm">
               <div className="mb-2 flex items-start justify-between gap-2">
@@ -2131,6 +2137,18 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                 </div>
                 <span className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-black text-zinc-600">{dayEvents.length}</span>
               </div>
+              {dayAvailability.length ? (
+                <div className="mb-2">
+                  <div className="mb-1 text-[9px] font-black uppercase tracking-wide text-zinc-400">Availability</div>
+                  <div className="flex flex-wrap gap-1">
+                    {dayAvailability.map(event => (
+                      <button key={`mobile-availability-${event.id}-${date}`} type="button" onClick={() => onClickEvent(event)} className={`max-w-full rounded-full border px-2 py-1 text-left text-[9px] font-black leading-tight shadow-sm ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-700 border-zinc-200'}`} title={`${event.title}${getEventTimeLabel(event) ? ` • ${getEventTimeLabel(event)}` : ''}`}>
+                        <span className="block max-w-full truncate">{event.title}{getEventTimeLabel(event) ? ` · ${getEventTimeLabel(event)}` : ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 {dayEvents.length ? dayEvents.map(event => (
                   <button key={`${event.id}-${date}`} type="button" onClick={() => onClickEvent(event)} className={`w-full rounded-2xl border p-3 text-left shadow-sm ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}`}>
@@ -2311,6 +2329,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
             <div className={`grid gap-2 sm:gap-3 ${liveState.showWeekends ? 'sm:grid-cols-2 xl:grid-cols-7' : 'sm:grid-cols-2 xl:grid-cols-5'}`}>
               {days.map(date => {
                 const dayEvents = weekEvents.filter(event => isDateInEventRange(event, date)).sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+                const dayAvailability = availabilityEvents.filter(event => isDateInEventRange(event, date)).sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
                 return <div key={date} className="min-h-[180px] rounded-[1.35rem] border border-white/10 bg-white/10 p-2 sm:min-h-[260px]">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <div>
@@ -2320,8 +2339,20 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     </div>
                     <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-black text-white/70">{dayEvents.length}</span>
                   </div>
+                  {dayAvailability.length ? (
+                    <div className="mb-2 rounded-xl border border-white/10 bg-black/10 p-1.5">
+                      <div className="mb-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/45">Availability</div>
+                      <div className="flex flex-wrap gap-1">
+                        {dayAvailability.map(event => (
+                          <button key={`availability-${event.id}-${date}`} type="button" onClick={() => onClickEvent(event)} className={`max-w-full rounded-full border px-2 py-1 text-left text-[9px] font-black leading-tight shadow-sm transition hover:-translate-y-px ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-700 border-zinc-200'}`} title={`${event.title}${getEventTimeLabel(event) ? ` • ${getEventTimeLabel(event)}` : ''}`}>
+                            <span className="block max-w-full truncate">{event.title}{getEventTimeLabel(event) ? ` · ${getEventTimeLabel(event)}` : ''}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
-                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={`${event.id}-${date}`} event={event} occurrenceDate={date} events={operationalEvents} photographers={photographers} assistants={assistants} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onAssignAssistant={assignAssistant} onRemoveAssistant={removeAssistant} onToggleHold={toggleHold} onToggleComplete={toggleComplete} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No events this day.</div>}
+                    {dayEvents.length ? dayEvents.map(event => <ScheduleLiveEventCard key={`${event.id}-${date}`} event={event} occurrenceDate={date} events={operationalEvents} photographers={photographers} assistants={assistants} onClickEvent={onClickEvent} onAssignPhotographer={assignPhotographer} onRemovePhotographer={removePhotographer} onAssignAssistant={assignAssistant} onRemoveAssistant={removeAssistant} onToggleHold={toggleHold} onToggleComplete={toggleComplete} onUpdateRequirements={updateRequirements} canEdit={canEdit} draggedPhotographer={draggedPhotographer} setDraggedPhotographer={setDraggedPhotographer} />) : <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No production events this day.</div>}
                   </div>
                 </div>;
               })}
