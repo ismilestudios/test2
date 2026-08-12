@@ -167,7 +167,7 @@ function formatEventMetaDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   const datePart = `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
-  const timePart = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   return `${datePart} ${timePart}`;
 }
 
@@ -198,7 +198,7 @@ function formatAttributionTime(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 function formatAttributionLabel(attribution) {
@@ -924,9 +924,31 @@ function getEventDateLabel(event) {
   return `${formatDate(event.date)} – ${formatDate(event.endDate)}`;
 }
 
+function formatClockTime(value) {
+  if (value == null) return '';
+  const raw = String(value).trim();
+  if (!raw || raw.toUpperCase() === 'TBD') return raw;
+
+  // Supabase/browser time inputs are stored as 24-hour HH:mm[:ss]. Keep the
+  // stored value unchanged, but always present it to staff as a 12-hour clock.
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/);
+  if (match) {
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+      const suffix = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${String(minute).padStart(2, '0')} ${suffix}`;
+    }
+  }
+
+  // Already-human labels/imported text are preserved rather than re-parsed.
+  return raw;
+}
+
 function getEventTimeLabel(event) {
-  const arrival = event?.arrivalTime && event.arrivalTime !== 'TBD' ? event.arrivalTime : '';
-  const start = event?.time && event.time !== 'TBD' ? event.time : '';
+  const arrival = event?.arrivalTime && event.arrivalTime !== 'TBD' ? formatClockTime(event.arrivalTime) : '';
+  const start = event?.time && event.time !== 'TBD' ? formatClockTime(event.time) : '';
   if (arrival && start) return `Arrival ${arrival} · Start ${start}`;
   if (arrival) return `Arrival ${arrival}`;
   if (start) return `Start ${start}`;
@@ -2216,7 +2238,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
             <div className="mt-2 flex max-h-[96px] max-w-full min-w-0 gap-2 overflow-x-auto overflow-y-auto pb-1 pr-1">
               {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
                 <div key={entry.id} className="schedule-live-comment-card w-[240px] min-w-[220px] max-w-[280px] shrink-0 rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
-                  <div className="text-[10px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
+                  <div className="text-[10px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
                   <div className="mt-1 max-h-10 overflow-hidden break-words text-xs leading-4 text-white/90 [overflow-wrap:anywhere]">{entry.text}</div>
                 </div>
               )) : <div className="w-full rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No live commentary yet.</div>}
@@ -2633,7 +2655,12 @@ function getPhotographerRolloutSummaryForDateRange(events = [], startKey, endKey
     getEventDateKeysInRange(event, startKey, endKey).forEach(dateKey => {
       const required = getRequiredPhotographerCount(event);
       const assigned = getScheduleLivePhotographersForDate(event, dateKey);
-      assigned.slice(0, required).forEach(name => {
+      // Personal rollout credit follows the actual assignment, one credit per
+      // photographer per event day. Do not cap this list at requiredPhotographers:
+      // older/imported events can have a stale requirement of 1 while legitimately
+      // carrying multiple assigned photographers. The scheduled-demand total remains
+      // requirement-based; this breakdown only answers who is actually working it.
+      assigned.forEach(name => {
         const canonical = canonicalPhotographerName(name);
         counts.set(canonical, (counts.get(canonical) || 0) + 1);
       });
@@ -5735,7 +5762,7 @@ function RecentlyAddedEventsModule({ events, onClick }) {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-zinc-950">{event.title}</div>
-                <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
+                <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {formatClockTime(event.time || 'TBD')}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
                 <div className="mt-1 text-xs font-semibold text-zinc-600">Added {formatEventMetaDateTime((getEventAddedMeta(event) || {}).addedAt || event.createdAt) || 'recently'} by {(getEventAddedMeta(event) || {}).name || 'Before We Began Tracking'}</div>
               </div>
               <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
@@ -5794,7 +5821,7 @@ function RecentlyModifiedEventsModule({ events, onClick }) {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-zinc-950">{event.title}</div>
-                  <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
+                  <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {formatClockTime(event.time || 'TBD')}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
                   <div className="mt-1 text-xs font-semibold text-zinc-600">Modified {formatEventMetaDateTime(editedAt) || 'recently'}{shouldShowEditor ? ` by ${editedName}` : ''}</div>
                 </div>
                 <Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>
@@ -5838,7 +5865,7 @@ function RemovedEventsModule({ events, onRestore, onPermanentDelete, canRestore 
                   {event.noAssistant ? <Pill className="border-zinc-200 bg-white text-zinc-700">No Assistant</Pill> : null}
                 </div>
                 <div className="mt-2 truncate text-sm font-semibold text-zinc-950">{event.title}</div>
-                <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {event.time || 'TBD'}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
+                <div className="mt-1 text-xs text-zinc-500">{formatDate(event.date)} · {formatClockTime(event.time || 'TBD')}{event.canonicalSchool ? ` · ${event.canonicalSchool}` : ''}</div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 {canRestore ? <button type="button" onClick={() => onRestore(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/80 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]">Restore</button> : null}
