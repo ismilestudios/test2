@@ -1972,7 +1972,6 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   // but they remain excluded from rollouts and Scheduling Complete.
   const scheduleLiveAvailabilityTypes = new Set(['Time Off', 'Personal Appointment', 'Call or Meeting']);
   const availabilityEvents = (operationalEvents || []).filter(event => event && event.active !== false && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && scheduleLiveAvailabilityTypes.has(event.type));
-  const heldEvents = (operationalEvents || []).filter(event => event && event.status === SCHEDULE_LIVE_HOLD_STATUS && monthKey(event.date) === monthKey(liveState.weekStart));
   // Count each occurrence/day and use its actual per-day staffing assignment.
   // This makes multi-day events and live assignment changes reflect immediately.
   const weeklyRollouts = days.reduce((total, dateKey) => total + getRolloutCountForDate(weekEvents, dateKey), 0);
@@ -2283,30 +2282,51 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
           </div>
         </div>
 
-        <div className="mt-5 hidden gap-3 sm:grid lg:grid-cols-[1fr_1fr]">
-          <section className="schedule-live-premium-glow rounded-[1.5rem] border border-[#FFEA00] bg-[#FFEA00] p-3 text-zinc-950 shadow-lg shadow-yellow-950/20">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-black text-zinc-950">🟡 Shelved! Needs Discussion Later</h3>
-              <span className="rounded-full bg-zinc-950 px-2 py-1 text-[10px] font-black text-[#FFEA00]">{heldEvents.length}</span>
-            </div>
-            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-              {heldEvents.length ? heldEvents.map(event => <button key={event.id} type="button" onClick={() => onClickEvent(event)} className="min-w-[220px] rounded-2xl border border-zinc-950/10 bg-white/85 p-3 text-left text-xs font-bold text-zinc-950 shadow-sm hover:bg-white"><div>{event.title}</div><div className="mt-1 text-zinc-700">{shortDate(event.date)} · {getEventTimeLabel(event)}</div>{canEdit ? <span onClick={(e) => { e.stopPropagation(); toggleHold(event); }} className="mt-2 inline-flex rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-yellow-950">Return to week</span> : null}</button>) : <div className="w-full rounded-2xl border border-dashed border-zinc-950/20 bg-white/35 p-4 text-center text-xs font-black text-zinc-800">Nothing shelved.</div>}
+        <div className="mt-5 hidden gap-3 sm:grid lg:grid-cols-[2fr_1fr]">
+          <section className="schedule-live-premium-glow min-w-0 rounded-[1.5rem] border border-white/10 bg-white/10 p-3 text-white">
+            <h3 className="text-sm font-black">Week Overview</h3>
+            <div className={`mt-3 grid gap-2 ${liveState.showWeekends ? 'grid-cols-7' : 'grid-cols-5'}`}>
+              {days.map(date => {
+                const overviewEvents = weekEvents
+                  .filter(event => isDateInEventRange(event, date))
+                  .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+                return (
+                  <div key={`week-overview-${date}`} className="min-w-0 rounded-xl border border-white/10 bg-black/10 p-2">
+                    <div className="mb-2 border-b border-white/10 pb-1.5 text-center">
+                      <div className="text-[10px] font-black uppercase tracking-wide text-white/70">{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                      <div className="text-[9px] font-semibold text-white/40">{shortDate(date)}</div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {overviewEvents.length ? overviewEvents.map(event => {
+                        const assignedNames = getScheduleLivePhotographersForDate(event, date);
+                        const photographerReady = event.status !== SCHEDULE_LIVE_HOLD_STATUS && scheduleLiveDateMeetsPhotographerRequirement(event, date);
+                        return (
+                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${assignedNames.length ? assignedNames.join(', ') : 'TBD'}`} className={`min-w-0 rounded-lg border px-2 py-1.5 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
+                            <div className="truncate text-[11px] font-black leading-tight text-white">{event.title}</div>
+                            <div className={`mt-0.5 truncate text-[10px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{assignedNames.length ? assignedNames.join(', ') : 'TBD'}</div>
+                          </div>
+                        );
+                      }) : <div className="py-2 text-center text-[9px] font-semibold text-white/25">No events</div>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
           <section className="schedule-live-premium-glow min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
             <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
             <div className="mt-2 flex gap-2">
-              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-sm text-zinc-900 outline-none" />
-              <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-sm font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
+              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-xs text-zinc-900 outline-none" />
+              <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-xs font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
             </div>
-            <div className="mt-2 flex max-h-[96px] max-w-full min-w-0 gap-2 overflow-x-auto overflow-y-auto pb-1 pr-1">
+            <div className="mt-2 max-h-[82px] max-w-full min-w-0 space-y-1.5 overflow-y-auto pr-1">
               {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
-                <div key={entry.id} className="schedule-live-comment-card w-[240px] min-w-[220px] max-w-[280px] shrink-0 rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white">
-                  <div className="text-[10px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
-                  <div className="mt-1 max-h-10 overflow-hidden break-words text-xs leading-4 text-white/90 [overflow-wrap:anywhere]">{entry.text}</div>
+                <div key={entry.id} className="schedule-live-comment-card min-w-0 rounded-xl border border-white/10 bg-white/10 p-2 text-white">
+                  <div className="truncate text-[9px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
+                  <div className="mt-0.5 line-clamp-2 break-words text-[10px] leading-4 text-white/85 [overflow-wrap:anywhere]">{entry.text}</div>
                 </div>
-              )) : <div className="w-full rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 text-center text-xs font-semibold text-white/45">No live commentary yet.</div>}
+              )) : <div className="rounded-xl border border-dashed border-white/15 bg-white/5 p-3 text-center text-[10px] font-semibold text-white/40">No live commentary yet.</div>}
             </div>
           </section>
         </div>
