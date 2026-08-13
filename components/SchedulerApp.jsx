@@ -2282,31 +2282,43 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
           </div>
         </div>
 
-        <div className="mt-5 hidden gap-3 sm:grid lg:grid-cols-[2fr_1fr]">
-          <section className="schedule-live-premium-glow min-w-0 rounded-[1.5rem] border border-white/10 bg-white/10 p-3 text-white">
-            <h3 className="text-sm font-black">Week Overview</h3>
-            <div className={`mt-3 grid gap-2 ${liveState.showWeekends ? 'grid-cols-7' : 'grid-cols-5'}`}>
+        <div className="mt-4 hidden gap-2.5 sm:grid lg:grid-cols-[4fr_1fr]">
+          <section className="schedule-live-premium-glow min-w-0 rounded-[1.35rem] border border-white/10 bg-white/10 p-2.5 text-white">
+            <h3 className="text-[13px] font-black">Week Overview</h3>
+            <div className={`mt-2 grid gap-1.5 ${liveState.showWeekends ? 'grid-cols-7' : 'grid-cols-5'}`}>
               {days.map(date => {
                 const overviewEvents = weekEvents
                   .filter(event => isDateInEventRange(event, date))
                   .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+                const overviewAvailability = availabilityEvents
+                  .filter(event => isDateInEventRange(event, date))
+                  .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
                 return (
-                  <div key={`week-overview-${date}`} className="min-w-0 rounded-xl border border-white/10 bg-black/10 p-2">
-                    <div className="mb-2 border-b border-white/10 pb-1.5 text-center">
-                      <div className="text-[10px] font-black uppercase tracking-wide text-white/70">{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                      <div className="text-[9px] font-semibold text-white/40">{shortDate(date)}</div>
+                  <div key={`week-overview-${date}`} className="min-w-0 rounded-lg border border-white/10 bg-black/10 p-1.5">
+                    <div className="mb-1.5 border-b border-white/10 pb-1 text-center">
+                      <div className="text-[9px] font-black uppercase tracking-wide text-white/70">{new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                      <div className="text-[8px] font-semibold text-white/40">{shortDate(date)}</div>
                     </div>
-                    <div className="space-y-1.5">
+                    {overviewAvailability.length ? (
+                      <div className="mb-1.5 flex flex-wrap gap-0.5">
+                        {overviewAvailability.map(event => (
+                          <div key={`week-overview-availability-${event.id}-${date}`} title={`${event.title}${getEventTimeLabel(event) ? ` • ${getEventTimeLabel(event)}` : ''}`} className={`max-w-full rounded-full border px-1.5 py-0.5 text-[8px] font-black leading-tight ${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-700 border-zinc-200'}`}>
+                            <span className="block max-w-full truncate">{event.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="space-y-1">
                       {overviewEvents.length ? overviewEvents.map(event => {
                         const assignedNames = getScheduleLivePhotographersForDate(event, date);
                         const photographerReady = event.status !== SCHEDULE_LIVE_HOLD_STATUS && scheduleLiveDateMeetsPhotographerRequirement(event, date);
                         return (
-                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${assignedNames.length ? assignedNames.join(', ') : 'TBD'}`} className={`min-w-0 rounded-lg border px-2 py-1.5 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
-                            <div className="truncate text-[11px] font-black leading-tight text-white">{event.title}</div>
-                            <div className={`mt-0.5 truncate text-[10px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{assignedNames.length ? assignedNames.join(', ') : 'TBD'}</div>
+                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${assignedNames.length ? assignedNames.join(', ') : 'TBD'}`} className={`min-w-0 rounded-md border px-1.5 py-1 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
+                            <div className="truncate text-[10px] font-black leading-tight text-white">{event.title}</div>
+                            <div className={`mt-px truncate text-[9px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{assignedNames.length ? assignedNames.join(', ') : 'TBD'}</div>
                           </div>
                         );
-                      }) : <div className="py-2 text-center text-[9px] font-semibold text-white/25">No events</div>}
+                      }) : (!overviewAvailability.length ? <div className="py-1.5 text-center text-[8px] font-semibold text-white/25">No events</div> : null)}
                     </div>
                   </div>
                 );
@@ -2314,19 +2326,19 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
             </div>
           </section>
 
-          <section className="schedule-live-premium-glow min-w-0 max-w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 p-3">
-            <h3 className="text-sm font-black text-white">🎙 Live Commentary</h3>
-            <div className="mt-2 flex gap-2">
-              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add live note..." className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/90 px-3 py-2 text-xs text-zinc-900 outline-none" />
-              <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-2xl bg-red-500 px-3 py-2 text-xs font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
+          <section className="schedule-live-premium-glow min-w-0 max-w-full overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/10 p-2">
+            <h3 className="text-xs font-black text-white">🎙 Commentary</h3>
+            <div className="mt-1.5 flex gap-1">
+              <input value={commentText} onChange={(e) => setCommentText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCommentary(); }} disabled={!authEmail} placeholder="Add note..." className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/90 px-2 py-1.5 text-[10px] text-zinc-900 outline-none" />
+              <button type="button" onClick={addCommentary} disabled={!commentText.trim()} className="rounded-xl bg-red-500 px-2 py-1.5 text-[10px] font-black text-white shadow-lg shadow-red-950/30 disabled:opacity-40">Add</button>
             </div>
-            <div className="mt-2 max-h-[82px] max-w-full min-w-0 space-y-1.5 overflow-y-auto pr-1">
+            <div className="mt-1.5 max-h-[58px] max-w-full min-w-0 space-y-1 overflow-y-auto pr-0.5">
               {(liveState.commentary || []).length ? liveState.commentary.map(entry => (
-                <div key={entry.id} className="schedule-live-comment-card min-w-0 rounded-xl border border-white/10 bg-white/10 p-2 text-white">
-                  <div className="truncate text-[9px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
-                  <div className="mt-0.5 line-clamp-2 break-words text-[10px] leading-4 text-white/85 [overflow-wrap:anywhere]">{entry.text}</div>
+                <div key={entry.id} className="schedule-live-comment-card min-w-0 rounded-lg border border-white/10 bg-white/10 p-1.5 text-white">
+                  <div className="truncate text-[8px] font-black uppercase tracking-wide text-red-100/75">{entry.name || 'User'} • {new Date(entry.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
+                  <div className="mt-px line-clamp-1 break-words text-[9px] leading-3 text-white/85 [overflow-wrap:anywhere]">{entry.text}</div>
                 </div>
-              )) : <div className="rounded-xl border border-dashed border-white/15 bg-white/5 p-3 text-center text-[10px] font-semibold text-white/40">No live commentary yet.</div>}
+              )) : <div className="rounded-lg border border-dashed border-white/15 bg-white/5 p-2 text-center text-[9px] font-semibold text-white/40">No commentary.</div>}
             </div>
           </section>
         </div>
