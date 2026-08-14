@@ -965,6 +965,11 @@ function weekBounds(date) {
   return { start: toKey(start), end: toKey(end) };
 }
 
+function rolloutWeekBounds(date = todayKey()) {
+  const start = getMondayStart(date || todayKey());
+  return { start, end: addDays(start, 6) };
+}
+
 function displayStatus(status) {
   return status === 'Needs Photographers Assigned' ? 'Needs Photographers Assigned' : status;
 }
@@ -1380,7 +1385,7 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
 
 function CurrentWeeklyRolloutCard({ events }) {
   const today = todayKey();
-  const { start, end } = weekBounds(today);
+  const { start, end } = rolloutWeekBounds(today);
   const weekEvents = events.filter(event => event && event.date <= end && (event.endDate || event.date) >= start);
   const weeklyRollouts = getRolloutCountForDateRange(events, start, end);
   const capacity = getCapacityTone(weeklyRollouts);
@@ -1609,8 +1614,8 @@ function getScheduleLiveDays(weekStart, showWeekends) {
 }
 
 function getScheduleLiveWeekLabel(weekStart, showWeekends) {
-  const days = getScheduleLiveDays(weekStart, showWeekends);
-  return `${shortDate(days[0])} – ${shortDate(days[days.length - 1])}`;
+  const { start, end } = rolloutWeekBounds(weekStart || todayKey());
+  return `${shortDate(start)} – ${shortDate(end)}`;
 }
 
 function getScheduleLiveMonthEvents(events, weekStart) {
@@ -1967,6 +1972,9 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   const days = getScheduleLiveDays(liveState.weekStart, liveState.showWeekends);
   const weekEnd = days[days.length - 1];
   const weekEvents = (operationalEvents || []).filter(event => event && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && isRolloutEvent(event));
+  const { start: rolloutWeekStart, end: rolloutWeekEnd } = rolloutWeekBounds(liveState.weekStart);
+  const rolloutWeekDays = Array.from({ length: 7 }, (_, index) => addDays(rolloutWeekStart, index));
+  const rolloutWeekEvents = (operationalEvents || []).filter(event => event && event.date <= rolloutWeekEnd && (event.endDate || event.date) >= rolloutWeekStart && isRolloutEvent(event));
   // Availability context is intentionally Schedule-Live-only. These internal
   // events are shown above production cards so schedulers can see conflicts,
   // but they remain excluded from rollouts and Scheduling Complete.
@@ -1974,7 +1982,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   const availabilityEvents = (operationalEvents || []).filter(event => event && event.active !== false && event.date <= weekEnd && (event.endDate || event.date) >= days[0] && scheduleLiveAvailabilityTypes.has(event.type));
   // Count each occurrence/day and use its actual per-day staffing assignment.
   // This makes multi-day events and live assignment changes reflect immediately.
-  const weeklyRollouts = days.reduce((total, dateKey) => total + getRolloutCountForDate(weekEvents, dateKey), 0);
+  const weeklyRollouts = rolloutWeekDays.reduce((total, dateKey) => total + getRolloutCountForDate(rolloutWeekEvents, dateKey), 0);
   const capacity = getCapacityTone(weeklyRollouts);
   const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
   const progress = getScheduleLiveProgress(operationalEvents, liveState.weekStart);
@@ -1986,8 +1994,8 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
     map[canonicalPhotographerName(name)] = 0;
     return map;
   }, {});
-  days.forEach(dateKey => {
-    weekEvents.filter(event => isDateInEventRange(event, dateKey)).forEach(event => {
+  rolloutWeekDays.forEach(dateKey => {
+    rolloutWeekEvents.filter(event => isDateInEventRange(event, dateKey)).forEach(event => {
       getScheduleLivePhotographersForDate(event, dateKey).forEach(name => {
         const canonical = canonicalPhotographerName(name);
         countsByPhotographer[canonical] = (countsByPhotographer[canonical] || 0) + 1;
@@ -2631,7 +2639,8 @@ const ROLLOUT_EVENT_TYPES = new Set([
   'Makeup Day',
   'Rain Date',
   'Family Photos',
-  'Special Event'
+  'Special Event',
+  'Studio Assigned Schools (SAS)'
 ]);
 
 function isNonRolloutOperationalEvent(event = {}) {
@@ -2803,7 +2812,7 @@ function RolloutBreakdownTooltip({ title = "This week's photographer load", star
 
 
 function getPhotographerWeekStats(events, date, photographer) {
-  const { start, end } = weekBounds(date || todayKey());
+  const { start, end } = rolloutWeekBounds(date || todayKey());
   const canonicalPhotographer = canonicalPhotographerName(photographer);
   const weekEvents = (events || []).filter(event => event && isRolloutEvent(event) && event.date <= end && (event.endDate || event.date) >= start);
   let rollouts = 0;
@@ -2891,10 +2900,11 @@ function PhotographerAssignmentPicker({ photographers, selectedPhotographers, se
 
 function WeekView({ events, selectedDate, onClick }) {
   const { start, end } = weekBounds(selectedDate);
+  const { start: rolloutStart, end: rolloutEnd } = rolloutWeekBounds(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const weekEvents = events.filter(event => event && event.date && event.date <= end && (event.endDate || event.date) >= start);
-  const weeklyRollouts = getRolloutCountForDateRange(events, start, end);
-  const photographerSummary = getPhotographerRolloutSummaryForDateRange(events, start, end);
+  const weeklyRollouts = getRolloutCountForDateRange(events, rolloutStart, rolloutEnd);
+  const photographerSummary = getPhotographerRolloutSummaryForDateRange(events, rolloutStart, rolloutEnd);
   const capacity = getCapacityTone(weeklyRollouts);
   const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
   const segments = buildMonthWeekSegments(events, days, null);
@@ -2918,7 +2928,7 @@ function WeekView({ events, selectedDate, onClick }) {
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/70">
             <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
           </div>
-          <RolloutBreakdownTooltip start={start} end={end} summary={photographerSummary} />
+          <RolloutBreakdownTooltip start={rolloutStart} end={rolloutEnd} summary={photographerSummary} />
         </div>
       </div>
 
@@ -3229,11 +3239,11 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
   const end = new Date('2026-12-31T12:00:00');
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const key = d.toISOString().slice(0, 10);
-    const { start: weekStart, end: weekEnd } = weekBounds(key);
+    const { start: weekStart, end: weekEnd } = rolloutWeekBounds(key);
     const scheduled = events.filter(event => isDateInEventRange(event, key));
     const weekEvents = events.filter(event => event && event.date && event.date <= weekEnd && (event.endDate || event.date) >= weekStart);
     const dayRollouts = scheduled.reduce((total, event) => total + getRolloutCountForOccurrence(event, key), 0);
-    const weekRollouts = getRolloutCountForDateRange(events, weekStart, weekEnd, { weekdaysOnly: true });
+    const weekRollouts = getRolloutCountForDateRange(events, weekStart, weekEnd);
     const remainingWeekRollouts = Math.max(0, WEEKLY_ROLLOUT_CAPACITY - weekRollouts);
     const capacity = getCapacityTone(weekRollouts);
     dates.push({ date: key, scheduledCount: scheduled.length, scheduled, dayRollouts, weekRollouts, remainingWeekRollouts, capacity, weekStart, weekEnd });
