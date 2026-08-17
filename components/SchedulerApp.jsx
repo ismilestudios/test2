@@ -1634,7 +1634,10 @@ function eventMeetsScheduleLiveCompletionRequirements(event = {}) {
   if (!event || event.status === SCHEDULE_LIVE_HOLD_STATUS) return false;
   const dates = getEventDateKeys(event);
   const eventDates = dates.length ? dates : (event.date ? [event.date] : []);
-  return eventDates.length > 0 && eventDates.every(date => scheduleLiveDateMeetsAllStaffingRequirements(event, date));
+  // "Scheduling Complete" in Schedule Live tracks the photographer scheduling
+  // pass. Assistant staffing remains visible/editable, but does not hold down
+  // this percentage because assistants are finalized independently.
+  return eventDates.length > 0 && eventDates.every(date => scheduleLiveDateMeetsPhotographerRequirement(event, date));
 }
 
 function getScheduleLiveProgress(events, weekStart) {
@@ -1823,7 +1826,7 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
   );
 }
 
-function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent, onSchedule, onAddEvent, authEmail, isAdminUser, canEdit = true, reloadEvents }) {
+function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent, onSchedule, onAddEvent, authEmail, isAdminUser, canEdit = true }) {
   const [liveState, setLiveState] = useState(() => scheduleLiveDefaultState(todayKey()));
   const [statusMessage, setStatusMessage] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -1831,9 +1834,37 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   const [selectedPhotographer, setSelectedPhotographer] = useState('');
   const [operationalEvents, setOperationalEvents] = useState(() => events || []);
   const liveStateRef = useRef(liveState);
+  const realtimeEventGenerationRef = useRef(new Map());
 
   useEffect(() => {
-    setOperationalEvents(events || []);
+    // Never wholesale-replace the live board from a parent refresh. During a
+    // multi-user session that can temporarily erase newer realtime state while
+    // an older full-event read is finishing. Merge only incoming rows that are
+    // new or at least as recent as the copy already visible in Schedule Live.
+    setOperationalEvents(prev => {
+      const current = prev || [];
+      const incoming = events || [];
+      if (!current.length) return incoming;
+      const next = [...current];
+      incoming.forEach(event => {
+        if (!event) return;
+        const matchIndex = next.findIndex(item =>
+          item && (
+            (event.supabaseId && item.supabaseId === event.supabaseId) ||
+            item.id === event.id
+          )
+        );
+        if (matchIndex < 0) {
+          next.push(event);
+          return;
+        }
+        const existing = next[matchIndex];
+        const incomingTime = new Date(event.updatedAt || event.createdAt || 0).getTime() || 0;
+        const existingTime = new Date(existing?.updatedAt || existing?.createdAt || 0).getTime() || 0;
+        if (!existingTime || !incomingTime || incomingTime >= existingTime) next[matchIndex] = event;
+      });
+      return next.sort((a, b) => String(a?.date || '').localeCompare(String(b?.date || '')));
+    });
   }, [events]);
 
   useEffect(() => {
@@ -1904,13 +1935,18 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
       if (cancelled || !supabase) return;
       const eventId = payload?.new?.id || payload?.old?.id;
       if (!eventId) {
-        await reloadEvents?.();
+        // A malformed notification should not trigger a whole-board reload.
+        // Keeping the current board intact is safer; the next valid event
+        // notification or manual refresh will reconcile it.
+        console.warn('Schedule Live realtime event notification had no event id', payload);
         return;
       }
 
-      // Re-read the committed Supabase row before changing another user's
-      // Schedule Live board. The realtime message is only the signal; Supabase
-      // remains the source of truth for the actual event state.
+      const currentGeneration = (realtimeEventGenerationRef.current.get(eventId) || 0) + 1;
+      realtimeEventGenerationRef.current.set(eventId, currentGeneration);
+
+      // Re-read only the committed event that changed. Multiple users can edit
+      // rapidly without launching overlapping full-calendar reloads.
       const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -1918,9 +1954,13 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
         .maybeSingle();
 
       if (cancelled) return;
+      // If a newer notification for this same event arrived while this request
+      // was in flight, ignore this older response.
+      if (realtimeEventGenerationRef.current.get(eventId) !== currentGeneration) return;
+
       if (error) {
         console.warn('Schedule Live realtime event readback failed', error);
-        await reloadEvents?.();
+        setStatusMessage('A live event update could not be read back. The saved schedule is safe; refresh only if this tile stops updating.');
         return;
       }
 
@@ -1929,15 +1969,20 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
         if (!data || data.active === false) {
           return current.filter(item => item?.supabaseId !== eventId && item?.id !== eventId);
         }
+
         const incoming = supabaseRowToEvent(data);
         const matchIndex = current.findIndex(item => item?.supabaseId === eventId || item?.id === eventId);
-        if (matchIndex < 0) return [...current, incoming].sort((a, b) => String(a?.date || '').localeCompare(String(b?.date || '')));
+        if (matchIndex < 0) {
+          return [...current, incoming].sort((a, b) => String(a?.date || '').localeCompare(String(b?.date || '')));
+        }
+
+        const existing = current[matchIndex];
+        const incomingTime = new Date(incoming?.updatedAt || incoming?.createdAt || 0).getTime() || 0;
+        const existingTime = new Date(existing?.updatedAt || existing?.createdAt || 0).getTime() || 0;
+        if (existingTime && incomingTime && incomingTime < existingTime) return current;
+
         return current.map((item, index) => index === matchIndex ? incoming : item);
       });
-
-      // Keep the parent event cache fresh too. This does not add realtime to
-      // any other view—the subscription only exists while Schedule Live is mounted.
-      await reloadEvents?.();
     };
 
     const channel = hasSupabaseEnv() && supabase
@@ -1959,7 +2004,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
 
     const heartbeat = window.setInterval(() => {
       saveLiveState(prev => ({ ...prev }));
-    }, 25000);
+    }, 60000);
 
     return () => {
       cancelled = true;
@@ -2261,10 +2306,10 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
               </div>
             </div>
             <div className="schedule-live-premium-glow rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
-              <div className="text-xs font-black uppercase tracking-wide opacity-70">Scheduling Complete</div>
+              <div className="text-xs font-black uppercase tracking-wide opacity-70">Photographer Scheduling Complete</div>
               <div className="mt-1 text-3xl font-black">{progress.pct}%</div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${progress.pct}%` }} /></div>
-              <div className="mt-2 text-xs font-black">{progress.assigned} of {progress.total} {monthLabel(monthKey(liveState.weekStart))} events assigned</div>
+              <div className="mt-2 text-xs font-black">{progress.assigned} of {progress.total} {monthLabel(monthKey(liveState.weekStart))} events photographer-ready</div>
             </div>
             <div className="schedule-live-premium-glow rounded-[1.5rem] border border-white/15 bg-white/10 p-4">
               <div className="text-xs font-black uppercase tracking-wide text-white/60">Host Controls</div>
@@ -2285,7 +2330,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
             <div className="mt-1 text-2xl font-black">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
           </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
-            <div className="text-[10px] font-black uppercase tracking-wide opacity-70">Complete</div>
+            <div className="text-[10px] font-black uppercase tracking-wide opacity-70">Photog Complete</div>
             <div className="mt-1 text-2xl font-black">{progress.pct}%</div>
           </div>
         </div>
