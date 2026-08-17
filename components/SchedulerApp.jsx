@@ -4880,10 +4880,24 @@ function normalizeImportedEventType(row = {}) {
   const title = String(row.title || '').toLowerCase();
   const date = String(row.date || '');
   const isGoogleImport = row.source === 'google_calendar_import';
-  // Once a user deliberately changes an imported event to one of the Scheduler's
-  // operational types, the saved event_type is authoritative. Do not let the
-  // historical Google-import title heuristics change it back during readback.
-  const authoritativeTypes = new Set(['Time Off', 'Personal Appointment', 'Edit Day', 'Call or Meeting']);
+  // Once a user deliberately changes an imported event to a current Scheduler
+  // event type, the saved event_type is authoritative. Historical Google-import
+  // title heuristics are only for legacy/raw import values and must never undo
+  // an explicit Event Type selection made in the Scheduler.
+  const authoritativeTypes = new Set([
+    'Fall Picture Day',
+    'Spring Picture Day',
+    'Makeup Day',
+    'Rain Date',
+    'Sports',
+    'Seniors',
+    'Special Event',
+    'Studio Assigned Schools (SAS)',
+    'Time Off',
+    'Personal Appointment',
+    'Edit Day',
+    'Call or Meeting'
+  ]);
   if (authoritativeTypes.has(rawType)) return rawType;
   if (!isGoogleImport) return rawType || 'Special Event';
   if (title.includes('rain date') || /\brain\b/.test(title)) return 'Rain Date';
