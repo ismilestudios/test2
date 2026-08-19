@@ -12,6 +12,7 @@ const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School
 const DEFAULT_WEEKLY_ROLLOUT_CAPACITY = 25;
 const MIN_WEEKLY_ROLLOUT_CAPACITY = 1;
 const MAX_WEEKLY_ROLLOUT_CAPACITY = 50;
+const NON_PRIMARY_PHOTOGRAPHER_EVENT_TYPES = new Set(['call or meeting', 'call/meeting', 'call / meeting', 'edit day', 'time off', 'personal appointment', 'time off / personal appointment']);
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -54,18 +55,28 @@ function canonicalPhotographerName(name = '') {
 }
 
 function uniqueCanonicalPhotographers(names = []) {
-  // Photographer array order is business-significant: the first photographer is
-  // the primary point of contact. Set preserves insertion order, so dedupe here
-  // must never be replaced with an alphabetical sort.
+  // Photographer array order is business-significant. For shoot/event types, the
+  // first photographer is the primary point of contact; internal non-shoot types
+  // keep the same order but intentionally do not display a primary marker. Set
+  // preserves insertion order, so dedupe here must never become alphabetical.
   return Array.from(new Set((names || []).map(canonicalPhotographerName).filter(Boolean)));
 }
 
-function primaryPhotographerDisplayNames(names = []) {
-  return uniqueCanonicalPhotographers(names).map((name, index) => index === 0 ? `${name}*` : name);
+function shouldMarkPrimaryPhotographer(eventOrType = '') {
+  const rawType = typeof eventOrType === 'string'
+    ? eventOrType
+    : (eventOrType?.type || eventOrType?.event_type || '');
+  const normalizedType = String(rawType || '').trim().toLowerCase();
+  return !NON_PRIMARY_PHOTOGRAPHER_EVENT_TYPES.has(normalizedType);
 }
 
-function formatPrimaryPhotographerList(names = [], fallback = '') {
-  const displayNames = primaryPhotographerDisplayNames(names);
+function primaryPhotographerDisplayNames(names = [], eventOrType = '') {
+  const markPrimary = shouldMarkPrimaryPhotographer(eventOrType);
+  return uniqueCanonicalPhotographers(names).map((name, index) => markPrimary && index === 0 ? `${name}*` : name);
+}
+
+function formatPrimaryPhotographerList(names = [], fallback = '', eventOrType = '') {
+  const displayNames = primaryPhotographerDisplayNames(names, eventOrType);
   return displayNames.length ? displayNames.join(', ') : fallback;
 }
 
@@ -880,7 +891,7 @@ function formatStaffingDisplay(event = {}, role = 'photographers') {
   if (!daily.length) return role === 'assistants' ? '—' : 'TBD';
 
   const formatNames = (names = []) => role === 'photographers'
-    ? formatPrimaryPhotographerList(names)
+    ? formatPrimaryPhotographerList(names, '', event)
     : names.filter(Boolean).join(', ');
   const multiDay = isMultiDayScheduleEvent(event);
   const firstNames = daily[0]?.names || [];
@@ -1370,7 +1381,7 @@ function compactCrewList(event = {}, occurrenceDate = '') {
     ? getScheduleLiveAssistantsForDate(event, targetDate)
     : (event.assistants || []).filter(Boolean);
   return [
-    ...primaryPhotographerDisplayNames(photographers),
+    ...primaryPhotographerDisplayNames(photographers, event),
     ...assistants
   ].filter(Boolean);
 }
@@ -1539,7 +1550,7 @@ function QuickAssignmentModal({ event, mode, photographers, assistants, onClose,
                 const canonical = canonicalPhotographerName(name);
                 const selectedNames = selectedPhotographers.map(canonicalPhotographerName);
                 const selected = selectedNames.includes(canonical);
-                const isPrimary = selected && selectedNames[0] === canonical;
+                const isPrimary = shouldMarkPrimaryPhotographer(event) && selected && selectedNames[0] === canonical;
                 return <button key={name} type="button" onClick={() => toggle(canonical, setSelectedPhotographers)} className={`rounded-full border px-3 py-2 text-sm font-semibold ${selected ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isPrimary ? `${canonical}*` : canonical}</button>;
               })}
             </div>
@@ -1864,7 +1875,7 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
       <AnimatePresence>
         {expandedHistory ? (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] text-zinc-700">
-            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-0.5"><span className="font-black">{row.date ? shortDate(row.date) : 'Past'}</span>{row.type ? <span className="text-zinc-400"> · {row.type}</span> : null} — {row.photographers.length ? formatPrimaryPhotographerList(row.photographers) : 'No photographer listed'}</div>) : <div className="text-zinc-500">No past photographer history found.</div>}
+            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-0.5"><span className="font-black">{row.date ? shortDate(row.date) : 'Past'}</span>{row.type ? <span className="text-zinc-400"> · {row.type}</span> : null} — {row.photographers.length ? formatPrimaryPhotographerList(row.photographers, '', row.type) : 'No photographer listed'}</div>) : <div className="text-zinc-500">No past photographer history found.</div>}
           </motion.div>
         ) : null}
         {expandedInfo ? (
@@ -2260,7 +2271,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     <div className="truncate text-sm font-black">{event.title}</div>
                     <div className="mt-1 text-xs font-semibold opacity-75">{getEventTimeLabel(event)}</div>
                     <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
-                      <div><span className="font-black">Photogs:</span> {formatPrimaryPhotographerList(getScheduleLivePhotographersForDate(event, date), 'Unassigned')}</div>
+                      <div><span className="font-black">Photogs:</span> {formatPrimaryPhotographerList(getScheduleLivePhotographersForDate(event, date), 'Unassigned', event)}</div>
                       <div><span className="font-black">Assistants:</span> {getScheduleLiveAssistantsForDate(event, date).length ? getScheduleLiveAssistantsForDate(event, date).join(', ') : 'None'}</div>
                     </div>
                   </button>
@@ -2419,9 +2430,9 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                         const assignedNames = getScheduleLivePhotographersForDate(event, date);
                         const photographerReady = event.status !== SCHEDULE_LIVE_HOLD_STATUS && scheduleLiveDateMeetsPhotographerRequirement(event, date);
                         return (
-                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${formatPrimaryPhotographerList(assignedNames, 'TBD')}`} className={`min-w-0 rounded-md border px-1.5 py-1 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
+                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${formatPrimaryPhotographerList(assignedNames, 'TBD', event)}`} className={`min-w-0 rounded-md border px-1.5 py-1 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
                             <div className="truncate text-[10px] font-black leading-tight text-white">{event.title}</div>
-                            <div className={`mt-px truncate text-[9px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{formatPrimaryPhotographerList(assignedNames, 'TBD')}</div>
+                            <div className={`mt-px truncate text-[9px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{formatPrimaryPhotographerList(assignedNames, 'TBD', event)}</div>
                           </div>
                         );
                       }) : (!overviewAvailability.length ? <div className="py-1.5 text-center text-[8px] font-semibold text-white/25">No events</div> : null)}
@@ -2967,7 +2978,7 @@ function getSchoolPhotographerHistory(history = []) {
   return Object.values(map).sort((a, b) => String(b.lastDate).localeCompare(String(a.lastDate)));
 }
 
-function PhotographerAssignmentPicker({ photographers, selectedPhotographers, setSelectedPhotographers, events = [], date, schoolName }) {
+function PhotographerAssignmentPicker({ photographers, selectedPhotographers, setSelectedPhotographers, events = [], date, schoolName, markPrimary = true }) {
   const recent = getRecentSchoolPhotographers(schoolName, events);
   const toggle = (name) => setSelectedPhotographers(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
   return (
@@ -2983,7 +2994,7 @@ function PhotographerAssignmentPicker({ photographers, selectedPhotographers, se
         {photographers.map(name => {
           const stats = getPhotographerWeekStats(events, date, name);
           const isSelected = selectedPhotographers.includes(name);
-          const isPrimary = isSelected && selectedPhotographers[0] === name;
+          const isPrimary = markPrimary && isSelected && selectedPhotographers[0] === name;
           const isRecent = recent.includes(name);
           return (
             <button key={name} type="button" onClick={() => toggle(name)} className={`rounded-2xl border p-3 text-left text-sm transition hover:-translate-y-0.5 hover:shadow-sm ${isSelected ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>
@@ -3461,7 +3472,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
                     <button key={event.id} onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-white/80 p-2 text-left text-xs transition hover:bg-white hover:shadow-sm">
                       <div className="font-semibold text-zinc-900">{formatDate(event.date)}</div>
                       <div className="mt-1 text-zinc-600">{event.title}</div>
-                      <div className="mt-1 text-zinc-500">Assigned: {formatPrimaryPhotographerList(event.photographers || [], '—')}</div>
+                      <div className="mt-1 text-zinc-500">Assigned: {formatPrimaryPhotographerList(event.photographers || [], '—', event)}</div>
                     </button>
                   ))}
                 </div>
@@ -3611,7 +3622,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
               <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">2025 Reference</div>
                 <div className="mt-2 text-sm text-zinc-800">{school.lastEvent ? `${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}` : 'No matched Fall 2025 reference yet.'}</div>
-                <div className="mt-1 text-xs text-zinc-500">Assigned: {formatPrimaryPhotographerList(school.lastEvent?.photographers || [], '—')}</div>
+                <div className="mt-1 text-xs text-zinc-500">Assigned: {formatPrimaryPhotographerList(school.lastEvent?.photographers || [], '—', school.lastEvent)}</div>
               </div>
             </div>
 
@@ -3886,7 +3897,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               </label>
             </div>
             {isInternalBlockingEvent ? (
-              <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={title || eventType} />
+              <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={title || eventType} markPrimary={shouldMarkPrimaryPhotographer(eventType)} />
             ) : null}
             {!isInternalBlockingEvent ? (
               <>
@@ -3927,7 +3938,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                             <div className="mt-2 flex flex-wrap gap-2">
                               {photographers.map(name => {
                                 const clean = canonicalPhotographerName(name);
-                                const isPrimary = assignedPhotogs[0] === clean;
+                                const isPrimary = shouldMarkPrimaryPhotographer(eventType) && assignedPhotogs[0] === clean;
                                 return <button key={`${day}-photog-${clean}`} type="button" onClick={() => toggleDayAssignmentName(day, 'photographers', clean)} className={`rounded-full border px-3 py-2 text-sm transition ${assignedPhotogs.includes(clean) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{isPrimary ? `${clean}*` : clean}</button>;
                               })}
                             </div>
@@ -3948,7 +3959,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                   </section>
                 ) : (
                   <>
-                    <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} />
+                    <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={schoolName} markPrimary={shouldMarkPrimaryPhotographer(eventType)} />
                     <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                       <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
                       {noAssistant || (Number(requiredAssistants) || 0) <= 0 ? (
@@ -4696,7 +4707,7 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
                     <div className="min-w-0">
                       <div className="text-[11px] font-black text-zinc-500">{formatDate(event.date)} · {event.season || getSeasonLabel(event.date)}</div>
                       <div className="mt-0.5 truncate text-sm font-black text-zinc-950">{event.title}</div>
-                      <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">Assigned: {formatPrimaryPhotographerList(event.photographers || [], '—')}</div>
+                      <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">Assigned: {formatPrimaryPhotographerList(event.photographers || [], '—', event)}</div>
                     </div>
                     <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} shrink-0 text-[9px]`}>{event.type}</Pill>
                   </div>
@@ -5643,7 +5654,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
                 {plainViewMode !== 'Day' ? <div className="border-b border-zinc-100 bg-cream/80 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-zinc-500">{formatDate(date)}</div> : null}
                 {dayEvents.map(event => {
                   const occurrenceDate = event.instanceDate || date || event.date;
-                  const photogs = formatPrimaryPhotographerList(getScheduleLivePhotographersForDate(event, occurrenceDate), 'TBD');
+                  const photogs = formatPrimaryPhotographerList(getScheduleLivePhotographersForDate(event, occurrenceDate), 'TBD', event);
                   const assistantsLabel = getScheduleLiveAssistantsForDate(event, occurrenceDate).join(', ') || '—';
                   return (
                     <div key={`${event.id}-${occurrenceDate}`} role="button" tabIndex={0} onClick={() => onClick(event)} onKeyDown={(keyEvent) => { if (keyEvent.key === 'Enter' || keyEvent.key === ' ') onClick(event); }} className="grid w-full cursor-pointer select-text grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45">
