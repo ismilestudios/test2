@@ -2428,11 +2428,18 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     <div className="space-y-1">
                       {overviewEvents.length ? overviewEvents.map(event => {
                         const assignedNames = getScheduleLivePhotographersForDate(event, date);
+                        const assignedAssistants = getScheduleLiveAssistantsForDate(event, date);
+                        const photographerDisplayNames = primaryPhotographerDisplayNames(assignedNames, event);
+                        const weekOverviewStaffNames = [
+                          ...(photographerDisplayNames.length ? photographerDisplayNames : ['TBD']),
+                          ...assignedAssistants
+                        ];
+                        const weekOverviewStaffLabel = weekOverviewStaffNames.join(', ');
                         const photographerReady = event.status !== SCHEDULE_LIVE_HOLD_STATUS && scheduleLiveDateMeetsPhotographerRequirement(event, date);
                         return (
-                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${formatPrimaryPhotographerList(assignedNames, 'TBD', event)}`} className={`min-w-0 rounded-md border px-1.5 py-1 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
+                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${weekOverviewStaffLabel}`} className={`min-w-0 rounded-md border px-1.5 py-1 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
                             <div className="truncate text-[10px] font-black leading-tight text-white">{event.title}</div>
-                            <div className={`mt-px truncate text-[9px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{formatPrimaryPhotographerList(assignedNames, 'TBD', event)}</div>
+                            <div className={`mt-px truncate text-[9px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{weekOverviewStaffLabel}</div>
                           </div>
                         );
                       }) : (!overviewAvailability.length ? <div className="py-1.5 text-center text-[8px] font-semibold text-white/25">No events</div> : null)}
