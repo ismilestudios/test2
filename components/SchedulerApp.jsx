@@ -9,7 +9,9 @@ import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 import { SCHEDULER_VERSION, SCHEDULER_LAST_UPDATED } from '../lib/schedulerVersion';
 
 const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
-const WEEKLY_ROLLOUT_CAPACITY = 21;
+const DEFAULT_WEEKLY_ROLLOUT_CAPACITY = 25;
+const MIN_WEEKLY_ROLLOUT_CAPACITY = 1;
+const MAX_WEEKLY_ROLLOUT_CAPACITY = 50;
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -52,7 +54,27 @@ function canonicalPhotographerName(name = '') {
 }
 
 function uniqueCanonicalPhotographers(names = []) {
+  // Photographer array order is business-significant: the first photographer is
+  // the primary point of contact. Set preserves insertion order, so dedupe here
+  // must never be replaced with an alphabetical sort.
   return Array.from(new Set((names || []).map(canonicalPhotographerName).filter(Boolean)));
+}
+
+function primaryPhotographerDisplayNames(names = []) {
+  return uniqueCanonicalPhotographers(names).map((name, index) => index === 0 ? `${name}*` : name);
+}
+
+function formatPrimaryPhotographerList(names = [], fallback = '') {
+  const displayNames = primaryPhotographerDisplayNames(names);
+  return displayNames.length ? displayNames.join(', ') : fallback;
+}
+
+function getWeeklyRolloutCapacity(date = todayKey(), overrides = {}) {
+  const weekStart = getMondayStart(date || todayKey());
+  const raw = overrides?.[weekStart];
+  const capacity = Number(raw);
+  if (Number.isInteger(capacity) && capacity >= MIN_WEEKLY_ROLLOUT_CAPACITY && capacity <= MAX_WEEKLY_ROLLOUT_CAPACITY) return capacity;
+  return DEFAULT_WEEKLY_ROLLOUT_CAPACITY;
 }
 
 function explicitCurrentPhotographerAssignments(names = [], allowedNames = PHOTOGRAPHERS) {
@@ -857,19 +879,22 @@ function formatStaffingDisplay(event = {}, role = 'photographers') {
   const daily = getEventStaffingByDate(event, role);
   if (!daily.length) return role === 'assistants' ? '—' : 'TBD';
 
+  const formatNames = (names = []) => role === 'photographers'
+    ? formatPrimaryPhotographerList(names)
+    : names.filter(Boolean).join(', ');
   const multiDay = isMultiDayScheduleEvent(event);
   const firstNames = daily[0]?.names || [];
   if (multiDay && firstNames.length && sameStaffEveryDay(daily)) {
-    return `${firstNames.join(', ')} — All Days`;
+    return `${formatNames(firstNames)} — All Days`;
   }
 
   if (multiDay) {
     return daily
-      .map(item => `${shortDate(item.date)}: ${item.names.length ? item.names.join(', ') : (role === 'assistants' ? '—' : 'TBD')}`)
+      .map(item => `${shortDate(item.date)}: ${item.names.length ? formatNames(item.names) : (role === 'assistants' ? '—' : 'TBD')}`)
       .join('\n');
   }
 
-  return firstNames.length ? firstNames.join(', ') : (role === 'assistants' ? '—' : 'TBD');
+  return firstNames.length ? formatNames(firstNames) : (role === 'assistants' ? '—' : 'TBD');
 }
 
 function getMultiDayPhotographerDisplay(event = {}) {
@@ -968,6 +993,23 @@ function weekBounds(date) {
 function rolloutWeekBounds(date = todayKey()) {
   const start = getMondayStart(date || todayKey());
   return { start, end: addDays(start, 6) };
+}
+
+
+function getRolloutWeekOptionsForYear(year) {
+  const numericYear = Number(year) || Number(todayKey().slice(0, 4));
+  const yearStart = `${numericYear}-01-01`;
+  const yearEnd = `${numericYear}-12-31`;
+  let cursor = getMondayStart(yearStart);
+  const weeks = [];
+  let guard = 0;
+  while (cursor <= yearEnd && guard < 54) {
+    const end = addDays(cursor, 6);
+    weeks.push({ start: cursor, end, label: `${shortDate(cursor)} – ${shortDate(end)}` });
+    cursor = addDays(cursor, 7);
+    guard += 1;
+  }
+  return weeks;
 }
 
 function displayStatus(status) {
@@ -1319,17 +1361,24 @@ function MonthNavigator({ month, setMonth }) {
 }
 
 
-function compactCrewList(event = {}) {
+function compactCrewList(event = {}, occurrenceDate = '') {
+  const targetDate = occurrenceDate || event.instanceDate || event.date || '';
+  const photographers = targetDate
+    ? getScheduleLivePhotographersForDate(event, targetDate)
+    : uniqueCanonicalPhotographers(event.photographers || []);
+  const assistants = targetDate
+    ? getScheduleLiveAssistantsForDate(event, targetDate)
+    : (event.assistants || []).filter(Boolean);
   return [
-    ...uniqueCanonicalPhotographers(event.photographers || []),
-    ...(event.assistants || []).filter(Boolean)
+    ...primaryPhotographerDisplayNames(photographers),
+    ...assistants
   ].filter(Boolean);
 }
 
-function buildDayCopyText(title, dayEvents) {
+function buildDayCopyText(title, dayEvents, occurrenceDate = '') {
   if (!dayEvents.length) return 'Nothing scheduled';
   const items = dayEvents.map(event => {
-    const crew = compactCrewList(event);
+    const crew = compactCrewList(event, occurrenceDate);
     return `${event.canonicalSchool || event.title}${crew.length ? ` (${crew.join(', ')})` : ''}`;
   });
   return items.join('\n');
@@ -1342,7 +1391,7 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
     .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
   const copyDay = async () => {
-    const text = buildDayCopyText(title, dayEvents);
+    const text = buildDayCopyText(title, dayEvents, date);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -1374,7 +1423,7 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
           >
             <div className="truncate text-sm font-semibold text-zinc-900">{event.title}</div>
             <div className="mt-1 truncate text-xs text-zinc-500">
-              {compactCrewList(event).length ? <>Crew: {compactCrewList(event).join(', ')}</> : <>Needs photographers assigned</>}
+              {compactCrewList(event, date).length ? <>Crew: {compactCrewList(event, date).join(', ')}</> : <>Needs photographers assigned</>}
             </div>
           </button>
         )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-400">Nothing currently scheduled.</div>}
@@ -1383,13 +1432,14 @@ function TodayTomorrowList({ title, date, events, onClickEvent }) {
   );
 }
 
-function CurrentWeeklyRolloutCard({ events }) {
+function CurrentWeeklyRolloutCard({ events, rolloutCapacityOverrides = {} }) {
   const today = todayKey();
   const { start, end } = rolloutWeekBounds(today);
   const weekEvents = events.filter(event => event && event.date <= end && (event.endDate || event.date) >= start);
   const weeklyRollouts = getRolloutCountForDateRange(events, start, end);
-  const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
+  const weeklyCapacity = getWeeklyRolloutCapacity(start, rolloutCapacityOverrides);
+  const capacity = getCapacityTone(weeklyRollouts, weeklyCapacity);
+  const pct = Math.min(100, Math.round((weeklyRollouts / weeklyCapacity) * 100));
   const photographerSummary = getPhotographerRolloutSummaryForDateRange(events, start, end);
 
   return (
@@ -1401,7 +1451,7 @@ function CurrentWeeklyRolloutCard({ events }) {
         </div>
         <Pill className={`border-current bg-white/60 ${capacity.className}`}>{capacity.label}</Pill>
       </div>
-      <div className="mt-5 text-3xl font-semibold">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
+      <div className="mt-5 text-3xl font-semibold">{weeklyRollouts} / {weeklyCapacity}</div>
       <div className="mt-1 text-xs font-semibold uppercase tracking-wide opacity-75">Photographer rollouts</div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/70">
         <div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} />
@@ -1412,13 +1462,13 @@ function CurrentWeeklyRolloutCard({ events }) {
   );
 }
 
-function OperationalSummary({ events, onClickEvent }) {
+function OperationalSummary({ events, onClickEvent, rolloutCapacityOverrides = {} }) {
   const today = todayKey();
   return (
     <section className="grid gap-3 lg:grid-cols-3">
       <TodayTomorrowList title="What We're Photographing Today" date={today} events={events} onClickEvent={onClickEvent} />
       <TodayTomorrowList title="What We're Photographing Tomorrow" date={addDays(today, 1)} events={events} onClickEvent={onClickEvent} />
-      <CurrentWeeklyRolloutCard events={events} />
+      <CurrentWeeklyRolloutCard events={events} rolloutCapacityOverrides={rolloutCapacityOverrides} />
     </section>
   );
 }
@@ -1487,8 +1537,10 @@ function QuickAssignmentModal({ event, mode, photographers, assistants, onClose,
             <div className="mt-2 flex flex-wrap gap-2">
               {photographers.map(name => {
                 const canonical = canonicalPhotographerName(name);
-                const selected = selectedPhotographers.map(canonicalPhotographerName).includes(canonical);
-                return <button key={name} type="button" onClick={() => toggle(canonical, setSelectedPhotographers)} className={`rounded-full border px-3 py-2 text-sm font-semibold ${selected ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{canonical}</button>;
+                const selectedNames = selectedPhotographers.map(canonicalPhotographerName);
+                const selected = selectedNames.includes(canonical);
+                const isPrimary = selected && selectedNames[0] === canonical;
+                return <button key={name} type="button" onClick={() => toggle(canonical, setSelectedPhotographers)} className={`rounded-full border px-3 py-2 text-sm font-semibold ${selected ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isPrimary ? `${canonical}*` : canonical}</button>;
               })}
             </div>
           </section>
@@ -1740,9 +1792,9 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {assigned.length ? assigned.map(name => (
+        {assigned.length ? assigned.map((name, index) => (
           <span key={name} className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2 py-1 text-[11px] font-bold text-zinc-800">
-            {name}
+            {index === 0 ? `${name}*` : name}
             {canEdit ? <button type="button" onClick={() => onRemovePhotographer(event, name, occurrenceDate)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
           </span>
         )) : null}
@@ -1797,7 +1849,7 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
       {makeupPhotographers.length ? (
         <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50/80 p-2 text-[11px] text-rose-900">
           <div className="font-black uppercase tracking-wide">Makeup shortcut</div>
-          <div className="mt-1">Picture Day crew: {makeupPhotographers.join(', ')}</div>
+          <div className="mt-1">Picture Day crew: {formatPrimaryPhotographerList(makeupPhotographers, '—')}</div>
           {canEdit ? <button type="button" onClick={() => makeupPhotographers.forEach(assign)} className="mt-2 rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white shadow-sm">Use same</button> : null}
         </div>
       ) : null}
@@ -1812,7 +1864,7 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
       <AnimatePresence>
         {expandedHistory ? (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] text-zinc-700">
-            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-0.5"><span className="font-black">{row.date ? shortDate(row.date) : 'Past'}</span>{row.type ? <span className="text-zinc-400"> · {row.type}</span> : null} — {row.photographers.length ? row.photographers.join(', ') : 'No photographer listed'}</div>) : <div className="text-zinc-500">No past photographer history found.</div>}
+            {history.length ? history.map(row => <div key={`${row.date}-${row.title}`} className="py-0.5"><span className="font-black">{row.date ? shortDate(row.date) : 'Past'}</span>{row.type ? <span className="text-zinc-400"> · {row.type}</span> : null} — {row.photographers.length ? formatPrimaryPhotographerList(row.photographers) : 'No photographer listed'}</div>) : <div className="text-zinc-500">No past photographer history found.</div>}
           </motion.div>
         ) : null}
         {expandedInfo ? (
@@ -1826,7 +1878,7 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
   );
 }
 
-function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent, onSchedule, onAddEvent, authEmail, isAdminUser, canEdit = true }) {
+function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent, onSchedule, onAddEvent, authEmail, isAdminUser, canEdit = true, rolloutCapacityOverrides = {} }) {
   const [liveState, setLiveState] = useState(() => scheduleLiveDefaultState(todayKey()));
   const [statusMessage, setStatusMessage] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -2028,8 +2080,9 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
   // Count each occurrence/day and use its actual per-day staffing assignment.
   // This makes multi-day events and live assignment changes reflect immediately.
   const weeklyRollouts = rolloutWeekDays.reduce((total, dateKey) => total + getRolloutCountForDate(rolloutWeekEvents, dateKey), 0);
-  const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
+  const weeklyCapacity = getWeeklyRolloutCapacity(rolloutWeekStart, rolloutCapacityOverrides);
+  const capacity = getCapacityTone(weeklyRollouts, weeklyCapacity);
+  const pct = Math.min(100, Math.round((weeklyRollouts / weeklyCapacity) * 100));
   const progress = getScheduleLiveProgress(operationalEvents, liveState.weekStart);
   const activeUsers = Object.values(liveState.activeUsers || {})
     .filter(user => user?.seenAt && Date.now() - new Date(user.seenAt).getTime() < 120000)
@@ -2166,7 +2219,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
             </div>
             <div className={`rounded-2xl border px-3 py-2 text-right ${capacity.className} bg-white text-zinc-900`}>
               <div className="text-[10px] font-black uppercase opacity-70">Rollouts</div>
-              <div className="text-lg font-black">{weeklyRollouts}/{WEEKLY_ROLLOUT_CAPACITY}</div>
+              <div className="text-lg font-black">{weeklyRollouts}/{weeklyCapacity}</div>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/10 p-2">
@@ -2207,7 +2260,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     <div className="truncate text-sm font-black">{event.title}</div>
                     <div className="mt-1 text-xs font-semibold opacity-75">{getEventTimeLabel(event)}</div>
                     <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
-                      <div><span className="font-black">Photogs:</span> {getScheduleLivePhotographersForDate(event, date).length ? getScheduleLivePhotographersForDate(event, date).join(', ') : 'Unassigned'}</div>
+                      <div><span className="font-black">Photogs:</span> {formatPrimaryPhotographerList(getScheduleLivePhotographersForDate(event, date), 'Unassigned')}</div>
                       <div><span className="font-black">Assistants:</span> {getScheduleLiveAssistantsForDate(event, date).length ? getScheduleLiveAssistantsForDate(event, date).join(', ') : 'None'}</div>
                     </div>
                   </button>
@@ -2288,9 +2341,9 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
           <div className="hidden gap-3 sm:grid sm:grid-cols-3 xl:min-w-[760px]">
             <div className={`schedule-live-premium-glow rounded-[1.5rem] border p-4 ${capacity.className} bg-white text-zinc-900`}>
               <div className="text-xs font-black uppercase tracking-wide opacity-70">Weekly Rollouts</div>
-              <div className="mt-1 text-3xl font-black">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
+              <div className="mt-1 text-3xl font-black">{weeklyRollouts} / {weeklyCapacity}</div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200"><div className={`h-full rounded-full ${capacity.barClassName}`} style={{ width: `${pct}%` }} /></div>
-              <div className="mt-2 text-xs font-black">{WEEKLY_ROLLOUT_CAPACITY - weeklyRollouts >= 0 ? `${WEEKLY_ROLLOUT_CAPACITY - weeklyRollouts} remaining` : `${weeklyRollouts - WEEKLY_ROLLOUT_CAPACITY} over capacity`} · {capacity.label}</div>
+              <div className="mt-2 text-xs font-black">{weeklyCapacity - weeklyRollouts >= 0 ? `${weeklyCapacity - weeklyRollouts} remaining` : `${weeklyRollouts - weeklyCapacity} over capacity`} · {capacity.label}</div>
               <div className="mt-3 border-t border-zinc-200/70 pt-2">
                 <div className="mb-1 text-[10px] font-black uppercase tracking-wide opacity-60">Weekly Rollouts</div>
                 <div className="flex flex-wrap gap-1.5">
@@ -2327,7 +2380,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
         <div className="mt-4 grid grid-cols-2 gap-2 sm:hidden">
           <div className={`rounded-2xl border p-3 ${capacity.className} bg-white text-zinc-900`}>
             <div className="text-[10px] font-black uppercase tracking-wide opacity-70">Rollouts</div>
-            <div className="mt-1 text-2xl font-black">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
+            <div className="mt-1 text-2xl font-black">{weeklyRollouts} / {weeklyCapacity}</div>
           </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
             <div className="text-[10px] font-black uppercase tracking-wide opacity-70">Photog Complete</div>
@@ -2366,9 +2419,9 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                         const assignedNames = getScheduleLivePhotographersForDate(event, date);
                         const photographerReady = event.status !== SCHEDULE_LIVE_HOLD_STATUS && scheduleLiveDateMeetsPhotographerRequirement(event, date);
                         return (
-                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${assignedNames.length ? assignedNames.join(', ') : 'TBD'}`} className={`min-w-0 rounded-md border px-1.5 py-1 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
+                          <div key={`week-overview-${event.id}-${date}`} title={`${event.title} • ${formatPrimaryPhotographerList(assignedNames, 'TBD')}`} className={`min-w-0 rounded-md border px-1.5 py-1 transition-colors ${photographerReady ? 'border-emerald-300/45 bg-emerald-300/15' : 'border-white/10 bg-white/5'}`}>
                             <div className="truncate text-[10px] font-black leading-tight text-white">{event.title}</div>
-                            <div className={`mt-px truncate text-[9px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{assignedNames.length ? assignedNames.join(', ') : 'TBD'}</div>
+                            <div className={`mt-px truncate text-[9px] font-bold leading-tight ${photographerReady ? 'text-emerald-100' : 'text-white/45'}`}>{formatPrimaryPhotographerList(assignedNames, 'TBD')}</div>
                           </div>
                         );
                       }) : (!overviewAvailability.length ? <div className="py-1.5 text-center text-[8px] font-semibold text-white/25">No events</div> : null)}
@@ -2790,13 +2843,16 @@ function getRolloutCountForDateRange(events = [], startKey, endKey, { weekdaysOn
   return total;
 }
 
-function getCapacityTone(rollouts) {
-  if (rollouts >= WEEKLY_ROLLOUT_CAPACITY) return {
+function getCapacityTone(rollouts, weeklyCapacity = DEFAULT_WEEKLY_ROLLOUT_CAPACITY) {
+  const safeCapacity = Math.max(MIN_WEEKLY_ROLLOUT_CAPACITY, Number(weeklyCapacity) || DEFAULT_WEEKLY_ROLLOUT_CAPACITY);
+  // Preserve the old 17-of-21 "Heavy" behavior proportionally as capacity changes.
+  const heavyThreshold = Math.max(1, Math.round(safeCapacity * (17 / 21)));
+  if (rollouts >= safeCapacity) return {
     label: 'Overloaded',
     className: 'border-rose-200 bg-rose-50 text-rose-800',
     barClassName: 'bg-rose-500'
   };
-  if (rollouts >= 17) return {
+  if (rollouts >= heavyThreshold) return {
     label: 'Heavy',
     className: 'border-amber-200 bg-amber-50 text-amber-900',
     barClassName: 'bg-amber-500'
@@ -2927,11 +2983,12 @@ function PhotographerAssignmentPicker({ photographers, selectedPhotographers, se
         {photographers.map(name => {
           const stats = getPhotographerWeekStats(events, date, name);
           const isSelected = selectedPhotographers.includes(name);
+          const isPrimary = isSelected && selectedPhotographers[0] === name;
           const isRecent = recent.includes(name);
           return (
             <button key={name} type="button" onClick={() => toggle(name)} className={`rounded-2xl border p-3 text-left text-sm transition hover:-translate-y-0.5 hover:shadow-sm ${isSelected ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold">{name}</span>
+                <span className="font-semibold">{isPrimary ? `${name}*` : name}</span>
                 {isRecent ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isSelected ? 'bg-white/15 text-white' : 'bg-[#DDE8D2] text-zinc-800'}`}>recent</span> : null}
               </div>
               <div className={`mt-1 text-xs ${isSelected ? 'text-white/70' : 'text-zinc-500'}`}>{stats.rollouts} rollout{stats.rollouts === 1 ? '' : 's'} this week{stats.dayEvents.length ? ` · ${stats.dayEvents.length} same-day` : ''}</div>
@@ -2943,15 +3000,16 @@ function PhotographerAssignmentPicker({ photographers, selectedPhotographers, se
   );
 }
 
-function WeekView({ events, selectedDate, onClick }) {
+function WeekView({ events, selectedDate, onClick, rolloutCapacityOverrides = {} }) {
   const { start, end } = weekBounds(selectedDate);
   const { start: rolloutStart, end: rolloutEnd } = rolloutWeekBounds(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const weekEvents = events.filter(event => event && event.date && event.date <= end && (event.endDate || event.date) >= start);
   const weeklyRollouts = getRolloutCountForDateRange(events, rolloutStart, rolloutEnd);
+  const weeklyCapacity = getWeeklyRolloutCapacity(rolloutStart, rolloutCapacityOverrides);
   const photographerSummary = getPhotographerRolloutSummaryForDateRange(events, rolloutStart, rolloutEnd);
-  const capacity = getCapacityTone(weeklyRollouts);
-  const pct = Math.min(100, Math.round((weeklyRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100));
+  const capacity = getCapacityTone(weeklyRollouts, weeklyCapacity);
+  const pct = Math.min(100, Math.round((weeklyRollouts / weeklyCapacity) * 100));
   const segments = buildMonthWeekSegments(events, days, null);
   const visibleRows = Math.max(4, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
   const hasHolidayInWeek = days.some(date => getHolidayLabels(date).length);
@@ -2966,7 +3024,7 @@ function WeekView({ events, selectedDate, onClick }) {
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide opacity-75">Weekly Rollouts</div>
-              <div className="mt-1 text-lg font-semibold">{weeklyRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</div>
+              <div className="mt-1 text-lg font-semibold">{weeklyRollouts} / {weeklyCapacity}</div>
             </div>
             <Pill className="border-current bg-white/60 text-current">{capacity.label}</Pill>
           </div>
@@ -3278,7 +3336,7 @@ function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS) {
+function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS, rolloutCapacityOverrides = {}) {
   const dates = [];
   const start = new Date('2026-08-01T12:00:00');
   const end = new Date('2026-12-31T12:00:00');
@@ -3289,9 +3347,10 @@ function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS)
     const weekEvents = events.filter(event => event && event.date && event.date <= weekEnd && (event.endDate || event.date) >= weekStart);
     const dayRollouts = scheduled.reduce((total, event) => total + getRolloutCountForOccurrence(event, key), 0);
     const weekRollouts = getRolloutCountForDateRange(events, weekStart, weekEnd);
-    const remainingWeekRollouts = Math.max(0, WEEKLY_ROLLOUT_CAPACITY - weekRollouts);
-    const capacity = getCapacityTone(weekRollouts);
-    dates.push({ date: key, scheduledCount: scheduled.length, scheduled, dayRollouts, weekRollouts, remainingWeekRollouts, capacity, weekStart, weekEnd });
+    const weeklyCapacity = getWeeklyRolloutCapacity(weekStart, rolloutCapacityOverrides);
+    const remainingWeekRollouts = Math.max(0, weeklyCapacity - weekRollouts);
+    const capacity = getCapacityTone(weekRollouts, weeklyCapacity);
+    dates.push({ date: key, scheduledCount: scheduled.length, scheduled, dayRollouts, weekRollouts, weeklyCapacity, remainingWeekRollouts, capacity, weekStart, weekEnd });
   }
   return dates;
 }
@@ -3402,7 +3461,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
                     <button key={event.id} onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-white/80 p-2 text-left text-xs transition hover:bg-white hover:shadow-sm">
                       <div className="font-semibold text-zinc-900">{formatDate(event.date)}</div>
                       <div className="mt-1 text-zinc-600">{event.title}</div>
-                      <div className="mt-1 text-zinc-500">Assigned: {event.photographers?.length ? event.photographers.join(', ') : '—'}</div>
+                      <div className="mt-1 text-zinc-500">Assigned: {formatPrimaryPhotographerList(event.photographers || [], '—')}</div>
                     </button>
                   ))}
                 </div>
@@ -3552,7 +3611,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
               <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">2025 Reference</div>
                 <div className="mt-2 text-sm text-zinc-800">{school.lastEvent ? `${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}` : 'No matched Fall 2025 reference yet.'}</div>
-                <div className="mt-1 text-xs text-zinc-500">Assigned: {school.lastEvent?.photographers?.length ? school.lastEvent.photographers.join(', ') : '—'}</div>
+                <div className="mt-1 text-xs text-zinc-500">Assigned: {formatPrimaryPhotographerList(school.lastEvent?.photographers || [], '—')}</div>
               </div>
             </div>
 
@@ -3868,7 +3927,8 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                             <div className="mt-2 flex flex-wrap gap-2">
                               {photographers.map(name => {
                                 const clean = canonicalPhotographerName(name);
-                                return <button key={`${day}-photog-${clean}`} type="button" onClick={() => toggleDayAssignmentName(day, 'photographers', clean)} className={`rounded-full border px-3 py-2 text-sm transition ${assignedPhotogs.includes(clean) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{clean}</button>;
+                                const isPrimary = assignedPhotogs[0] === clean;
+                                return <button key={`${day}-photog-${clean}`} type="button" onClick={() => toggleDayAssignmentName(day, 'photographers', clean)} className={`rounded-full border px-3 py-2 text-sm transition ${assignedPhotogs.includes(clean) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{isPrimary ? `${clean}*` : clean}</button>;
                               })}
                             </div>
                             {noAssistant || (Number(requiredAssistants) || 0) <= 0 ? (
@@ -4089,9 +4149,9 @@ function AddSchoolModal({ onClose, onSave }) {
   );
 }
 
-function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule, schoolsList, setSchools, onSchoolAdded, canEdit = true }) {
+function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule, schoolsList, setSchools, onSchoolAdded, canEdit = true, rolloutCapacityOverrides = {} }) {
   const schools = useMemo(() => getSchoolsToScheduleFromList(schoolsList, events), [schoolsList, events]);
-  const availability = useMemo(() => getFall2026Availability(events, photographers), [events, photographers]);
+  const availability = useMemo(() => getFall2026Availability(events, photographers, rolloutCapacityOverrides), [events, photographers, rolloutCapacityOverrides]);
   const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
   const [schedulingSchool, setSchedulingSchool] = useState(null);
   const [addingEvent, setAddingEvent] = useState(false);
@@ -4212,7 +4272,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
                 </div>
                 <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
                 <div className="mt-3 flex items-center justify-between gap-2">
-                  <div className="min-h-7">{item.lastEvent ? <div className="text-xs text-zinc-500">2025 Fall assigned: {item.referencePhotographers?.length ? item.referencePhotographers.join(', ') : '—'}</div> : null}</div>
+                  <div className="min-h-7">{item.lastEvent ? <div className="text-xs text-zinc-500">2025 Fall assigned: {formatPrimaryPhotographerList(item.referencePhotographers || [], '—')}</div> : null}</div>
                   {canEdit ? <button type="button" onClick={(event) => { event.stopPropagation(); setNoFallScheduling(item, true); }} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">No Fall Scheduling</button> : null}
                 </div>
               </div>
@@ -4249,11 +4309,11 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-2">
                   <Pill className="border-current bg-white/60 text-current">Day: {day.dayRollouts} rollout{day.dayRollouts === 1 ? '' : 's'}</Pill>
-                  <Pill className="border-current bg-white/60 text-current">Week: {day.weekRollouts} / {WEEKLY_ROLLOUT_CAPACITY}</Pill>
+                  <Pill className="border-current bg-white/60 text-current">Week: {day.weekRollouts} / {day.weeklyCapacity}</Pill>
                 </div>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/70">
-                <div className={`${day.capacity.barClassName || 'bg-emerald-500'} h-full rounded-full`} style={{ width: `${Math.min(100, Math.round((day.weekRollouts / WEEKLY_ROLLOUT_CAPACITY) * 100))}%` }} />
+                <div className={`${day.capacity.barClassName || 'bg-emerald-500'} h-full rounded-full`} style={{ width: `${Math.min(100, Math.round((day.weekRollouts / day.weeklyCapacity) * 100))}%` }} />
               </div>
               <div className="mt-3 text-xs leading-relaxed opacity-70">Currently Booked: {day.scheduled.map(event => event.title).join(', ') || '—'}</div>
             </button>
@@ -4636,7 +4696,7 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
                     <div className="min-w-0">
                       <div className="text-[11px] font-black text-zinc-500">{formatDate(event.date)} · {event.season || getSeasonLabel(event.date)}</div>
                       <div className="mt-0.5 truncate text-sm font-black text-zinc-950">{event.title}</div>
-                      <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">Assigned: {event.photographers?.length ? event.photographers.join(', ') : '—'}</div>
+                      <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">Assigned: {formatPrimaryPhotographerList(event.photographers || [], '—')}</div>
                     </div>
                     <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} shrink-0 text-[9px]`}>{event.type}</Pill>
                   </div>
@@ -5511,7 +5571,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
             <button key={event.id} type="button" onClick={() => onClick(event)} className="w-full rounded-xl border border-white/70 bg-white/80 p-2 text-left shadow-sm sm:rounded-2xl sm:p-3">
               <div className="truncate text-sm font-bold text-zinc-950">{event.title}</div>
               <div className="mt-0.5 text-xs text-zinc-600">{getEventTimeLabel(event)}</div>
-              <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">{compactCrewList(event).join(', ') || 'Staff TBD'}</div>
+              <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">{compactCrewList(event, today).join(', ') || 'Staff TBD'}</div>
             </button>
           )) : <div className="rounded-xl border border-dashed border-white/80 bg-white/60 p-3 text-sm text-zinc-500">Nothing scheduled for today.</div>}
         </div>
@@ -5583,7 +5643,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
                 {plainViewMode !== 'Day' ? <div className="border-b border-zinc-100 bg-cream/80 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-zinc-500">{formatDate(date)}</div> : null}
                 {dayEvents.map(event => {
                   const occurrenceDate = event.instanceDate || date || event.date;
-                  const photogs = getScheduleLivePhotographersForDate(event, occurrenceDate).join(', ') || 'TBD';
+                  const photogs = formatPrimaryPhotographerList(getScheduleLivePhotographersForDate(event, occurrenceDate), 'TBD');
                   const assistantsLabel = getScheduleLiveAssistantsForDate(event, occurrenceDate).join(', ') || '—';
                   return (
                     <div key={`${event.id}-${occurrenceDate}`} role="button" tabIndex={0} onClick={() => onClick(event)} onKeyDown={(keyEvent) => { if (keyEvent.key === 'Enter' || keyEvent.key === ' ') onClick(event); }} className="grid w-full cursor-pointer select-text grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45">
@@ -5605,7 +5665,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   );
 }
 
-function CalendarView({ viewMode, setViewMode, events, month, setMonth, selectedDate, setSelectedDate, onClick, onAddEvent, canEdit = true }) {
+function CalendarView({ viewMode, setViewMode, events, month, setMonth, selectedDate, setSelectedDate, onClick, onAddEvent, canEdit = true, rolloutCapacityOverrides = {} }) {
   const viewSwitcher = (
     <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:w-auto">
       {['Month', 'Week', 'Day'].map(mode => (
@@ -5633,7 +5693,7 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
 
       <div className="px-1.5 sm:px-0"><CalendarColorKey /></div>
       {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={canEdit ? onAddEvent : null} />}
-      {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} />}
+      {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
       {viewMode === 'Day' && <DayView events={events} selectedDate={selectedDate} onClick={onClick} />}
     </div>
   );
@@ -6395,7 +6455,155 @@ function makeBackupFilename(label, extension) {
   return `ismile-scheduler-${label}-${stamp}.${extension}`;
 }
 
-function AdminPage({ events, schools, photographers, assistants, staffMembers = [], eventsMessage, schoolsMessage, reloadEvents, reloadSchools, reloadTeamMembers, authEmail }) {
+function RolloutController({ rolloutCapacityOverrides = {}, setRolloutCapacityOverrides, authEmail = '' }) {
+  const currentYear = Number(todayKey().slice(0, 4));
+  const currentWeekStart = getMondayStart(todayKey());
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const weekOptions = useMemo(() => getRolloutWeekOptionsForYear(selectedYear), [selectedYear]);
+  const [selectedWeekStart, setSelectedWeekStart] = useState(currentWeekStart);
+  const effectiveCapacity = getWeeklyRolloutCapacity(selectedWeekStart, rolloutCapacityOverrides);
+  const [capacityValue, setCapacityValue] = useState(String(effectiveCapacity));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const overrideEntries = useMemo(() => Object.entries(rolloutCapacityOverrides || {})
+    .filter(([, capacity]) => Number.isInteger(Number(capacity)))
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0]))), [rolloutCapacityOverrides]);
+
+  useEffect(() => {
+    const options = getRolloutWeekOptionsForYear(selectedYear);
+    if (!options.some(option => option.start === selectedWeekStart)) {
+      const preferred = options.find(option => todayKey() >= option.start && todayKey() <= option.end) || options[0];
+      if (preferred) setSelectedWeekStart(preferred.start);
+    }
+  }, [selectedYear, selectedWeekStart]);
+
+  useEffect(() => {
+    setCapacityValue(String(getWeeklyRolloutCapacity(selectedWeekStart, rolloutCapacityOverrides)));
+  }, [selectedWeekStart, rolloutCapacityOverrides]);
+
+  const saveCapacity = async () => {
+    const capacity = Number(capacityValue);
+    if (!Number.isInteger(capacity) || capacity < MIN_WEEKLY_ROLLOUT_CAPACITY || capacity > MAX_WEEKLY_ROLLOUT_CAPACITY) {
+      setMessage(`Enter a whole-number capacity from ${MIN_WEEKLY_ROLLOUT_CAPACITY} to ${MAX_WEEKLY_ROLLOUT_CAPACITY}.`);
+      return;
+    }
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected, so this weekly setting could not be saved.');
+      return;
+    }
+
+    setSaving(true);
+    setMessage('Saving rollout capacity…');
+    let error = null;
+    if (capacity === DEFAULT_WEEKLY_ROLLOUT_CAPACITY) {
+      ({ error } = await supabase.from('rollout_capacity_overrides').delete().eq('week_start', selectedWeekStart));
+    } else {
+      ({ error } = await supabase.from('rollout_capacity_overrides').upsert({
+        week_start: selectedWeekStart,
+        capacity,
+        updated_by: authEmail || null,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'week_start' }));
+    }
+    setSaving(false);
+
+    if (error) {
+      setMessage(`Could not save rollout capacity: ${error.message}. Run the included v1.89 rollout-controller SQL if it has not been installed yet.`);
+      return;
+    }
+
+    setRolloutCapacityOverrides?.(prev => {
+      const next = { ...(prev || {}) };
+      if (capacity === DEFAULT_WEEKLY_ROLLOUT_CAPACITY) delete next[selectedWeekStart];
+      else next[selectedWeekStart] = capacity;
+      return next;
+    });
+    setMessage(capacity === DEFAULT_WEEKLY_ROLLOUT_CAPACITY
+      ? `Week of ${shortDate(selectedWeekStart)} reset to the default capacity of ${DEFAULT_WEEKLY_ROLLOUT_CAPACITY}.`
+      : `Week of ${shortDate(selectedWeekStart)} saved at ${capacity} rollouts.`);
+  };
+
+  const resetCapacity = async () => {
+    setCapacityValue(String(DEFAULT_WEEKLY_ROLLOUT_CAPACITY));
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected, so this weekly setting could not be reset.');
+      return;
+    }
+    setSaving(true);
+    setMessage('Resetting to default…');
+    const { error } = await supabase.from('rollout_capacity_overrides').delete().eq('week_start', selectedWeekStart);
+    setSaving(false);
+    if (error) {
+      setMessage(`Could not reset rollout capacity: ${error.message}.`);
+      return;
+    }
+    setRolloutCapacityOverrides?.(prev => {
+      const next = { ...(prev || {}) };
+      delete next[selectedWeekStart];
+      return next;
+    });
+    setMessage(`Week of ${shortDate(selectedWeekStart)} reset to the default capacity of ${DEFAULT_WEEKLY_ROLLOUT_CAPACITY}.`);
+  };
+
+  return (
+    <div className="rounded-[2rem] border border-[#AEBB9E] bg-[#DDE8D2]/35 p-5 shadow-sm">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="font-semibold text-zinc-950">Rollout Controller</h3>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">Weekly rollout capacity uses a Monday–Sunday business week. Normal weeks default to {DEFAULT_WEEKLY_ROLLOUT_CAPACITY}; only exception weeks are saved.</p>
+        </div>
+        <Pill className="border-[#AEBB9E] bg-white/80 text-zinc-800">Default: {DEFAULT_WEEKLY_ROLLOUT_CAPACITY}</Pill>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-[140px_minmax(240px,1fr)_160px_auto] md:items-end">
+        <label>
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Year</div>
+          <select value={selectedYear} onChange={(event) => setSelectedYear(Number(event.target.value))} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-semibold text-zinc-900 outline-none focus:border-[#AEBB9E]">
+            {[currentYear - 1, currentYear, currentYear + 1, currentYear + 2].map(year => <option key={year} value={year}>{year}</option>)}
+          </select>
+        </label>
+        <label>
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Week (Monday–Sunday)</div>
+          <select value={selectedWeekStart} onChange={(event) => setSelectedWeekStart(event.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-semibold text-zinc-900 outline-none focus:border-[#AEBB9E]">
+            {weekOptions.map(option => <option key={option.start} value={option.start}>{option.label}</option>)}
+          </select>
+        </label>
+        <label>
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Capacity</div>
+          <input type="number" min={MIN_WEEKLY_ROLLOUT_CAPACITY} max={MAX_WEEKLY_ROLLOUT_CAPACITY} step="1" value={capacityValue} onChange={(event) => setCapacityValue(event.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-black text-zinc-900 outline-none focus:border-[#AEBB9E]" />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={saving} onClick={saveCapacity} className="rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
+          <button type="button" disabled={saving || effectiveCapacity === DEFAULT_WEEKLY_ROLLOUT_CAPACITY} onClick={resetCapacity} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40">Reset to {DEFAULT_WEEKLY_ROLLOUT_CAPACITY}</button>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-600">
+        <span>Selected week: {shortDate(selectedWeekStart)} – {shortDate(addDays(selectedWeekStart, 6))}</span>
+        <span>•</span>
+        <span>Effective capacity: {effectiveCapacity}</span>
+        {rolloutCapacityOverrides?.[selectedWeekStart] ? <Pill className="border-amber-200 bg-amber-50 text-amber-800">Override</Pill> : <Pill className="border-emerald-200 bg-emerald-50 text-emerald-800">Default</Pill>}
+      </div>
+      {message ? <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/80 px-3 py-2 text-sm text-zinc-700">{message}</div> : null}
+      {overrideEntries.length ? (
+        <div className="mt-4 border-t border-[#AEBB9E]/50 pt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Saved Exceptions</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {overrideEntries.map(([weekStart, capacity]) => (
+              <button key={weekStart} type="button" onClick={() => { setSelectedYear(Number(weekStart.slice(0, 4))); setSelectedWeekStart(weekStart); }} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 shadow-sm hover:border-[#AEBB9E]">
+                {shortDate(weekStart)}: {capacity}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AdminPage({ events, schools, photographers, assistants, staffMembers = [], eventsMessage, schoolsMessage, reloadEvents, reloadSchools, reloadTeamMembers, authEmail, rolloutCapacityOverrides = {}, setRolloutCapacityOverrides }) {
   const activeEvents = (events || []).filter(event => event.active !== false);
   const removedEvents = (events || []).filter(event => event.active === false);
   const googleImported = activeEvents.filter(event => event.source === 'google_calendar_import');
@@ -6895,6 +7103,8 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
         ))}
       </div>
 
+      <RolloutController rolloutCapacityOverrides={rolloutCapacityOverrides} setRolloutCapacityOverrides={setRolloutCapacityOverrides} authEmail={authEmail} />
+
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
@@ -7094,6 +7304,7 @@ export default function SchedulerApp() {
   const [authEmail, setAuthEmail] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState('assistant');
   const [initialLoading, setInitialLoading] = useState(true);
+  const [rolloutCapacityOverrides, setRolloutCapacityOverrides] = useState({});
 
   useEffect(() => {
     setLocalManualEvents(loadLocalManualEvents());
@@ -7282,6 +7493,33 @@ export default function SchedulerApp() {
     setSchoolsMessage(`Loaded ${loadedSchools.length} protected School List row${loadedSchools.length === 1 ? '' : 's'} from Supabase.`);
   };
 
+  const loadRolloutCapacityOverrides = async () => {
+    if (!hasSupabaseEnv()) {
+      setRolloutCapacityOverrides({});
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from('rollout_capacity_overrides')
+      .select('week_start, capacity')
+      .order('week_start', { ascending: true });
+    if (error) {
+      // The controller migration may not be installed yet. Default capacity 25
+      // remains safe and operational; never let a settings read break Scheduler.
+      console.warn('Could not load rollout capacity overrides', error);
+      return;
+    }
+    const next = {};
+    (data || []).forEach(row => {
+      const capacity = Number(row?.capacity);
+      if (row?.week_start && Number.isInteger(capacity) && capacity >= MIN_WEEKLY_ROLLOUT_CAPACITY && capacity <= MAX_WEEKLY_ROLLOUT_CAPACITY) {
+        next[row.week_start] = capacity;
+      }
+    });
+    setRolloutCapacityOverrides(next);
+  };
+
   const loadTeamMembersFromSupabase = async () => {
     if (!hasSupabaseEnv()) {
       setTeamMembersMessage('Supabase is not connected yet. Using the built-in team member list.');
@@ -7395,7 +7633,8 @@ export default function SchedulerApp() {
       await Promise.all([
         loadTeamMembersFromSupabase(),
         loadSchoolsFromSupabase(),
-        loadEventsFromSupabase()
+        loadEventsFromSupabase(),
+        loadRolloutCapacityOverrides()
       ]);
       if (!cancelled) setInitialLoading(false);
 
@@ -7415,6 +7654,7 @@ export default function SchedulerApp() {
         loadTeamMembersFromSupabase();
         loadSchoolsFromSupabase();
         loadEventsFromSupabase();
+        loadRolloutCapacityOverrides();
       }
     });
 
@@ -7735,7 +7975,7 @@ export default function SchedulerApp() {
       <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-3 sm:space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : activeTab === 'Schedule Live!' ? 'px-1 sm:px-6' : 'px-2 sm:px-6'} ${activeTab === 'Overview' ? 'pb-36' : 'pb-28'} pt-3 sm:pb-6 sm:pt-6`}>
         <LoginRequiredNotice />
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
-        {activeTab === 'Overview' && !query.trim() ? <OperationalSummary events={allEvents} onClickEvent={setSelected} /> : null}
+        {activeTab === 'Overview' && !query.trim() ? <OperationalSummary events={allEvents} onClickEvent={setSelected} rolloutCapacityOverrides={rolloutCapacityOverrides} /> : null}
         <section className={activeTab === 'Schedule Live!' ? 'rounded-none border-0 bg-transparent p-0 shadow-none' : `rounded-[2rem] border border-zinc-200/80 bg-white/35 ${['Calendar View','Mobile View'].includes(activeTab) ? 'p-0 sm:p-4' : 'p-2 sm:p-4'} shadow-soft`}>
           {activeTab === 'Overview' && !query.trim() && <>
             {canEditScheduler ? (
@@ -7762,19 +8002,19 @@ export default function SchedulerApp() {
               <RemovedEventsModule events={removedEvents} onRestore={handleRestoreEvent} onPermanentDelete={handlePermanentDeleteEvent} canRestore={isAdminUser} canPermanentDelete={isAdminUser} />
             </div>
           </>}
-          {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} onAddEvent={openAddEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} />}
+          {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} onAddEvent={openAddEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
           {activeTab === 'Calendar View' && <>
-            <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} />
+            <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />
             <div className="mt-4 flex flex-col gap-2 rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/40 p-3 text-sm text-zinc-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div>{eventsMessage || 'Refresh the shared calendar data from Supabase when needed.'}</div>
               <button type="button" onClick={loadEventsFromSupabase} className="rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-white">Reload Supabase Events</button>
             </div>
           </>}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} assistants={assistants} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
-          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} />}
+          {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} />}
           {activeTab === 'Team Members' && authEmail && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
-          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} />}
+          {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} rolloutCapacityOverrides={rolloutCapacityOverrides} setRolloutCapacityOverrides={setRolloutCapacityOverrides} />}
         </section>
         <section className="hidden gap-4 md:grid md:grid-cols-3">
           <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4"><h3 className="font-semibold">Photographers</h3><p className="mt-2 text-sm text-zinc-600">{photographers.join(', ')}</p></div>
