@@ -12,6 +12,7 @@ const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School
 const DEFAULT_WEEKLY_ROLLOUT_CAPACITY = 25;
 const MIN_WEEKLY_ROLLOUT_CAPACITY = 1;
 const MAX_WEEKLY_ROLLOUT_CAPACITY = 50;
+const EVENT_CHANGE_TRACKING_START_LABEL = 'August 21, 2026';
 const NON_PRIMARY_PHOTOGRAPHER_EVENT_TYPES = new Set(['call or meeting', 'call/meeting', 'call / meeting', 'edit day', 'time off', 'personal appointment', 'time off / personal appointment']);
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
@@ -216,6 +217,218 @@ function stripInternalEventMeta(history = '') {
     .replace(/\n?\[added_by_meta[^\]]*\]/g, '')
     .replace(/\n?\[last_edited_meta[^\]]*\]/g, '')
     .trim();
+}
+
+function auditValuesEqual(a, b) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+function auditList(value = []) {
+  return (Array.isArray(value) ? value : []).map(item => String(item || '').trim()).filter(Boolean);
+}
+
+function auditListLabel(value = []) {
+  const items = auditList(value);
+  return items.length ? items.join(', ') : 'None';
+}
+
+function auditDateLabel(value = '') {
+  if (!value) return 'None';
+  try { return formatDate(value); } catch { return String(value); }
+}
+
+function auditTimeLabel(value = '') {
+  if (!value || value === 'TBD') return 'TBD';
+  try { return formatClockTime(value); } catch { return String(value); }
+}
+
+function makeAuditChange(field, label, before, after, summary = '') {
+  return {
+    field,
+    label,
+    before: before === undefined || before === null || before === '' ? 'None' : String(before),
+    after: after === undefined || after === null || after === '' ? 'None' : String(after),
+    summary: summary || `${label}: ${before || 'None'} → ${after || 'None'}`
+  };
+}
+
+function assignmentAuditChange(field, singularLabel, pluralLabel, beforeNames = [], afterNames = [], prefix = '') {
+  const before = auditList(beforeNames);
+  const after = auditList(afterNames);
+  if (auditValuesEqual(before, after)) return null;
+  const added = after.filter(name => !before.includes(name));
+  const removed = before.filter(name => !after.includes(name));
+  const lead = prefix ? `${prefix}: ` : '';
+  let summary = `${lead}${pluralLabel}: ${auditListLabel(before)} → ${auditListLabel(after)}`;
+  if (added.length === 1 && !removed.length) summary = `${lead}${singularLabel} added: ${added[0]}`;
+  else if (removed.length === 1 && !added.length) summary = `${lead}${singularLabel} removed: ${removed[0]}`;
+  return makeAuditChange(field, prefix ? `${prefix} ${pluralLabel}` : pluralLabel, auditListLabel(before), auditListLabel(after), summary);
+}
+
+function auditScalarLabel(value) {
+  return value === undefined || value === null || value === '' ? 'None' : String(value);
+}
+
+function auditEventDateRangeLabel(event = {}) {
+  if (!event?.date) return 'None';
+  const start = auditDateLabel(event.date);
+  const endDate = event.endDate || event.date;
+  return endDate && endDate !== event.date ? `${start} – ${auditDateLabel(endDate)}` : start;
+}
+
+function auditRequiredPhotographerCount(event = {}) {
+  if (isTimeOffEvent(event)) return 0;
+  const explicit = Number(event.requiredPhotographers ?? event.required_photographers);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.max(1, Math.min(6, explicit));
+  return Math.max(1, parseRequiredPhotographerCountFromTitle(event.title));
+}
+
+function auditRequiredAssistantCount(event = {}) {
+  if (event.noAssistant) return 0;
+  const explicit = Number(event.requiredAssistants ?? event.required_assistants);
+  if (Number.isFinite(explicit) && explicit >= 0) return Math.max(0, Math.min(6, explicit));
+  return parseRequiredAssistantCountFromTitle(event.title);
+}
+
+function auditScheduleLiveStatusLabel(status = '') {
+  if (status === SCHEDULE_LIVE_HOLD_STATUS) return 'Shelved';
+  if (status === SCHEDULE_LIVE_COMPLETE_STATUS) return 'Complete';
+  return status || 'None';
+}
+
+function buildEventAuditChanges(previousEvent = null, nextEvent = {}) {
+  if (!previousEvent) {
+    return [makeAuditChange('created', 'Event', 'None', nextEvent.title || 'Event', 'Event created')];
+  }
+
+  const changes = [];
+  const pushSimple = (field, label, before, after, formatter = value => value, summaryLabel = label) => {
+    if (auditValuesEqual(before, after)) return;
+    const beforeLabel = formatter(before);
+    const afterLabel = formatter(after);
+    changes.push(makeAuditChange(field, label, beforeLabel, afterLabel, `${summaryLabel}: ${auditScalarLabel(beforeLabel)} → ${auditScalarLabel(afterLabel)}`));
+  };
+
+  pushSimple('title', 'Event Title', previousEvent.title || '', nextEvent.title || '');
+  pushSimple('type', 'Event Type', previousEvent.type || '', nextEvent.type || '');
+
+  const previousSchool = previousEvent.canonicalSchool || '';
+  const nextSchool = nextEvent.canonicalSchool || '';
+  const schoolIdChanged = String(previousEvent.schoolId || '') !== String(nextEvent.schoolId || '');
+  if (schoolIdChanged || previousSchool !== nextSchool) {
+    changes.push(makeAuditChange('school', 'Associated School', previousSchool || 'None', nextSchool || 'None', `Associated School: ${previousSchool || 'None'} → ${nextSchool || 'None'}`));
+  }
+
+  const previousDateRange = auditEventDateRangeLabel(previousEvent);
+  const nextDateRange = auditEventDateRangeLabel(nextEvent);
+  if (previousDateRange !== nextDateRange) {
+    changes.push(makeAuditChange('dateRange', 'Date / Date Range', previousDateRange, nextDateRange, `Date / Date Range: ${previousDateRange} → ${nextDateRange}`));
+  }
+  pushSimple('arrivalTime', 'Arrival Time', previousEvent.arrivalTime || '', nextEvent.arrivalTime || '', auditTimeLabel);
+  pushSimple('time', 'Start Time', previousEvent.time || '', nextEvent.time || '', auditTimeLabel);
+  pushSimple('requiredPhotographers', 'Photographer Count', auditRequiredPhotographerCount(previousEvent), auditRequiredPhotographerCount(nextEvent));
+  pushSimple('requiredAssistants', 'Assistant Count', auditRequiredAssistantCount(previousEvent), auditRequiredAssistantCount(nextEvent));
+
+  const previousDays = getScheduleLiveDayAssignments(previousEvent);
+  const nextDays = getScheduleLiveDayAssignments(nextEvent);
+  const hasPerDayAssignments = Object.keys(previousDays).length > 0 || Object.keys(nextDays).length > 0;
+  if (!hasPerDayAssignments) {
+    const photographerChange = assignmentAuditChange('photographers', 'Photographer', 'Photographers', uniqueCanonicalPhotographers(previousEvent.photographers || []), uniqueCanonicalPhotographers(nextEvent.photographers || []));
+    if (photographerChange) changes.push(photographerChange);
+    const assistantChange = assignmentAuditChange('assistants', 'Assistant', 'Assistants', previousEvent.assistants || [], nextEvent.assistants || []);
+    if (assistantChange) changes.push(assistantChange);
+  }
+
+  if (Boolean(previousEvent.noAssistant) !== Boolean(nextEvent.noAssistant)) {
+    const before = previousEvent.noAssistant ? 'No Assistant' : 'Assistants Allowed';
+    const after = nextEvent.noAssistant ? 'No Assistant' : 'Assistants Allowed';
+    changes.push(makeAuditChange('noAssistant', 'Assistant Setting', before, after, `Assistant Setting: ${before} → ${after}`));
+  }
+
+  if (hasPerDayAssignments && !auditValuesEqual(previousDays, nextDays)) {
+    const dayKeys = Array.from(new Set([
+      ...getEventDateKeys(previousEvent),
+      ...getEventDateKeys(nextEvent),
+      ...Object.keys(previousDays),
+      ...Object.keys(nextDays)
+    ])).sort();
+    dayKeys.forEach(dateKey => {
+      const beforePhotographers = getScheduleLivePhotographersForDate(previousEvent, dateKey);
+      const afterPhotographers = getScheduleLivePhotographersForDate(nextEvent, dateKey);
+      const dayPrefix = auditDateLabel(dateKey);
+      const dayPhotographerChange = assignmentAuditChange(`day:${dateKey}:photographers`, 'Photographer', 'Photographers', beforePhotographers, afterPhotographers, dayPrefix);
+      if (dayPhotographerChange) changes.push(dayPhotographerChange);
+
+      const beforeAssistants = getScheduleLiveAssistantsForDate(previousEvent, dateKey);
+      const afterAssistants = getScheduleLiveAssistantsForDate(nextEvent, dateKey);
+      const dayAssistantChange = assignmentAuditChange(`day:${dateKey}:assistants`, 'Assistant', 'Assistants', beforeAssistants, afterAssistants, dayPrefix);
+      if (dayAssistantChange) changes.push(dayAssistantChange);
+    });
+  }
+
+  pushSimple('irm', 'IRM', previousEvent.irm ?? '', nextEvent.irm ?? '');
+
+  if (String(previousEvent.notes || '') !== String(nextEvent.notes || '')) {
+    changes.push(makeAuditChange('notes', 'Picture Day Notes', 'Previous version', 'Updated version', 'Picture Day Notes updated'));
+  }
+  if (String(previousEvent.rainInfo || '') !== String(nextEvent.rainInfo || '')) {
+    changes.push(makeAuditChange('rainInfo', 'Rain Information', 'Previous version', 'Updated version', 'Rain Information updated'));
+  }
+
+  const previousStatus = String(previousEvent.status || '');
+  const nextStatus = String(nextEvent.status || '');
+  const specialStatuses = new Set([SCHEDULE_LIVE_HOLD_STATUS, SCHEDULE_LIVE_COMPLETE_STATUS]);
+  if (previousStatus !== nextStatus && (specialStatuses.has(previousStatus) || specialStatuses.has(nextStatus))) {
+    changes.push(makeAuditChange('status', 'Schedule Live Status', previousStatus || 'None', nextStatus || 'None', `Schedule Live Status: ${auditScheduleLiveStatusLabel(previousStatus)} → ${auditScheduleLiveStatusLabel(nextStatus)}`));
+  }
+
+  if (Boolean(previousEvent.active !== false) !== Boolean(nextEvent.active !== false)) {
+    const becameActive = nextEvent.active !== false;
+    changes.push(makeAuditChange('active', 'Event Status', previousEvent.active === false ? 'Removed' : 'Active', becameActive ? 'Active' : 'Removed', becameActive ? 'Event restored' : 'Event removed'));
+  }
+
+  return changes;
+}
+
+function summarizeEventAuditChanges(changes = []) {
+  const clean = (changes || []).filter(Boolean);
+  if (!clean.length) return '';
+  if (clean.length === 1) return clean[0].summary || clean[0].label || 'Event updated';
+  if (clean.length === 2) return clean.map(change => change.summary || change.label).join('; ');
+  return `${clean.length} event details changed`;
+}
+
+async function recordEventChangeLog(supabase, eventId, previousEvent, nextEvent, authEmail = '') {
+  if (!supabase || !eventId) return { logged: false, changes: [], error: null };
+  const changes = buildEventAuditChanges(previousEvent, nextEvent);
+  if (!changes.length) return { logged: false, changes, error: null };
+  const email = String(authEmail || '').trim();
+  const payload = {
+    event_id: eventId,
+    changed_by_email: email || null,
+    changed_by_name: displayNameFromEmail(email || 'User'),
+    change_summary: summarizeEventAuditChanges(changes),
+    changes
+  };
+  const { error } = await supabase.from('event_change_log').insert(payload);
+  if (error) {
+    console.warn('Event change history could not be recorded', error, payload);
+    return { logged: false, changes, error };
+  }
+  return { logged: true, changes, error: null };
+}
+
+function normalizeEventChangeLogRow(row = {}) {
+  const changes = Array.isArray(row.changes) ? row.changes : [];
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    changedAt: row.changed_at || '',
+    changedByEmail: row.changed_by_email || '',
+    changedByName: row.changed_by_name || displayNameFromEmail(row.changed_by_email || ''),
+    changeSummary: row.change_summary || summarizeEventAuditChanges(changes),
+    changes
+  };
 }
 
 function formatShortAttributionDate(value) {
@@ -2116,7 +2329,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
     const matches = item => item && (item.supabaseId === previousEvent.supabaseId || item.id === previousEvent.id);
     setOperationalEvents(prev => (prev || []).map(item => matches(item) ? nextEvent : item));
     setStatusMessage('Saving Schedule Live change…');
-    const saved = await onSchedule(nextEvent);
+    const saved = await onSchedule(nextEvent, previousEvent);
     if (!saved) {
       setOperationalEvents(prev => (prev || []).map(item => matches(item) ? previousEvent : item));
       setStatusMessage('That change could not be saved. It was rolled back—please check your login or permissions and try again.');
@@ -6144,18 +6357,59 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   const [editingNotesOnly, setEditingNotesOnly] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [eventChangeLog, setEventChangeLog] = useState([]);
+  const [eventChangeLogLoading, setEventChangeLogLoading] = useState(false);
+  const [eventChangeLogError, setEventChangeLogError] = useState('');
+  const [showEventChangeHistory, setShowEventChangeHistory] = useState(false);
 
   useEffect(() => {
     setEditingNotesOnly(false);
     setNotesDraft(String(event?.notes || ''));
     setSavingNotes(false);
+    setShowEventChangeHistory(false);
   }, [event?.id, event?.supabaseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadEventChangeLog() {
+      if (!event?.supabaseId) {
+        setEventChangeLog([]);
+        setEventChangeLogError('');
+        return;
+      }
+      const supabase = createClient();
+      if (!hasSupabaseEnv() || !supabase) return;
+      setEventChangeLogLoading(true);
+      setEventChangeLogError('');
+      const { data, error } = await supabase
+        .from('event_change_log')
+        .select('id, event_id, changed_at, changed_by_email, changed_by_name, change_summary, changes')
+        .eq('event_id', event.supabaseId)
+        .order('changed_at', { ascending: false });
+      if (cancelled) return;
+      setEventChangeLogLoading(false);
+      if (error) {
+        console.warn('Could not load event change history', error);
+        setEventChangeLog([]);
+        setEventChangeLogError('Change History is unavailable. Run the included v1.91 SQL if it has not been installed yet.');
+        return;
+      }
+      setEventChangeLog((data || []).map(normalizeEventChangeLogRow));
+    }
+    loadEventChangeLog();
+    return () => { cancelled = true; };
+  }, [event?.supabaseId, event?.updatedAt]);
 
   if (!event) return null;
   const addedMeta = getEventAddedMeta(event);
   const editedMeta = getEventLastEditedMeta(event);
+  const latestAudit = eventChangeLog[0] || null;
+  const latestAuditIsCreationOnly = Boolean(latestAudit?.changes?.length) && latestAudit.changes.every(change => change?.field === 'created');
   const createdByLabel = `${addedMeta.name}${addedMeta.addedAt ? ` · ${formatEventMetaDateTime(addedMeta.addedAt)}` : ''}`;
-  const editedLabel = editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : '';
+  const editedLabel = latestAudit && !latestAuditIsCreationOnly
+    ? `${latestAudit.changedByName || displayNameFromEmail(latestAudit.changedByEmail || '')}${latestAudit.changedAt ? ` · ${formatEventMetaDateTime(latestAudit.changedAt)}` : ''}`
+    : (editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : '');
+  const lastChangeLabel = latestAudit?.changeSummary || '';
   const noteCount = getPictureDayNoteCount(event);
   const plainNoteEditedLabel = getPlainPictureDayNoteEditedLabel(event.noteAttribution);
 
@@ -6167,10 +6421,10 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
     if (saved) setEditingNotesOnly(false);
   };
 
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:gap-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex min-h-[58px] w-full flex-col items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2.5 text-center text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:min-h-[64px] sm:px-5 sm:py-3">
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}{lastChangeLabel ? <div><span className="font-semibold text-zinc-700">Last Change:</span> {lastChangeLabel}</div> : (event.supabaseId && !eventChangeLogLoading && !eventChangeLogError ? <div><span className="font-semibold text-zinc-700">Change History:</span> Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div> : null)}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:gap-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex min-h-[58px] w-full flex-col items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2.5 text-center text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:min-h-[64px] sm:px-5 sm:py-3">
   <span className="max-w-full break-words text-sm font-bold leading-snug">View {event.canonicalSchool}</span>
   <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-600 sm:text-xs">in School List <ChevronRight size={14} aria-hidden="true" /></span>
-</button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div>{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+</button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div>{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}<div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div>{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -6708,26 +6962,30 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
     if (!ok) return;
     setLinkingEventId(event.supabaseId);
     setUnlinkedMessage('Linking event...');
-    const { error } = await supabase
+    const { data: linkedRow, error } = await supabase
       .from('events')
       .update({
         school_id: selectedSchool.id,
         canonical_school: selectedSchool.name,
         updated_at: new Date().toISOString()
       })
-      .eq('id', event.supabaseId);
+      .eq('id', event.supabaseId)
+      .select()
+      .single();
     setLinkingEventId('');
     if (error) {
       setUnlinkedMessage(`Could not link event: ${error.message}`);
       return;
     }
+    const linkedEvent = supabaseRowToEvent(linkedRow);
+    const auditResult = await recordEventChangeLog(supabase, event.supabaseId, event, linkedEvent, authEmail);
     setManualSchoolSelections(prev => {
       const next = { ...prev };
       delete next[event.supabaseId];
       return next;
     });
     await reloadEvents?.();
-    setUnlinkedMessage(`Linked ${event.title} to ${selectedSchool.name}.`);
+    setUnlinkedMessage(`Linked ${event.title} to ${selectedSchool.name}.${auditResult.error ? ` Change History could not be recorded: ${auditResult.error.message}.` : ''}`);
   };
 
   const saveStaffMember = async (event) => {
@@ -7692,12 +7950,12 @@ export default function SchedulerApp() {
     if (hasSupabaseEnv() && authReady && !authEmail) return [];
     return supabaseEvents.filter(event => event.active === false);
   }, [supabaseEvents, authReady, authEmail]);
-  const handleScheduleEvent = async (event) => {
+  const handleScheduleEvent = async (event, previousEventOverride = null) => {
     if (!canEditScheduler) {
       setEventsMessage('Your account has view-only access. Ask an Admin or Photographer to make scheduling changes.');
       return false;
     }
-    const previousEvent = [...(supabaseEvents || []), ...(localManualEvents || [])].find(item =>
+    const previousEvent = previousEventOverride || [...(supabaseEvents || []), ...(localManualEvents || [])].find(item =>
       item.id === event.id ||
       item.supabaseId === event.supabaseId ||
       (event.supabaseId && item.supabaseId === event.supabaseId)
@@ -7763,6 +8021,17 @@ export default function SchedulerApp() {
       const readbackConfirmed = !readbackResult.error && Boolean(readbackResult.data);
       const confirmedEvent = readbackConfirmed ? { ...supabaseRowToEvent(readbackResult.data), localBackupOnly: false } : { ...savedEvent, localBackupOnly: true };
 
+      // v1.91 Event Change History is append-only and intentionally separate from
+      // the event row. The operational event save remains authoritative even if
+      // audit logging is temporarily unavailable.
+      const auditResult = await recordEventChangeLog(
+        supabase,
+        confirmedEvent.supabaseId || data.id,
+        isNewEvent ? null : previousEvent,
+        confirmedEvent,
+        authEmail
+      );
+
       if (readbackConfirmed) {
         // Keep a non-warning browser backup too. Supabase is still the source of truth,
         // but this protects the UI if a later refresh happens before auth/session readback finishes.
@@ -7780,10 +8049,11 @@ export default function SchedulerApp() {
 
       setSelected(null);
       setEditingEvent(null);
+      const auditWarning = auditResult.error ? ` Change History could not be recorded: ${auditResult.error.message}.` : '';
       setEventsMessage(
-        readbackConfirmed
+        (readbackConfirmed
           ? (eventWithId.supabaseId ? 'Event changes saved and verified in Supabase.' : `Event saved and verified in Supabase for ${formatDate(confirmedEvent.date)}.`)
-          : `Event appeared to save, but Supabase readback could not verify it: ${readbackResult.error?.message || 'unknown readback error'}. It is shown with a warning until verified.`
+          : `Event appeared to save, but Supabase readback could not verify it: ${readbackResult.error?.message || 'unknown readback error'}. It is shown with a warning until verified.`) + auditWarning
       );
       if (!eventWithId.supabaseId) {
         setMonth(monthKey(confirmedEvent.date));
@@ -7826,9 +8096,10 @@ export default function SchedulerApp() {
     }
 
     const removedEvent = supabaseRowToEvent(data);
+    const auditResult = await recordEventChangeLog(supabase, removedEvent.supabaseId, event, removedEvent, authEmail);
     setSupabaseEvents(prev => (prev || []).map(item => item.supabaseId === removedEvent.supabaseId ? removedEvent : item));
     setSelected(null);
-    setEventsMessage('Event moved to Removed Events.');
+    setEventsMessage(`Event moved to Removed Events.${auditResult.error ? ` Change History could not be recorded: ${auditResult.error.message}.` : ''}`);
   };
 
   const handleRestoreEvent = async (event) => {
@@ -7853,8 +8124,9 @@ export default function SchedulerApp() {
     }
 
     const restoredEvent = supabaseRowToEvent(data);
+    const auditResult = await recordEventChangeLog(supabase, restoredEvent.supabaseId, event, restoredEvent, authEmail);
     setSupabaseEvents(prev => (prev || []).map(item => item.supabaseId === restoredEvent.supabaseId ? restoredEvent : item));
-    setEventsMessage('Event restored to the calendar.');
+    setEventsMessage(`Event restored to the calendar.${auditResult.error ? ` Change History could not be recorded: ${auditResult.error.message}.` : ''}`);
     setMonth(monthKey(restoredEvent.date));
     setSelectedDate(restoredEvent.date);
     setActiveTab('Calendar View');
