@@ -1117,26 +1117,47 @@ function sameStaffEveryDay(daily = []) {
   });
 }
 
+function formatAssistantSlotNames(event = {}, names = []) {
+  const required = getRequiredAssistantCount(event);
+  if (event?.noAssistant || required <= 0) return '--';
+  const assigned = (Array.isArray(names) ? names : []).filter(Boolean);
+  const missing = Math.max(0, required - assigned.length);
+  const parts = [...assigned];
+  if (missing === 1) parts.push('TBD');
+  else if (missing > 1) parts.push(`TBD ×${missing}`);
+  return parts.length ? parts.join(', ') : '--';
+}
+
+function formatAssistantAssignmentForDate(event = {}, date = '') {
+  const names = date
+    ? getScheduleLiveAssistantsForDate(event, date)
+    : (Array.isArray(event?.assistants) ? event.assistants.filter(Boolean) : []);
+  return formatAssistantSlotNames(event, names);
+}
+
 function formatStaffingDisplay(event = {}, role = 'photographers') {
   const daily = getEventStaffingByDate(event, role);
-  if (!daily.length) return role === 'assistants' ? '—' : 'TBD';
+  if (!daily.length) return role === 'assistants' ? formatAssistantSlotNames(event, []) : 'TBD';
 
   const formatNames = (names = []) => role === 'photographers'
     ? formatPrimaryPhotographerList(names, '', event)
-    : names.filter(Boolean).join(', ');
+    : formatAssistantSlotNames(event, names);
   const multiDay = isMultiDayScheduleEvent(event);
   const firstNames = daily[0]?.names || [];
-  if (multiDay && firstNames.length && sameStaffEveryDay(daily)) {
+
+  if (role === 'assistants' && (event?.noAssistant || getRequiredAssistantCount(event) <= 0)) return '--';
+
+  if (multiDay && sameStaffEveryDay(daily) && (role === 'assistants' || firstNames.length)) {
     return `${formatNames(firstNames)} — All Days`;
   }
 
   if (multiDay) {
     return daily
-      .map(item => `${shortDate(item.date)}: ${item.names.length ? formatNames(item.names) : (role === 'assistants' ? '—' : 'TBD')}`)
+      .map(item => `${shortDate(item.date)}: ${item.names.length || role === 'assistants' ? formatNames(item.names) : 'TBD'}`)
       .join('\n');
   }
 
-  return firstNames.length ? formatNames(firstNames) : (role === 'assistants' ? '—' : 'TBD');
+  return role === 'assistants' ? formatNames(firstNames) : (firstNames.length ? formatNames(firstNames) : 'TBD');
 }
 
 function getMultiDayPhotographerDisplay(event = {}) {
@@ -1223,13 +1244,11 @@ function getEventTimeLabel(event) {
 }
 
 function weekBounds(date) {
-  const d = new Date(date + 'T12:00:00');
-  const start = new Date(d);
-  start.setDate(d.getDate() - d.getDay());
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  const toKey = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  return { start: toKey(start), end: toKey(end) };
+  // Scheduler's operational week is Monday–Sunday everywhere. Keeping the
+  // visible Week range on the same boundary as rollout capacity prevents a
+  // Sunday-selected week from showing the prior week's rollout total.
+  const start = getMondayStart(date || todayKey());
+  return { start, end: addDays(start, 6) };
 }
 
 function rolloutWeekBounds(date = todayKey()) {
@@ -1315,13 +1334,7 @@ function isRainWatchEvent(event = {}) {
 }
 
 function displayAssistants(event) {
-  if (isTimeOffEvent(event)) return '—';
-  if (event?.noAssistant) return 'No Assistant';
-  const display = formatStaffingDisplay(event, 'assistants');
-  if (display !== '—' && !display.split('\n').every(line => line.endsWith(': —'))) return display;
-  const required = Math.max(0, getRequiredAssistantCount(event));
-  if (required > 0) return `Needs ${required} assistant${required === 1 ? '' : 's'} assigned`;
-  return '—';
+  return formatStaffingDisplay(event, 'assistants');
 }
 
 function normalizeSchoolLookupKey(value = '') {
@@ -1478,7 +1491,7 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
       {!compact && (
         <div className="mt-1.5 space-y-0.5 text-[10px] leading-4 text-zinc-600 sm:mt-3 sm:space-y-1 sm:text-xs">
           <div>Photographers Assigned: {displayPhotographerAssignment(event)}</div>
-          <div>Assistants: {event.assistants.length ? event.assistants.join(', ') : '—'}</div>
+          <div>Assistants: {displayAssistants(event)}</div>
         </div>
       )}
       {onAction && actionLabel ? (
@@ -1613,7 +1626,7 @@ function compactCrewList(event = {}, occurrenceDate = '') {
     : (event.assistants || []).filter(Boolean);
   return [
     ...primaryPhotographerDisplayNames(photographers, event),
-    ...assistants
+    targetDate ? formatAssistantAssignmentForDate(event, targetDate) : formatAssistantSlotNames(event, assistants)
   ].filter(Boolean);
 }
 
@@ -1822,6 +1835,11 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
       filter: (event) => isNeedsAssistantAssignment(event)
     },
     {
+      key: 'sas',
+      title: 'SASs',
+      filter: (event) => event?.type === 'Studio Assigned Schools (SAS)'
+    },
+    {
       key: 'rain-watch',
       title: 'Rain Watch',
       filter: (event) => isRainWatchEvent(event)
@@ -1835,7 +1853,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
           <button type="button" onClick={onAddEvent} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add Event</button>
         </div>
       ) : null}
-      <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-4">
       {overviewColumns.map(column => {
         const columnEvents = events.filter(column.filter);
         return (
@@ -1846,7 +1864,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
             </div>
             <div className="space-y-2 md:max-h-[430px] md:overflow-y-auto md:overscroll-contain md:pr-1">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
-              return <EventCard key={event.id} event={event} onClick={onClick} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
+              return <EventCard key={event.id} event={event} onClick={onClick} compact={column.key === 'sas'} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
             })}</div>
           </div>
         );
@@ -1874,6 +1892,9 @@ function getCleanScheduleLiveCommentary(commentary = []) {
 function cleanScheduleLiveState(state = {}) {
   return {
     ...state,
+    // Normalize older/shared sessions as they are read so Schedule Live's visible
+    // week and its rollout card always reference the same Monday–Sunday range.
+    weekStart: getMondayStart(state.weekStart || todayKey()),
     commentary: getCleanScheduleLiveCommentary(state.commentary)
   };
 }
@@ -1898,7 +1919,7 @@ function scheduleLiveDefaultState(date = todayKey()) {
 }
 
 function getScheduleLiveSessionMonthLabel(weekStart) {
-  return monthLabel(monthKey(weekStart || todayKey()));
+  return monthLabel(monthKey(getMondayStart(weekStart || todayKey())));
 }
 
 function getScheduleLiveDays(weekStart, showWeekends) {
@@ -2046,6 +2067,11 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
             {canEdit ? <button type="button" onClick={() => onRemoveAssistant?.(event, name, occurrenceDate)} className="text-zinc-400 hover:text-rose-600">×</button> : null}
           </span>
         )) : null}
+        {event.noAssistant || requiredAssistants <= 0 ? (
+          <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-black text-zinc-500">Asst: --</span>
+        ) : assignedAssistants.length < requiredAssistants ? (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-800">Asst: TBD{requiredAssistants - assignedAssistants.length > 1 ? ` ×${requiredAssistants - assignedAssistants.length}` : ''}</span>
+        ) : null}
         {needsMorePhotographers ? <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700">Needs {requiredPhotographers - assigned.length} Photographer{requiredPhotographers - assigned.length === 1 ? '' : 's'}</span> : null}
         {isComplete ? <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700">Complete</span> : null}
       </div>
@@ -2503,7 +2529,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     <div className="mt-1 text-xs font-semibold opacity-75">{getEventTimeLabel(event)}</div>
                     <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
                       <div><span className="font-black">Photogs:</span> {formatPrimaryPhotographerList(getScheduleLivePhotographersForDate(event, date), 'Unassigned', event)}</div>
-                      <div><span className="font-black">Assistants:</span> {getScheduleLiveAssistantsForDate(event, date).length ? getScheduleLiveAssistantsForDate(event, date).join(', ') : 'None'}</div>
+                      <div><span className="font-black">Assistants:</span> {formatAssistantAssignmentForDate(event, date)}</div>
                     </div>
                   </button>
                 )) : <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/70 p-4 text-center text-sm text-zinc-500">No events this day.</div>}
@@ -2659,11 +2685,11 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
                     <div className="space-y-1">
                       {overviewEvents.length ? overviewEvents.map(event => {
                         const assignedNames = getScheduleLivePhotographersForDate(event, date);
-                        const assignedAssistants = getScheduleLiveAssistantsForDate(event, date);
                         const photographerDisplayNames = primaryPhotographerDisplayNames(assignedNames, event);
+                        const assistantDisplay = formatAssistantAssignmentForDate(event, date);
                         const weekOverviewStaffNames = [
                           ...(photographerDisplayNames.length ? photographerDisplayNames : ['TBD']),
-                          ...assignedAssistants
+                          assistantDisplay
                         ];
                         const weekOverviewStaffLabel = weekOverviewStaffNames.join(', ');
                         const photographerReady = event.status !== SCHEDULE_LIVE_HOLD_STATUS && scheduleLiveDateMeetsPhotographerRequirement(event, date);
@@ -5848,7 +5874,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
                   <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400 sm:text-xs">{getEventDateLabel(event)}</div>
                   <div className="mt-0.5 truncate text-sm font-black text-zinc-950 sm:text-base">{event.title}</div>
                   <div className="mt-0.5 text-xs text-zinc-600 sm:text-sm">{getEventTimeLabel(event)}</div>
-                  {event.assistants?.length ? <div className="mt-0.5 text-[11px] font-semibold text-zinc-500">Assistant: {event.assistants.join(', ')}</div> : null}
+                  <div className="mt-0.5 text-[11px] font-semibold text-zinc-500">Assistant: {displayAssistants(event)}</div>
                 </div>
                 <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} text-[10px]`}>{event.type}</Pill>
               </div>
@@ -5893,7 +5919,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
                 {dayEvents.map(event => {
                   const occurrenceDate = event.instanceDate || date || event.date;
                   const photogs = formatPrimaryPhotographerList(getScheduleLivePhotographersForDate(event, occurrenceDate), 'TBD', event);
-                  const assistantsLabel = getScheduleLiveAssistantsForDate(event, occurrenceDate).join(', ') || '—';
+                  const assistantsLabel = formatAssistantAssignmentForDate(event, occurrenceDate);
                   return (
                     <div key={`${event.id}-${occurrenceDate}`} role="button" tabIndex={0} onClick={() => onClick(event)} onKeyDown={(keyEvent) => { if (keyEvent.key === 'Enter' || keyEvent.key === ' ') onClick(event); }} className="grid w-full cursor-pointer select-text grid-cols-[64px_1.8fr_1fr_1fr] border-b border-zinc-100 text-left text-xs transition hover:bg-[#DDE8D2]/45">
                       <div className="px-2 py-1.5 font-semibold italic text-zinc-600">{shortDate(event.instanceDate || date || event.date)}</div>
@@ -6442,7 +6468,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}{lastChangeLabel ? <div><span className="font-semibold text-zinc-700">Last Change:</span> {lastChangeLabel}</div> : (event.supabaseId && !eventChangeLogLoading && !eventChangeLogError ? <div><span className="font-semibold text-zinc-700">Change History:</span> Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div> : null)}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:gap-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex min-h-[58px] w-full flex-col items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2.5 text-center text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:min-h-[64px] sm:px-5 sm:py-3">
   <span className="max-w-full break-words text-sm font-bold leading-snug">View {event.canonicalSchool}</span>
   <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-600 sm:text-xs">in School List <ChevronRight size={14} aria-hidden="true" /></span>
-</button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div>{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+</button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div>{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -8255,7 +8281,7 @@ export default function SchedulerApp() {
     if (overviewMode === 'Month') return queryFilteredEvents.filter(event => event && monthKey(event.date) <= month && monthKey(event.endDate || event.date) >= month);
     if (overviewMode === 'Week') {
       const { start, end } = weekBounds(selectedDate);
-      return queryFilteredEvents.filter(event => event && event.date >= start && event.date <= end);
+      return queryFilteredEvents.filter(event => event && event.date <= end && (event.endDate || event.date) >= start);
     }
     return queryFilteredEvents.filter(event => isDateInEventRange(event, selectedDate));
   }, [queryFilteredEvents, overviewMode, month, selectedDate]);
