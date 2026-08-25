@@ -1484,7 +1484,7 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1 sm:shrink-0 sm:flex-col sm:items-end">
-          <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} text-[10px] sm:text-xs`}>{event.type}</Pill>
+          <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} text-[10px] sm:text-xs`}>{event.type === 'Studio Assigned Schools (SAS)' ? 'SAS' : event.type}</Pill>
           {getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-[10px] text-amber-900 sm:text-xs">IRM {getEventIrm(event)}</Pill> : null}
         </div>
       </div>
