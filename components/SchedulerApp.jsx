@@ -13,7 +13,7 @@ const DEFAULT_WEEKLY_ROLLOUT_CAPACITY = 25;
 const MIN_WEEKLY_ROLLOUT_CAPACITY = 1;
 const MAX_WEEKLY_ROLLOUT_CAPACITY = 50;
 const EVENT_CHANGE_TRACKING_START_LABEL = 'August 21, 2026';
-const NON_PRIMARY_PHOTOGRAPHER_EVENT_TYPES = new Set(['call or meeting', 'call/meeting', 'call / meeting', 'edit day', 'time off', 'personal appointment', 'time off / personal appointment']);
+const NON_PRIMARY_PHOTOGRAPHER_EVENT_TYPES = new Set(['call or meeting', 'call/meeting', 'call / meeting', 'edit day', 'time off', 'personal appointment', 'time off / personal appointment', 'school holiday calendar']);
 
 const USER_PERMISSION_ROLES = ['Admin', 'Photographer', 'Assistant'];
 const USER_PERMISSION_ROLE_VALUES = {
@@ -743,6 +743,7 @@ function CalendarColorKey() {
     ['Call or Meeting', TYPE_COLORS['Call or Meeting']],
     ['Edit Day', TYPE_COLORS['Edit Day']],
     ['Time Off / Personal Appointment', TYPE_COLORS['Time Off']],
+    ['School Holiday Calendar', TYPE_COLORS['School Holiday Calendar']],
     ['Studio Assigned Schools (SAS)', TYPE_COLORS['Studio Assigned Schools (SAS)']]
   ];
 
@@ -1235,6 +1236,7 @@ function formatClockTime(value) {
 }
 
 function getEventTimeLabel(event) {
+  if (String(event?.type || '').trim() === 'School Holiday Calendar') return 'All Day';
   const arrival = event?.arrivalTime && event.arrivalTime !== 'TBD' ? formatClockTime(event.arrivalTime) : '';
   const start = event?.time && event.time !== 'TBD' ? formatClockTime(event.time) : '';
   if (arrival && start) return `Arrival ${arrival} · Start ${start}`;
@@ -1287,7 +1289,10 @@ function displayPhotographerAssignment(event) {
 
 function isTimeOffEvent(event = {}) {
   const type = String(event?.type || event?.event_type || '').trim().toLowerCase();
-  return type === 'time off' || type === 'personal appointment';
+  // School Holiday Calendar is an informational no-staff event. It shares the
+  // same staffing/rollout exclusions as Time Off and Personal Appointment, but
+  // remains its own editable event type and visual Calendar entry.
+  return type === 'time off' || type === 'personal appointment' || type === 'school holiday calendar';
 }
 
 function isNeedsPhotographerAssignment(event) {
@@ -3026,6 +3031,7 @@ function isNonRolloutOperationalEvent(event = {}) {
     type === 'photo booth' ||
     type === 'time off' ||
     type === 'personal appointment' ||
+    type === 'school holiday calendar' ||
     /\b(call|meeting|huddle|interview|training|edit day|editing day|in-studio|in studio|do not book)\b/.test(title) ||
     /photo\s*booth/.test(title)
   );
@@ -3521,7 +3527,7 @@ function isCarrieFall2026ScheduledEvent(event) {
   const eventEnd = String(event.endDate || event.date || '');
   if (!eventStart || eventStart > '2026-12-31' || eventEnd < '2026-08-01') return false;
 
-  const internalOnlyTypes = new Set(['Call or Meeting', 'Time Off', 'Personal Appointment', 'Edit Day', 'Rain Date']);
+  const internalOnlyTypes = new Set(['Call or Meeting', 'Time Off', 'Personal Appointment', 'Edit Day', 'Rain Date', 'School Holiday Calendar']);
   return !internalOnlyTypes.has(event.type);
 }
 
@@ -3951,7 +3957,9 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
   const [eventType, setEventType] = useState(initialEvent?.type || 'Fall Picture Day');
   const isTimeOff = eventType === 'Time Off';
   const isPersonalAppointment = eventType === 'Personal Appointment';
-  const isInternalBlockingEvent = isTimeOff || isPersonalAppointment;
+  const isSchoolHoliday = eventType === 'School Holiday Calendar';
+  const isInternalBlockingEvent = isTimeOff || isPersonalAppointment || isSchoolHoliday;
+  const allowsInternalPhotographerAssignment = isTimeOff || isPersonalAppointment;
   const [selectedPhotographers, setSelectedPhotographers] = useState(isDuplicate ? [] : explicitCurrentPhotographerAssignments(initialEvent?.photographers || [], photographers));
   const [selectedAssistants, setSelectedAssistants] = useState(isDuplicate ? [] : (initialEvent?.assistants || []));
   const [dayAssignments, setDayAssignments] = useState(() => {
@@ -4020,7 +4028,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       return;
     }
     const cleanAssignmentDates = getEventDateKeys({ date, endDate: cleanEndDate || date });
-    const titleMatchedPhotographer = isInternalBlockingEvent
+    const titleMatchedPhotographer = allowsInternalPhotographerAssignment
       ? findPhotographerMentionedInTitle(cleanTitle, photographers)
       : '';
     const cleanDayAssignments = isTwoDay ? cleanAssignmentDates.reduce((map, day) => {
@@ -4048,9 +4056,9 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       schoolId: isInternalBlockingEvent ? null : (matchedSchool?.id || null),
       type: eventType,
       status: isInternalBlockingEvent ? 'Scheduled' : (isTwoDay ? (multiDayMeetsRequirement ? 'Scheduled' : 'Needs Photographers Assigned') : (selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned')),
-      photographers: isTwoDay ? [] : cleanSelectedPhotographers,
+      photographers: isSchoolHoliday ? [] : (isTwoDay ? [] : cleanSelectedPhotographers),
       assistants: isTwoDay || isInternalBlockingEvent || noAssistant ? [] : selectedAssistants,
-      scheduleLiveDayAssignments: isTwoDay ? cleanDayAssignments : {},
+      scheduleLiveDayAssignments: isSchoolHoliday ? {} : (isTwoDay ? cleanDayAssignments : {}),
       requiredPhotographers: isInternalBlockingEvent ? 0 : (Number(requiredPhotographers) || 1),
       requiredAssistants: isInternalBlockingEvent || noAssistant ? 0 : (Number(requiredAssistants) || 0),
       noAssistant: isInternalBlockingEvent ? true : noAssistant,
@@ -4070,7 +4078,9 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
             ? 'Created from Add Event as Time Off.'
             : isPersonalAppointment
               ? 'Created from Add Event as Personal Appointment.'
-              : matchedSchool
+              : isSchoolHoliday
+                ? 'Created from Add Event as School Holiday Calendar.'
+                : matchedSchool
                 ? 'Created from Add Event using an existing school/account.'
                 : cleanName
                   ? 'Created from Add Event using a school/account name not yet in School List.'
@@ -4156,11 +4166,11 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               ) : null}
               <label className={`rounded-3xl border border-zinc-200 bg-white/70 p-4 ${isInternalBlockingEvent ? 'md:col-span-2' : ''}`}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</div>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTimeOff ? "Example: Beth PTO" : isPersonalAppointment ? "Example: Matt dentist appointment" : "Optional — auto-fills if blank"} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTimeOff ? "Example: Beth PTO" : isPersonalAppointment ? "Example: Matt dentist appointment" : isSchoolHoliday ? "Example: Winter Recess" : "Optional — auto-fills if blank"} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
                 {!isInternalBlockingEvent && matchedSchool?.irm ? <div className="mt-2"><Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {matchedSchool.irm}</Pill></div> : null}
               </label>
             </div>
-            {isInternalBlockingEvent ? (
+            {allowsInternalPhotographerAssignment ? (
               <PhotographerAssignmentPicker photographers={photographers} selectedPhotographers={selectedPhotographers} setSelectedPhotographers={setSelectedPhotographers} events={events} date={date} schoolName={title || eventType} markPrimary={shouldMarkPrimaryPhotographer(eventType)} />
             ) : null}
             {!isInternalBlockingEvent ? (
@@ -4239,12 +4249,12 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
               </>
             ) : null}
             <label className="block rounded-3xl border border-zinc-200 bg-white/70 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Time Off Notes' : isPersonalAppointment ? 'Personal Appointment Notes' : 'Add New Picture Day Note'}</div>
-              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder={isTimeOff ? 'Optional details about this time off.' : isPersonalAppointment ? 'Optional details about this personal appointment.' : 'Add a new picture day note. Admins can edit prior note entries if details change.'} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isTimeOff ? 'Time Off Notes' : isPersonalAppointment ? 'Personal Appointment Notes' : isSchoolHoliday ? 'School Holiday Notes' : 'Add New Picture Day Note'}</div>
+              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={4} placeholder={isTimeOff ? 'Optional details about this time off.' : isPersonalAppointment ? 'Optional details about this personal appointment.' : isSchoolHoliday ? 'Optional details about this school holiday or recess.' : 'Add a new picture day note. Admins can edit prior note entries if details change.'} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
             </label>
             <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Picture Day Notes ({getNoteHistory(noteAttribution).length + (String(notes || '').trim() ? 1 : 0)})</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{isSchoolHoliday ? 'School Holiday Notes' : 'Picture Day Notes'} ({getNoteHistory(noteAttribution).length + (String(notes || '').trim() ? 1 : 0)})</div>
                 {canEditNotes ? <Pill className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-zinc-800">Admin note editing enabled</Pill> : null}
               </div>
               <div className="mt-3"><NoteHistoryList entries={getNoteHistory(noteAttribution)} canEdit={canEditNotes} onEditNote={(noteId, text) => setNoteAttribution(prev => editNoteHistory(prev, noteId, authEmail, text))} /></div>
@@ -5275,6 +5285,7 @@ function normalizeImportedEventType(row = {}) {
     'Studio Assigned Schools (SAS)',
     'Time Off',
     'Personal Appointment',
+    'School Holiday Calendar',
     'Edit Day',
     'Call or Meeting'
   ]);
@@ -6455,6 +6466,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
     : (editedMeta ? `${editedMeta.name}${editedMeta.editedAt ? ` · ${formatEventMetaDateTime(editedMeta.editedAt)}` : ''}` : '');
   const lastChangeLabel = latestAudit?.changeSummary || '';
   const noteCount = getPictureDayNoteCount(event);
+  const isSchoolHoliday = event.type === 'School Holiday Calendar';
   const plainNoteEditedLabel = getPlainPictureDayNoteEditedLabel(event.noteAttribution);
 
   const saveNotesOnly = async () => {
@@ -6468,7 +6480,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}{lastChangeLabel ? <div><span className="font-semibold text-zinc-700">Last Change:</span> {lastChangeLabel}</div> : (event.supabaseId && !eventChangeLogLoading && !eventChangeLogError ? <div><span className="font-semibold text-zinc-700">Change History:</span> Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div> : null)}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:gap-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex min-h-[58px] w-full flex-col items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2.5 text-center text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:min-h-[64px] sm:px-5 sm:py-3">
   <span className="max-w-full break-words text-sm font-bold leading-snug">View {event.canonicalSchool}</span>
   <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-600 sm:text-xs">in School List <ChevronRight size={14} aria-hidden="true" /></span>
-</button> : null}<div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} /><Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /></div><div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div><div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />Picture Day Notes ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">Edit Picture Day Notes</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div>{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+</button> : null}<div className={isSchoolHoliday ? "grid grid-cols-1 gap-2 sm:gap-3" : "grid grid-cols-2 gap-2 sm:gap-3"}><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} />{!isSchoolHoliday ? <Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /> : null}</div>{!isSchoolHoliday ? <div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div> : null}<div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />{isSchoolHoliday ? 'School Holiday Notes' : 'Picture Day Notes'} ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">{isSchoolHoliday ? 'Edit School Holiday Notes' : 'Edit Picture Day Notes'}</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div>{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
