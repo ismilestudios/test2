@@ -82,8 +82,11 @@ function formatPrimaryPhotographerList(names = [], fallback = '', eventOrType = 
 }
 
 function getWeeklyRolloutCapacity(date = todayKey(), overrides = {}) {
-  const weekStart = getMondayStart(date || todayKey());
-  const raw = overrides?.[weekStart];
+  const weekStart = getSundayStart(date || todayKey());
+  // v1.89–v1.96 stored rollout exceptions by Monday. Prefer the new Sunday key,
+  // but accept the following Monday as a legacy fallback so existing capacity
+  // overrides remain effective during the Sunday–Saturday migration.
+  const raw = overrides?.[weekStart] ?? overrides?.[addDays(weekStart, 1)];
   const capacity = Number(raw);
   if (Number.isInteger(capacity) && capacity >= MIN_WEEKLY_ROLLOUT_CAPACITY && capacity <= MAX_WEEKLY_ROLLOUT_CAPACITY) return capacity;
   return DEFAULT_WEEKLY_ROLLOUT_CAPACITY;
@@ -1246,15 +1249,14 @@ function getEventTimeLabel(event) {
 }
 
 function weekBounds(date) {
-  // Scheduler's operational week is Monday–Sunday everywhere. Keeping the
-  // visible Week range on the same boundary as rollout capacity prevents a
-  // Sunday-selected week from showing the prior week's rollout total.
-  const start = getMondayStart(date || todayKey());
+  // Calendar, Schedule Live, and rollout capacity all use the same
+  // Sunday–Saturday week so the visible date range and workload totals agree.
+  const start = getSundayStart(date || todayKey());
   return { start, end: addDays(start, 6) };
 }
 
 function rolloutWeekBounds(date = todayKey()) {
-  const start = getMondayStart(date || todayKey());
+  const start = getSundayStart(date || todayKey());
   return { start, end: addDays(start, 6) };
 }
 
@@ -1263,7 +1265,7 @@ function getRolloutWeekOptionsForYear(year) {
   const numericYear = Number(year) || Number(todayKey().slice(0, 4));
   const yearStart = `${numericYear}-01-01`;
   const yearEnd = `${numericYear}-12-31`;
-  let cursor = getMondayStart(yearStart);
+  let cursor = getSundayStart(yearStart);
   const weeks = [];
   let guard = 0;
   while (cursor <= yearEnd && guard < 54) {
@@ -1898,23 +1900,22 @@ function cleanScheduleLiveState(state = {}) {
   return {
     ...state,
     // Normalize older/shared sessions as they are read so Schedule Live's visible
-    // week and its rollout card always reference the same Monday–Sunday range.
-    weekStart: getMondayStart(state.weekStart || todayKey()),
+    // week and its rollout card always reference the same Sunday–Saturday range.
+    weekStart: getSundayStart(state.weekStart || todayKey()),
     commentary: getCleanScheduleLiveCommentary(state.commentary)
   };
 }
 
-function getMondayStart(date = todayKey()) {
+function getSundayStart(date = todayKey()) {
   const d = new Date(`${date}T12:00:00`);
   const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
+  d.setDate(d.getDate() - day);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function scheduleLiveDefaultState(date = todayKey()) {
   return {
-    weekStart: getMondayStart(date),
+    weekStart: getSundayStart(date),
     showWeekends: false,
     hostEmail: '',
     hostName: '',
@@ -1924,13 +1925,15 @@ function scheduleLiveDefaultState(date = todayKey()) {
 }
 
 function getScheduleLiveSessionMonthLabel(weekStart) {
-  return monthLabel(monthKey(getMondayStart(weekStart || todayKey())));
+  return monthLabel(monthKey(getSundayStart(weekStart || todayKey())));
 }
 
 function getScheduleLiveDays(weekStart, showWeekends) {
-  const start = getMondayStart(weekStart || todayKey());
-  const count = showWeekends ? 7 : 5;
-  return Array.from({ length: count }, (_, index) => addDays(start, index));
+  const start = getSundayStart(weekStart || todayKey());
+  // With weekends hidden, keep the operational board focused on Monday–Friday
+  // even though the shared week itself is Sunday–Saturday.
+  if (!showWeekends) return Array.from({ length: 5 }, (_, index) => addDays(start, index + 1));
+  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
 }
 
 function getScheduleLiveWeekLabel(weekStart, showWeekends) {
@@ -2391,7 +2394,7 @@ function ScheduleLiveView({ events, photographers, assistants = [], onClickEvent
 
   const changeWeek = (delta) => {
     if (!canControlWeek) return;
-    saveLiveState(prev => ({ ...prev, weekStart: addDays(getMondayStart(prev.weekStart), delta * 7) }));
+    saveLiveState(prev => ({ ...prev, weekStart: addDays(getSundayStart(prev.weekStart), delta * 7) }));
   };
 
   const assignPhotographer = async (event, photographer, occurrenceDate = '') => {
@@ -2798,8 +2801,8 @@ function buildMonthWeekSegments(events, weekDays, month = null) {
       const segmentEnd = [event.endDate || event.date, weekEnd, monthRange?.end].filter(Boolean).sort()[0];
       if (!segmentStart || !segmentEnd || segmentStart > segmentEnd) return null;
       // Position segments by the actual order of the displayed week row instead
-      // of Date.getDay(). Month View is Sunday-first while Week View is
-      // Monday-first, so native Sunday=0 weekday indexes shift Week View by one.
+      // of Date.getDay(). Positioning by the displayed row keeps Sunday–Saturday
+      // Month and Week views aligned without relying on native weekday indexes.
       const startCol = weekDays.indexOf(segmentStart);
       const endCol = weekDays.indexOf(segmentEnd);
       if (startCol < 0 || endCol < 0) return null;
@@ -6789,7 +6792,7 @@ function makeBackupFilename(label, extension) {
 
 function RolloutController({ rolloutCapacityOverrides = {}, setRolloutCapacityOverrides, authEmail = '' }) {
   const currentYear = Number(todayKey().slice(0, 4));
-  const currentWeekStart = getMondayStart(todayKey());
+  const currentWeekStart = getSundayStart(todayKey());
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const weekOptions = useMemo(() => getRolloutWeekOptionsForYear(selectedYear), [selectedYear]);
   const [selectedWeekStart, setSelectedWeekStart] = useState(currentWeekStart);
@@ -6829,7 +6832,10 @@ function RolloutController({ rolloutCapacityOverrides = {}, setRolloutCapacityOv
     setMessage('Saving rollout capacity…');
     let error = null;
     if (capacity === DEFAULT_WEEKLY_ROLLOUT_CAPACITY) {
-      ({ error } = await supabase.from('rollout_capacity_overrides').delete().eq('week_start', selectedWeekStart));
+      ({ error } = await supabase
+        .from('rollout_capacity_overrides')
+        .delete()
+        .in('week_start', [selectedWeekStart, addDays(selectedWeekStart, 1)]));
     } else {
       ({ error } = await supabase.from('rollout_capacity_overrides').upsert({
         week_start: selectedWeekStart,
@@ -6865,7 +6871,10 @@ function RolloutController({ rolloutCapacityOverrides = {}, setRolloutCapacityOv
     }
     setSaving(true);
     setMessage('Resetting to default…');
-    const { error } = await supabase.from('rollout_capacity_overrides').delete().eq('week_start', selectedWeekStart);
+    const { error } = await supabase
+      .from('rollout_capacity_overrides')
+      .delete()
+      .in('week_start', [selectedWeekStart, addDays(selectedWeekStart, 1)]);
     setSaving(false);
     if (error) {
       setMessage(`Could not reset rollout capacity: ${error.message}.`);
@@ -6884,7 +6893,7 @@ function RolloutController({ rolloutCapacityOverrides = {}, setRolloutCapacityOv
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <h3 className="font-semibold text-zinc-950">Rollout Controller</h3>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">Weekly rollout capacity uses a Monday–Sunday business week. Normal weeks default to {DEFAULT_WEEKLY_ROLLOUT_CAPACITY}; only exception weeks are saved.</p>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">Weekly rollout capacity uses a Sunday–Saturday week. Normal weeks default to {DEFAULT_WEEKLY_ROLLOUT_CAPACITY}; only exception weeks are saved.</p>
         </div>
         <Pill className="border-[#AEBB9E] bg-white/80 text-zinc-800">Default: {DEFAULT_WEEKLY_ROLLOUT_CAPACITY}</Pill>
       </div>
@@ -6897,7 +6906,7 @@ function RolloutController({ rolloutCapacityOverrides = {}, setRolloutCapacityOv
           </select>
         </label>
         <label>
-          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Week (Monday–Sunday)</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Week (Sunday–Saturday)</div>
           <select value={selectedWeekStart} onChange={(event) => setSelectedWeekStart(event.target.value)} className="mt-1 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-semibold text-zinc-900 outline-none focus:border-[#AEBB9E]">
             {weekOptions.map(option => <option key={option.start} value={option.start}>{option.label}</option>)}
           </select>
@@ -7849,9 +7858,12 @@ export default function SchedulerApp() {
     const next = {};
     (data || []).forEach(row => {
       const capacity = Number(row?.capacity);
-      if (row?.week_start && Number.isInteger(capacity) && capacity >= MIN_WEEKLY_ROLLOUT_CAPACITY && capacity <= MAX_WEEKLY_ROLLOUT_CAPACITY) {
-        next[row.week_start] = capacity;
-      }
+      if (!row?.week_start || !Number.isInteger(capacity) || capacity < MIN_WEEKLY_ROLLOUT_CAPACITY || capacity > MAX_WEEKLY_ROLLOUT_CAPACITY) return;
+      const normalizedWeekStart = getSundayStart(row.week_start);
+      const sourceDay = new Date(`${row.week_start}T12:00:00`).getDay();
+      // Prefer a native Sunday-keyed v1.97+ override if both it and a legacy
+      // Monday-keyed override exist for the same Sunday–Saturday week.
+      if (sourceDay === 0 || next[normalizedWeekStart] === undefined) next[normalizedWeekStart] = capacity;
     });
     setRolloutCapacityOverrides(next);
   };
