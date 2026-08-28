@@ -2797,8 +2797,12 @@ function buildMonthWeekSegments(events, weekDays, month = null) {
       const segmentStart = [event.date, weekStart, monthRange?.start].filter(Boolean).sort()[[event.date, weekStart, monthRange?.start].filter(Boolean).length - 1];
       const segmentEnd = [event.endDate || event.date, weekEnd, monthRange?.end].filter(Boolean).sort()[0];
       if (!segmentStart || !segmentEnd || segmentStart > segmentEnd) return null;
-      const startCol = new Date(`${segmentStart}T12:00:00`).getDay();
-      const endCol = new Date(`${segmentEnd}T12:00:00`).getDay();
+      // Position segments by the actual order of the displayed week row instead
+      // of Date.getDay(). Month View is Sunday-first while Week View is
+      // Monday-first, so native Sunday=0 weekday indexes shift Week View by one.
+      const startCol = weekDays.indexOf(segmentStart);
+      const endCol = weekDays.indexOf(segmentEnd);
+      if (startCol < 0 || endCol < 0) return null;
       return {
         event,
         segmentStart,
