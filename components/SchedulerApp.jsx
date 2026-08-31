@@ -741,7 +741,7 @@ function CalendarColorKey() {
     ['Makeup Day', TYPE_COLORS['Makeup Day']],
     ['Sports', TYPE_COLORS.Sports],
     ['Seniors', TYPE_COLORS.Seniors],
-    ['Special Event', TYPE_COLORS['Special Event']],
+    ['Special Events / Headshots / Family Photos', TYPE_COLORS['Special Event']],
     ['Rain Date', TYPE_COLORS['Rain Date']],
     ['Call or Meeting', TYPE_COLORS['Call or Meeting']],
     ['Edit Day', TYPE_COLORS['Edit Day']],
@@ -3024,6 +3024,7 @@ const ROLLOUT_EVENT_TYPES = new Set([
   'Makeup Day',
   'Rain Date',
   'Family Photos',
+  'Headshots',
   'Special Event',
   'Studio Assigned Schools (SAS)'
 ]);
@@ -5268,7 +5269,7 @@ function importedEventToSupabaseRow(event = {}) {
 
 function normalizeEventTypeName(value = '') {
   const clean = String(value || '').trim();
-  if (clean.toLowerCase() === 'headshots' || clean.toLowerCase() === 'headshot') return 'Special Event';
+  if (clean.toLowerCase() === 'headshot') return 'Headshots';
   return clean || 'Special Event';
 }
 
@@ -5289,6 +5290,8 @@ function normalizeImportedEventType(row = {}) {
     'Sports',
     'Seniors',
     'Special Event',
+    'Family Photos',
+    'Headshots',
     'Studio Assigned Schools (SAS)',
     'Time Off',
     'Personal Appointment',
@@ -5302,7 +5305,7 @@ function normalizeImportedEventType(row = {}) {
   if (title.includes('makeup') || title.includes('make up') || title.includes('retake') || rawType === 'makeup/retake') return 'Makeup Day';
   if (title.includes('sports') || rawType === 'sports') return 'Sports';
   if (title.includes('photo booth') || title.includes('photobooth') || rawType === 'photo booth') return 'Photo Booth';
-  if (title.includes('headshot')) return 'Special Event';
+  if (title.includes('headshot')) return 'Headshots';
   if (title.includes('senior') && !title.includes('underclass') && !title.includes('graduation') && !title.includes('pano')) return 'Seniors';
   if (title.includes('spring') || rawType === 'spring picture day') {
     if (!title.includes('grad') && !title.includes('graduation') && !title.includes('pano')) return 'Spring Picture Day';
