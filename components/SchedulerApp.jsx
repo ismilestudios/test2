@@ -3458,6 +3458,7 @@ function getSeasonLabel(date) {
   if (date >= '2025-09-01' && date <= '2025-11-30') return 'Fall 2025';
   if (date >= '2026-03-01' && date <= '2026-06-30') return 'Spring 2026';
   if (date >= '2026-09-01' && date <= '2026-11-30') return 'Fall 2026';
+  if (date >= '2027-01-01' && date <= '2027-06-30') return 'Spring 2027';
   return date.slice(0, 4);
 }
 
@@ -3509,6 +3510,13 @@ function chooseCarrieReferenceEvent(history = []) {
   return fall2025[0] || history[history.length - 1] || null;
 }
 
+function chooseCarrieSpringReferenceEvent(history = []) {
+  const spring2026 = history.filter(event => event && event.date >= '2026-01-01' && event.date <= '2026-06-30');
+  const springPictureDays = spring2026.filter(event => event.type === 'Spring Picture Day');
+  if (springPictureDays.length) return springPictureDays[0];
+  return spring2026[0] || null;
+}
+
 function getUniqueNamesFromEvents(events = [], key = 'photographers') {
   return [...new Set(events.flatMap(event => event?.[key] || []).filter(Boolean))];
 }
@@ -3550,6 +3558,21 @@ function eventMatchesSchoolIdentity(event, school = {}, mergedSourceSchools = []
 
 function schoolHasCarrieFall2026ScheduledEvent(school = {}, mergedSourceSchools = [], events = EVENTS) {
   return events.some(event => isCarrieFall2026ScheduledEvent(event) && eventMatchesSchoolIdentity(event, school, mergedSourceSchools));
+}
+
+function isCarrieSpring2027ScheduledEvent(event) {
+  if (!event || event.removed || event.active === false) return false;
+
+  const eventStart = String(event.date || '');
+  const eventEnd = String(event.endDate || event.date || '');
+  if (!eventStart || eventStart > '2027-06-30' || eventEnd < '2027-01-01') return false;
+
+  const internalOnlyTypes = new Set(['Call or Meeting', 'Time Off', 'Personal Appointment', 'Edit Day', 'Rain Date', 'School Holiday Calendar']);
+  return !internalOnlyTypes.has(event.type);
+}
+
+function schoolHasCarrieSpring2027ScheduledEvent(school = {}, mergedSourceSchools = [], events = EVENTS) {
+  return events.some(event => isCarrieSpring2027ScheduledEvent(event) && eventMatchesSchoolIdentity(event, school, mergedSourceSchools));
 }
 
 function getFall2026ScheduledSchools(events = EVENTS) {
@@ -3625,10 +3648,53 @@ function getSchoolsToScheduleFromList(schoolsList = SCHOOLS, events = EVENTS) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getFall2026Availability(events = EVENTS, photographers = PHOTOGRAPHERS, rolloutCapacityOverrides = {}) {
+function getSchoolsToScheduleSpring2027FromList(schoolsList = SCHOOLS, events = EVENTS) {
+  const allSchools = (Array.isArray(schoolsList) ? schoolsList : []).filter(Boolean);
+
+  const mergedSourcesByTarget = {};
+  allSchools.forEach((school) => {
+    if (school?.mergedInto) {
+      mergedSourcesByTarget[school.mergedInto] ||= [];
+      mergedSourcesByTarget[school.mergedInto].push(school.originalName || school.name);
+    }
+  });
+
+  return allSchools
+    .filter(school => school.active !== false && !school.mergedInto)
+    .filter(school => !school.noSpringSchedulingSpring2027)
+    .map(school => {
+      const mergedFrom = mergedSourcesByTarget[school.originalName || school.name] || [];
+      const mergedSourceSchools = mergedFrom.map(name => allSchools.find(item => (item.originalName || item.name) === name)).filter(Boolean);
+      if (schoolHasCarrieSpring2027ScheduledEvent(school, mergedSourceSchools, events)) return null;
+      const history = getSchoolHistoryForSchool(school, mergedSourceSchools, events);
+      const spring2026 = history.filter(event => event && event.date >= '2026-01-01' && event.date <= '2026-06-30');
+      const springPictureDayEvents = spring2026.filter(event => event.type === 'Spring Picture Day');
+      const referenceEvent = chooseCarrieSpringReferenceEvent(history);
+      const mergedNotes = mergedSourceSchools.map(item => item.notes).filter(Boolean);
+      const notes = [school.notes, ...mergedNotes.map((note, index) => `Merged from ${mergedSourceSchools[index]?.name || mergedFrom[index]}:\n${note}`)].filter(Boolean).join('\n\n');
+
+      return {
+        ...school,
+        notes,
+        referenceImages: [...(school.referenceImages || []), ...mergedSourceSchools.flatMap(item => item.referenceImages || [])],
+        mergedFrom: mergedSourceSchools.map(item => item.name),
+        displayName: getCarrieSchoolDisplayName(school.name),
+        history,
+        spring2026,
+        springPictureDayEvents,
+        lastEvent: referenceEvent,
+        referencePhotographers: getUniqueNamesFromEvents(springPictureDayEvents.length ? springPictureDayEvents : referenceEvent ? [referenceEvent] : [], 'photographers'),
+        status: 'Needs Spring 2027 Scheduling'
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function getCarrie2026To2027Availability(events = EVENTS, photographers = PHOTOGRAPHERS, rolloutCapacityOverrides = {}) {
   const dates = [];
   const start = new Date('2026-08-01T12:00:00');
-  const end = new Date('2026-12-31T12:00:00');
+  const end = new Date('2027-06-30T12:00:00');
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const key = d.toISOString().slice(0, 10);
     const { start: weekStart, end: weekEnd } = rolloutWeekBounds(key);
@@ -3811,8 +3877,16 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
   );
 }
 
-function SchedulingModal({ school, photographers, assistants, events = [], onClose, onSave, defaultDate = '2026-09-01' }) {
-  const [date, setDate] = useState(defaultDate || '2026-09-01');
+function SchedulingModal({ school, photographers, assistants, events = [], onClose, onSave, defaultDate = null, season = 'Fall 2026' }) {
+  const isSpring2027 = season === 'Spring 2027';
+  const seasonStart = isSpring2027 ? '2027-01-01' : '2026-08-01';
+  const seasonEnd = isSpring2027 ? '2027-06-30' : '2026-12-31';
+  const seasonDefaultDate = isSpring2027 ? '2027-01-01' : '2026-09-01';
+  const initialDate = defaultDate && defaultDate >= seasonStart && defaultDate <= seasonEnd ? defaultDate : seasonDefaultDate;
+  const pictureDayType = isSpring2027 ? 'Spring Picture Day' : 'Fall Picture Day';
+  const seasonName = isSpring2027 ? 'Spring' : 'Fall';
+  const referenceLabel = isSpring2027 ? 'Spring 2026' : 'Fall 2025';
+  const [date, setDate] = useState(initialDate);
   const [isTwoDay, setIsTwoDay] = useState(false);
   const [endDate, setEndDate] = useState('');
   const [arrivalTime, setArrivalTime] = useState('');
@@ -3832,12 +3906,12 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 
   const saveSchedule = async () => {
     const event = {
-      id: `2026-${school.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+      id: `${date.slice(0, 4)}-${school.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
       date,
       endDate: isTwoDay ? (endDate || addDays(date, 1)) : null,
-      title: `${school.name} Fall Picture Day`,
+      title: `${school.name} ${seasonName} Picture Day`,
       canonicalSchool: school.name,
-      type: 'Fall Picture Day',
+      type: pictureDayType,
       status: selectedPhotographers.length >= (Number(requiredPhotographers) || 1) ? 'Scheduled' : 'Needs Photographers Assigned',
       photographers: selectedPhotographers,
       assistants: noAssistant ? [] : selectedAssistants,
@@ -3850,7 +3924,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
       time: startTime || 'TBD',
       notes: notes || 'Scheduled from Carrie View. Details can be refined later.',
       rainInfo: '',
-      history: school.lastEvent ? `Fall 2025 reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Assigned photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
+      history: school.lastEvent ? `${referenceLabel} reference: ${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}. Assigned photographers: ${school.lastEvent.photographers?.join(', ') || '—'}.` : 'Created from Carrie View.',
     };
     const result = await onSave(event);
     if (result) {
@@ -3865,7 +3939,7 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
           <div className="border-b border-zinc-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Schedule Fall 2026</Pill>
+                <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">Schedule {season}</Pill>
                 <h2 className="mt-3 text-2xl font-semibold text-zinc-950">{school.name}</h2>
                 <p className="mt-1 text-sm text-zinc-600">Pick a date and assign the team. This saves locally in the prototype for now.</p>
               </div>
@@ -3876,15 +3950,15 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
           <div className="max-h-[72vh] space-y-4 overflow-auto p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Fall 2026 First Date</div>
-                <input type="date" min="2026-08-01" max="2026-12-31" value={date} onChange={(e) => { setDate(e.target.value); if (isTwoDay && (!endDate || endDate < e.target.value)) setEndDate(addDays(e.target.value, 1)); }} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{season} First Date</div>
+                <input type="date" min={seasonStart} max={seasonEnd} value={date} onChange={(e) => { setDate(e.target.value); if (isTwoDay && (!endDate || endDate < e.target.value)) setEndDate(addDays(e.target.value, 1)); }} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4" />
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">End Date</div>
                   <button type="button" onClick={() => { const next = !isTwoDay; setIsTwoDay(next); if (next && !endDate) setEndDate(addDays(date, 1)); }} className={`rounded-full border px-3 py-1 text-xs font-semibold ${isTwoDay ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700'}`}>{isTwoDay ? 'Multi-day' : 'One-day'}</button>
                 </div>
-                <input type="date" min="2026-08-01" max="2026-12-31" disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
+                <input type="date" min={seasonStart} max={seasonEnd} disabled={!isTwoDay} value={isTwoDay ? (endDate || addDays(date, 1)) : ''} onChange={(e) => setEndDate(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-sage/30 focus:ring-4 disabled:bg-zinc-100 disabled:text-zinc-400" />
               </label>
               <label className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Arrival Time</div>
@@ -3898,8 +3972,8 @@ function SchedulingModal({ school, photographers, assistants, events = [], onClo
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">2025 Reference</div>
-                <div className="mt-2 text-sm text-zinc-800">{school.lastEvent ? `${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}` : 'No matched Fall 2025 reference yet.'}</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{referenceLabel} Reference</div>
+                <div className="mt-2 text-sm text-zinc-800">{school.lastEvent ? `${formatDate(school.lastEvent.date)} — ${school.lastEvent.title}` : `No matched ${referenceLabel} reference yet.`}</div>
                 <div className="mt-1 text-xs text-zinc-500">Assigned: {formatPrimaryPhotographerList(school.lastEvent?.photographers || [], '—', school.lastEvent)}</div>
               </div>
             </div>
@@ -4443,14 +4517,21 @@ function AddSchoolModal({ onClose, onSave }) {
 }
 
 function CarrieView({ query, onClickEvent, photographers, assistants, events, onSchedule, schoolsList, setSchools, onSchoolAdded, canEdit = true, rolloutCapacityOverrides = {} }) {
-  const schools = useMemo(() => getSchoolsToScheduleFromList(schoolsList, events), [schoolsList, events]);
-  const availability = useMemo(() => getFall2026Availability(events, photographers, rolloutCapacityOverrides), [events, photographers, rolloutCapacityOverrides]);
-  const [selectedSchool, setSelectedSchool] = useState(schools[0] || null);
+  // Fall 2026 is intentionally left on its existing filtering/state path. Spring
+  // 2027 is additive and independent so introducing the new season cannot reset
+  // or reinterpret Carrie's existing Fall 2026 working list.
+  const fallSchools = useMemo(() => getSchoolsToScheduleFromList(schoolsList, events), [schoolsList, events]);
+  const springSchools = useMemo(() => getSchoolsToScheduleSpring2027FromList(schoolsList, events), [schoolsList, events]);
+  const availability = useMemo(() => getCarrie2026To2027Availability(events, photographers, rolloutCapacityOverrides), [events, photographers, rolloutCapacityOverrides]);
+  const [selectedSchool, setSelectedSchool] = useState(fallSchools[0] || springSchools[0] || null);
+  const [selectedSeason, setSelectedSeason] = useState(fallSchools.length ? 'Fall 2026' : 'Spring 2027');
   const [schedulingSchool, setSchedulingSchool] = useState(null);
+  const [schedulingSeason, setSchedulingSeason] = useState('Fall 2026');
   const [addingEvent, setAddingEvent] = useState(false);
   const [addingEventDefaultDate, setAddingEventDefaultDate] = useState(todayKey());
   const [addingSchool, setAddingSchool] = useState(false);
   const [noFallUndo, setNoFallUndo] = useState(null);
+  const [noSpringUndo, setNoSpringUndo] = useState(null);
 
   const setNoFallScheduling = async (school, value) => {
     if (!school) return;
@@ -4475,20 +4556,58 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
     }
   };
 
-  useEffect(() => {
-    if (!schools.length) {
-      setSelectedSchool(null);
+
+  const setNoSpringScheduling = async (school, value) => {
+    if (!school) return;
+    if (!school.id) {
+      alert('Could not update No Spring Scheduling because the canonical School List row id is missing. No school data was changed.');
       return;
     }
-    if (!selectedSchool || !schools.some(school => school.name === selectedSchool.name)) {
-      setSelectedSchool(schools[0]);
+
+    const originalName = school.originalName || school.name;
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      alert('Supabase is not connected, so No Spring Scheduling could not be saved. No school data was changed.');
+      return;
     }
-  }, [schools, selectedSchool]);
+
+    const updatePayload = { no_spring_scheduling_spring_2027: value, updated_at: new Date().toISOString() };
+    const { data, error } = await supabase
+      .from('schools')
+      .update(updatePayload)
+      .eq('id', school.id)
+      .select('id, no_spring_scheduling_spring_2027')
+      .single();
+
+    if (error || !data?.id) {
+      alert(`Could not update No Spring Scheduling: ${error?.message || 'Supabase did not confirm the canonical school row.'}`);
+      return;
+    }
+
+    const savedValue = Boolean(data.no_spring_scheduling_spring_2027);
+    setSchools?.(prev => (prev || []).map(item => item.id === school.id ? { ...item, noSpringSchedulingSpring2027: savedValue } : item));
+    setNoSpringUndo(savedValue ? { school: { ...school, noSpringSchedulingSpring2027: true }, originalName } : null);
+  };
+
+  useEffect(() => {
+    const activeSchools = selectedSeason === 'Spring 2027' ? springSchools : fallSchools;
+    if (selectedSchool && activeSchools.some(school => school.name === selectedSchool.name)) return;
+
+    if (activeSchools.length) {
+      setSelectedSchool(activeSchools[0]);
+      return;
+    }
+
+    const fallbackSeason = selectedSeason === 'Spring 2027' ? 'Fall 2026' : 'Spring 2027';
+    const fallbackSchools = fallbackSeason === 'Spring 2027' ? springSchools : fallSchools;
+    setSelectedSeason(fallbackSchools.length ? fallbackSeason : selectedSeason);
+    setSelectedSchool(fallbackSchools[0] || null);
+  }, [fallSchools, springSchools, selectedSchool, selectedSeason]);
 
   const q = query.trim().toLowerCase();
-  const filteredSchools = q
-    ? schools.filter(item => [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join('\n').toLowerCase().includes(q))
-    : schools;
+  const matchesCarrieQuery = (item) => !q || [item.name, item.displayName, item.notes, item.lastEvent?.title, item.lastEvent?.notes, ...(item.referencePhotographers || []), ...(item.lastEvent?.photographers || []), ...(item.lastEvent?.assistants || [])].filter(Boolean).join('\n').toLowerCase().includes(q);
+  const filteredFallSchools = fallSchools.filter(matchesCarrieQuery);
+  const filteredSpringSchools = springSchools.filter(matchesCarrieQuery);
 
   const saveSchool = async (schoolValues) => {
     const supabase = createClient();
@@ -4543,44 +4662,72 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
         ) : null}
       </div>
       <div className="grid gap-4 xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.25fr)]">
-        <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[680px] xl:flex-col xl:overflow-hidden">
-          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="max-w-xl">
-              <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled <span className="text-zinc-500">[Fall 2026]</span></h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-600">Click a school to review it for Fall 2026 scheduling. Since Fall 2026 starts blank, this is the full working list until schools are saved.</p>
-            </div>
-            <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-              <Pill className="border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSchools.length} to schedule</Pill>
-            </div>
-          </div>
-          <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:pr-1">
-            {filteredSchools.map(item => (
-              <div key={item.name} onClick={() => setSelectedSchool(item)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedSchool(item); }} className={`w-full cursor-pointer rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-950">{item.displayName || item.name}</div>
-                    <div className="mt-1 text-xs text-zinc-500">{item.lastEvent ? `2025 reference: ${formatDate(item.lastEvent.date)}` : 'No imported Fall 2025 event matched yet'}</div>
-                  </div>
-                  {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
-                </div>
-                <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <div className="min-h-7">{item.lastEvent ? <div className="text-xs text-zinc-500">2025 Fall assigned: {formatPrimaryPhotographerList(item.referencePhotographers || [], '—')}</div> : null}</div>
-                  {canEdit ? <button type="button" onClick={(event) => { event.stopPropagation(); setNoFallScheduling(item, true); }} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">No Fall Scheduling</button> : null}
-                </div>
+        <div className="space-y-4">
+          <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[430px] xl:flex-col xl:overflow-hidden">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="max-w-xl">
+                <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled <span className="text-zinc-500">[Fall 2026]</span></h2>
+                <p className="mt-1 text-sm leading-6 text-zinc-600">Existing Fall 2026 working list. Scheduled schools and No Fall Scheduling schools stay off this list.</p>
               </div>
-            ))}
-          </div>
-        </section>
+              <Pill className="shrink-0 border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredFallSchools.length} to schedule</Pill>
+            </div>
+            <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:pr-1">
+              {filteredFallSchools.map(item => (
+                <div key={`fall-${item.name}`} onClick={() => { setSelectedSeason('Fall 2026'); setSelectedSchool(item); }} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { setSelectedSeason('Fall 2026'); setSelectedSchool(item); } }} className={`w-full cursor-pointer rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSeason === 'Fall 2026' && selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-zinc-950">{item.displayName || item.name}</div>
+                      <div className="mt-1 text-xs text-zinc-500">{item.lastEvent ? `2025 reference: ${formatDate(item.lastEvent.date)}` : 'No imported Fall 2025 event matched yet'}</div>
+                    </div>
+                    {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="min-h-7">{item.lastEvent ? <div className="text-xs text-zinc-500">2025 Fall assigned: {formatPrimaryPhotographerList(item.referencePhotographers || [], '—')}</div> : null}</div>
+                    {canEdit ? <button type="button" onClick={(event) => { event.stopPropagation(); setNoFallScheduling(item, true); }} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">No Fall Scheduling</button> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[430px] xl:flex-col xl:overflow-hidden">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="max-w-xl">
+                <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled <span className="text-zinc-500">[Spring 2027]</span></h2>
+                <p className="mt-1 text-sm leading-6 text-zinc-600">Spring 2027 is tracked independently. A school drops off once it has a Spring 2027 production event or is marked No Spring Scheduling.</p>
+              </div>
+              <Pill className="shrink-0 border-[#AEBB9E] bg-[#DDE8D2] text-zinc-800">{filteredSpringSchools.length} to schedule</Pill>
+            </div>
+            <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-auto xl:pr-1">
+              {filteredSpringSchools.map(item => (
+                <div key={`spring-${item.name}`} onClick={() => { setSelectedSeason('Spring 2027'); setSelectedSchool(item); }} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { setSelectedSeason('Spring 2027'); setSelectedSchool(item); } }} className={`w-full cursor-pointer rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedSeason === 'Spring 2027' && selectedSchool?.name === item.name ? 'border-[#AEBB9E] bg-[#DDE8D2]/70' : 'border-zinc-200 bg-cream/75'}`}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-zinc-950">{item.displayName || item.name}</div>
+                      <div className="mt-1 text-xs text-zinc-500">{item.lastEvent ? `Spring 2026 reference: ${formatDate(item.lastEvent.date)}` : 'No imported Spring 2026 event matched yet'}</div>
+                    </div>
+                    {item.irm ? <Pill className="border-zinc-200 bg-white text-zinc-700">IRM {item.irm}</Pill> : null}
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-600">{item.lastEvent?.title || 'Needs historical matching/review'}</div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="min-h-7">{item.lastEvent ? <div className="text-xs text-zinc-500">2026 Spring assigned: {formatPrimaryPhotographerList(item.referencePhotographers || [], '—')}</div> : null}</div>
+                    {canEdit ? <button type="button" onClick={(event) => { event.stopPropagation(); setNoSpringScheduling(item, true); }} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">No Spring Scheduling</button> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
 
         <section className="space-y-3">
-          <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:max-h-[680px] xl:overflow-auto">
+          <div className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:max-h-[876px] xl:overflow-auto">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-zinc-950">Selected School</h2>
                 <p className="mt-1 text-sm text-zinc-600">Review history, contacts, notes, and prior assignments before scheduling.</p>
               </div>
-              {selectedSchool && canEdit ? <button type="button" onClick={() => setSchedulingSchool(selectedSchool)} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Schedule for Fall 2026</button> : null}
+              {selectedSchool && canEdit ? <button type="button" onClick={() => { setSchedulingSeason(selectedSeason); setSchedulingSchool(selectedSchool); }} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">Schedule for {selectedSeason}</button> : null}
             </div>
             <SchoolHistoryPanel school={selectedSchool} onClickEvent={onClickEvent} />
           </div>
@@ -4589,10 +4736,10 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
 
       <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm">
         <div className="mb-4">
-          <h2 className="text-lg font-semibold text-zinc-950">Fall 2026 Date Availability</h2>
-          <p className="mt-1 text-sm text-zinc-600">August through December, including weekends. Availability reflects booked events and weekly rollout capacity.</p>
+          <h2 className="text-lg font-semibold text-zinc-950">2026–2027 Date Availability</h2>
+          <p className="mt-1 text-sm text-zinc-600">August 1, 2026 through June 30, 2027, including weekends. Availability reflects booked events and weekly rollout capacity.</p>
         </div>
-        <div className="grid max-h-[520px] gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid max-h-[680px] gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
           {availability.map(day => (
             <button key={day.date} type="button" onClick={() => { if (!canEdit) return; setAddingEventDefaultDate(day.date); setAddingEvent(true); }} className={`rounded-2xl border p-3 text-left transition ${canEdit ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-soft focus:outline-none focus:ring-4 focus:ring-[#AEBB9E]/30' : ''} ${day.capacity.className || 'border-zinc-200 bg-cream/75 text-zinc-800'}`} title={canEdit ? `Add an event on ${formatDate(day.date)}` : undefined}>
               <div className="flex items-start justify-between gap-3">
@@ -4613,12 +4760,20 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
           ))}
         </div>
       </section>
-      {canEdit ? <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} defaultDate={addingEventDefaultDate} /> : null}
+      {canEdit ? <SchedulingModal school={schedulingSchool} photographers={photographers} assistants={assistants} events={events} onClose={() => setSchedulingSchool(null)} onSave={onSchedule} defaultDate={addingEventDefaultDate} season={schedulingSeason} /> : null}
       {canEdit && noFallUndo ? (
         <div className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-zinc-950 px-4 py-3 text-sm text-white shadow-2xl sm:bottom-6">
           <div className="flex items-center justify-between gap-3">
             <div><span className="font-semibold">{noFallUndo.school?.displayName || noFallUndo.school?.name}</span> marked No Fall Scheduling.</div>
             <button type="button" onClick={() => setNoFallScheduling(noFallUndo.school, false)} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950">Undo</button>
+          </div>
+        </div>
+      ) : null}
+      {canEdit && noSpringUndo ? (
+        <div className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-zinc-950 px-4 py-3 text-sm text-white shadow-2xl sm:bottom-6">
+          <div className="flex items-center justify-between gap-3">
+            <div><span className="font-semibold">{noSpringUndo.school?.displayName || noSpringUndo.school?.name}</span> marked No Spring Scheduling.</div>
+            <button type="button" onClick={() => setNoSpringScheduling(noSpringUndo.school, false)} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950">Undo</button>
           </div>
         </div>
       ) : null}
@@ -4649,6 +4804,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
   const [saveStatus, setSaveStatus] = useState('');
   const [referenceImages, setReferenceImages] = useState(school?.referenceImages || []);
   const [noFallSchedulingFall2026, setNoFallSchedulingFall2026] = useState(Boolean(school?.noFallSchedulingFall2026));
+  const [noSpringSchedulingSpring2027, setNoSpringSchedulingSpring2027] = useState(Boolean(school?.noSpringSchedulingSpring2027));
 
   useEffect(() => {
     setName(school?.name || '');
@@ -4670,6 +4826,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
     setSaving(false);
     setReferenceImages(school?.referenceImages || []);
     setNoFallSchedulingFall2026(Boolean(school?.noFallSchedulingFall2026));
+    setNoSpringSchedulingSpring2027(Boolean(school?.noSpringSchedulingSpring2027));
   }, [school]);
 
   if (!school) return null;
@@ -4728,7 +4885,8 @@ function EditSchoolModal({ school, onClose, onSave }) {
         notes: school.notes || '',
         newNote: newNote.trim(),
         referenceImages,
-        noFallSchedulingFall2026
+        noFallSchedulingFall2026,
+        noSpringSchedulingSpring2027
       });
       if (result === false) {
         setSaveStatus('Save failed. Check the message on the School List page.');
@@ -4827,6 +4985,13 @@ function EditSchoolModal({ school, onClose, onSave }) {
             <span>
               <span className="font-semibold text-zinc-900">No Fall Scheduling</span>
               <span className="mt-1 block text-xs leading-5 text-zinc-500">Hide this school from Carrie View’s Fall 2026 To Be Scheduled list. This is reversible.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-sm text-zinc-700">
+            <input type="checkbox" checked={noSpringSchedulingSpring2027} onChange={(e) => setNoSpringSchedulingSpring2027(e.target.checked)} className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900" />
+            <span>
+              <span className="font-semibold text-zinc-900">No Spring Scheduling</span>
+              <span className="mt-1 block text-xs leading-5 text-zinc-500">Hide this school from Carrie View’s Spring 2027 To Be Scheduled list. This is reversible and independent from Fall 2026.</span>
             </span>
           </label>
           </div>
@@ -5089,7 +5254,8 @@ function schoolToSupabaseRow(school = {}) {
     merged_into: school.mergedInto || null,
     active: school.active !== false,
     updated_at: new Date().toISOString(),
-    no_fall_scheduling_fall_2026: Boolean(school.noFallSchedulingFall2026 || school.no_fall_scheduling_fall_2026)
+    no_fall_scheduling_fall_2026: Boolean(school.noFallSchedulingFall2026 || school.no_fall_scheduling_fall_2026),
+    no_spring_scheduling_spring_2027: Boolean(school.noSpringSchedulingSpring2027 || school.no_spring_scheduling_spring_2027)
   };
 }
 
@@ -5097,7 +5263,7 @@ const SCHOOL_DATA_FIELDS = [
   'district', 'irm', 'address', 'city', 'state', 'zip', 'state_zip', 'notes', 'school_notes_attribution',
   'contact_first', 'contact_last', 'contact_phone', 'contact_email', 'contact_title',
   'secondary_contact_first', 'secondary_contact_last', 'secondary_contact_email', 'secondary_contact_title',
-  'reference_images', 'no_fall_scheduling_fall_2026'
+  'reference_images', 'no_fall_scheduling_fall_2026', 'no_spring_scheduling_spring_2027'
 ];
 
 function isMeaningfullyBlankSchoolValue(value) {
@@ -5172,6 +5338,7 @@ function supabaseRowToSchool(row = {}) {
     mergedInto: row.mergedInto || row.merged_into || null,
     active: row.active !== false,
     noFallSchedulingFall2026: Boolean(row.noFallSchedulingFall2026 || row.no_fall_scheduling_fall_2026),
+    noSpringSchedulingSpring2027: Boolean(row.noSpringSchedulingSpring2027 || row.no_spring_scheduling_spring_2027),
     createdAt: row.createdAt || row.created_at || '',
     updatedAt: row.updatedAt || row.updated_at || ''
   };
