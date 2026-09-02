@@ -4691,7 +4691,7 @@ function CarrieView({ query, onClickEvent, photographers, assistants, events, on
             </div>
           </section>
 
-          <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[430px] xl:flex-col xl:overflow-hidden">
+          <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:flex xl:max-h-[680px] xl:flex-col xl:overflow-hidden">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="max-w-xl">
                 <h2 className="text-lg font-semibold text-zinc-950">To Be Scheduled <span className="text-zinc-500">[Spring 2027]</span></h2>
