@@ -4,13 +4,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        cream: "#FFFDF8",
+        cream: "#FAFBF8",
         sage: "#AEBB9E",
         mist: "#DDE8D2",
         pebble: "#E6E7E1"
       },
       boxShadow: {
-        soft: "0 20px 60px rgba(39, 39, 42, 0.08)"
+        soft: "0 14px 40px rgba(39, 39, 42, 0.08)"
       }
     }
   },

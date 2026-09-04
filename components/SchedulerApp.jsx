@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2 } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
@@ -614,6 +614,54 @@ function editNoteHistory(attribution, noteId, email, text) {
   return { ...previous, history };
 }
 
+
+const LINKIFIABLE_TEXT_PATTERN = /((?:https?:\/\/|www\.)[^\s<]+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
+
+function linkifiablePart(part = '') {
+  const value = String(part || '');
+  if (!value) return null;
+  const isEmail = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value);
+  const isUrl = /^(?:https?:\/\/|www\.)/i.test(value);
+  if (!isEmail && !isUrl) return null;
+
+  let clean = value;
+  let trailing = '';
+  while (clean && /[),.;!?]$/.test(clean)) {
+    trailing = clean.slice(-1) + trailing;
+    clean = clean.slice(0, -1);
+  }
+  if (!clean) return null;
+  const href = isEmail ? `mailto:${clean}` : (/^www\./i.test(clean) ? `https://${clean}` : clean);
+  return { clean, trailing, href, isEmail };
+}
+
+function LinkifiedText({ text, className = '' }) {
+  const value = String(text || '');
+  const parts = value.split(LINKIFIABLE_TEXT_PATTERN);
+  return (
+    <div className={`whitespace-pre-wrap break-words ${className}`}>
+      {parts.map((part, index) => {
+        const link = linkifiablePart(part);
+        if (!link) return <Fragment key={`text-${index}`}>{part}</Fragment>;
+        return (
+          <Fragment key={`link-${index}`}>
+            <a
+              href={link.href}
+              target={link.isEmail ? undefined : '_blank'}
+              rel={link.isEmail ? undefined : 'noreferrer noopener'}
+              className="font-semibold text-sky-700 underline decoration-sky-300 underline-offset-2 transition hover:text-sky-900"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {link.clean}
+            </a>
+            {link.trailing}
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 function AttributionPill({ attribution }) {
   const clean = normalizeAttribution(attribution);
   if (!clean?.name && !clean?.email) return null;
@@ -646,7 +694,7 @@ function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.', canEdit =
               </div>
             ) : (
               <>
-                <div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{entry.text}</div>
+                <LinkifiedText text={entry.text} className="text-sm leading-6 text-zinc-800" />
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <AttributionPill attribution={entry} />
@@ -1522,10 +1570,10 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
   const primaryTabs = visibleTabs.filter(tab => tab !== 'Admin');
   const showAdminTab = visibleTabs.includes('Admin');
   return (
-    <header className={`sticky top-0 z-50 border-b border-zinc-200/70 bg-cream shadow-sm ${mobileViewCompact ? 'sm:py-0' : ''}`}>
+    <header className={`sticky top-0 z-50 border-b border-zinc-200/70 bg-[#F8FAF7]/95 shadow-[0_8px_24px_rgba(39,39,42,0.05)] backdrop-blur ${mobileViewCompact ? 'sm:py-0' : ''}`}>
       <div className={`mx-auto max-w-7xl ${mobileViewCompact ? 'px-2 sm:px-6' : 'px-4 sm:px-6'} ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-3 sm:py-4'}`}>
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-3 sm:gap-4'}`}>
-          <div>
+          <div className="sm:rounded-[2rem] sm:border sm:border-white/80 sm:bg-white/55 sm:p-3 sm:shadow-[0_10px_30px_rgba(39,39,42,0.06)]">
             <div className="flex items-center gap-3 sm:gap-4">
               <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm sm:h-28 sm:w-28 sm:rounded-3xl"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain sm:h-[6.5rem] sm:w-[6.5rem]" /></span>
               <div className="min-w-0">
@@ -1860,7 +1908,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
           <button type="button" onClick={onAddEvent} className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"><Plus size={16} /> Add Event</button>
         </div>
       ) : null}
-      <div className="grid gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(190px,0.78fr)]">
       {overviewColumns.map(column => {
         const columnEvents = events.filter(column.filter);
         return (
@@ -2145,8 +2193,8 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
         ) : null}
         {expandedInfo ? (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white/80 p-2 text-[11px] leading-5 text-zinc-700">
-            {event.notes ? <div className="whitespace-pre-wrap">{event.notes}</div> : <div className="text-zinc-500">No Picture Day Info entered.</div>}
-            {stripInternalEventMeta(event.history) ? <div className="mt-2 whitespace-pre-wrap border-t border-zinc-100 pt-2 text-zinc-500">{stripInternalEventMeta(event.history)}</div> : null}
+            {event.notes ? <LinkifiedText text={event.notes} /> : <div className="text-zinc-500">No Picture Day Info entered.</div>}
+            {stripInternalEventMeta(event.history) ? <div className="mt-2 border-t border-zinc-100 pt-2 text-zinc-500"><LinkifiedText text={stripInternalEventMeta(event.history)} /></div> : null}
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -3799,7 +3847,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         {visiblePlainSchoolNotes ? (
           <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{getPlainSchoolNoteLabel(visiblePlainSchoolNotes)}</div>
-            <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{visiblePlainSchoolNotes}</div>
+            <LinkifiedText text={visiblePlainSchoolNotes} className="mt-2 text-sm leading-6 text-zinc-700" />
           </div>
         ) : null}
       </div>
@@ -4346,7 +4394,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                   {canEditNotes ? (
                     <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={8} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
                   ) : (
-                    <div className="whitespace-pre-wrap text-sm leading-6 text-zinc-700">{notes}</div>
+                    <LinkifiedText text={notes} className="text-sm leading-6 text-zinc-700" />
                   )}
                 </div>
               ) : null}
@@ -4973,7 +5021,7 @@ function EditSchoolModal({ school, onClose, onSave }) {
             {school.notes ? (
               <div className="mt-4 rounded-2xl border border-zinc-200 bg-cream/70 p-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Stored School Notes</div>
-                <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-700">{school.notes}</div>
+                <LinkifiedText text={school.notes} className="mt-2 text-sm leading-6 text-zinc-700" />
               </div>
             ) : null}
           </section>
@@ -5137,9 +5185,9 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
             <div className="mt-2 rounded-2xl border border-zinc-100 bg-cream/60 p-2">
               <NoteHistoryList entries={schoolNoteHistory} />
               {visiblePlainSchoolNotes ? (
-                <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-zinc-700">
+                <div className="mt-2 text-xs leading-5 text-zinc-700">
                   <div className="mb-1 font-black uppercase tracking-wide text-zinc-500">{getPlainSchoolNoteLabel(visiblePlainSchoolNotes)}</div>
-                  {visiblePlainSchoolNotes}
+                  <LinkifiedText text={visiblePlainSchoolNotes} />
                 </div>
               ) : schoolNoteHistory.length ? null : <div className="text-xs font-semibold text-zinc-400">No notes yet.</div>}
             </div>
@@ -6100,7 +6148,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
             <div className="px-2 py-2">Photog</div>
             <div className="px-2 py-2">Assistant</div>
           </div>
-          <div className="max-h-[520px] overflow-y-auto">
+          <div className="overflow-visible sm:max-h-[520px] sm:overflow-y-auto sm:overscroll-contain">
             {groupedPlainViewEvents.length ? groupedPlainViewEvents.map(([date, dayEvents]) => (
               <div key={date}>
                 {plainViewMode !== 'Day' ? <div className="border-b border-zinc-100 bg-cream/80 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-zinc-500">{formatDate(date)}</div> : null}
@@ -6657,7 +6705,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}{lastChangeLabel ? <div><span className="font-semibold text-zinc-700">Last Change:</span> {lastChangeLabel}</div> : (event.supabaseId && !eventChangeLogLoading && !eventChangeLogError ? <div><span className="font-semibold text-zinc-700">Change History:</span> Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div> : null)}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:gap-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex min-h-[58px] w-full flex-col items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2.5 text-center text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:min-h-[64px] sm:px-5 sm:py-3">
   <span className="max-w-full break-words text-sm font-bold leading-snug">View {event.canonicalSchool}</span>
   <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-600 sm:text-xs">in School List <ChevronRight size={14} aria-hidden="true" /></span>
-</button> : null}<div className={isSchoolHoliday ? "grid grid-cols-1 gap-2 sm:gap-3" : "grid grid-cols-2 gap-2 sm:gap-3"}><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} />{!isSchoolHoliday ? <Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /> : null}</div>{!isSchoolHoliday ? <div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div> : null}<div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />{isSchoolHoliday ? 'School Holiday Notes' : 'Picture Day Notes'} ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">{isSchoolHoliday ? 'Edit School Holiday Notes' : 'Edit Picture Day Notes'}</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><div className="whitespace-pre-wrap text-sm leading-6 text-zinc-800">{event.notes}</div>{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+</button> : null}<div className={isSchoolHoliday ? "grid grid-cols-1 gap-2 sm:gap-3" : "grid grid-cols-2 gap-2 sm:gap-3"}><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} />{!isSchoolHoliday ? <Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /> : null}</div>{!isSchoolHoliday ? <div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div> : null}<div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />{isSchoolHoliday ? 'School Holiday Notes' : 'Picture Day Notes'} ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">{isSchoolHoliday ? 'Edit School Holiday Notes' : 'Edit Picture Day Notes'}</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><LinkifiedText text={event.notes} className="text-sm leading-6 text-zinc-800" />{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -8518,7 +8566,7 @@ export default function SchedulerApp() {
                     <div className="mt-1 text-lg font-black text-zinc-950">Open the live scheduling draft room</div>
                     <div className="mt-1 text-sm font-semibold text-zinc-600">Assign photographers week by week with live rollout counts, host control, Shelve, and commentary.</div>
                   </div>
-                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="schedule-live-launch-button inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-7 py-3 text-sm font-black uppercase tracking-wide text-zinc-950 shadow-lg shadow-red-200/60 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-red-50 active:translate-y-0">✨ Launch Schedule Live!</button>
+                  <button type="button" onClick={() => setActiveTab('Schedule Live!')} className="schedule-live-launch-button inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-9 py-4 text-base font-black uppercase tracking-wide text-zinc-950 shadow-lg shadow-red-200/60 transition hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-red-50 active:translate-y-0">✨ Launch Schedule Live!</button>
                 </div>
               </div>
             ) : null}
