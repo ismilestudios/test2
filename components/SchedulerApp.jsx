@@ -5884,7 +5884,7 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
                   <th className="px-3 py-2.5">Other Contact</th>
                   <th className="px-3 py-2.5">Who Reached Out</th>
                   <th className="px-3 py-2.5">Notes</th>
-                  {canEdit ? <th className="px-3 py-2.5 text-right">Actions</th> : null}
+                  {canEdit ? <th className="sticky right-0 z-10 w-[180px] border-l border-zinc-200 bg-zinc-50 px-3 py-2.5 text-right">Actions</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
@@ -5899,10 +5899,10 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
                     </td>
                     <td className="min-w-[240px] max-w-[360px] px-3 py-3">{item.notes ? <LinkifiedText text={item.notes} className="text-sm" /> : <span className="text-zinc-400">—</span>}</td>
                     {canEdit ? (
-                      <td className="px-3 py-3 text-right">
+                      <td className="sticky right-0 z-[1] w-[180px] border-l border-zinc-100 bg-white px-3 py-3 text-right">
                         <div className="flex justify-end gap-1.5">
-                          <button type="button" onClick={() => setEditing(item)} className="rounded-xl border border-zinc-200 bg-white p-2 text-zinc-600 hover:text-zinc-950" aria-label={`Edit ${item.schoolName}`} title="Edit"><Pencil size={15} /></button>
-                          {canRemove ? <button type="button" onClick={() => removeAcquisition(item)} disabled={removingId === item.id} className="rounded-xl border border-zinc-200 bg-white p-2 text-zinc-400 hover:text-rose-600 disabled:opacity-40" aria-label={`Remove ${item.schoolName}`} title="Remove"><Trash2 size={15} /></button> : null}
+                          <button type="button" onClick={() => setEditing(item)} className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-bold text-zinc-700 shadow-sm hover:bg-zinc-50 hover:text-zinc-950" aria-label={`Edit ${item.schoolName}`} title="Edit"><Pencil size={14} /> Edit</button>
+                          {canRemove ? <button type="button" onClick={() => removeAcquisition(item)} disabled={removingId === item.id} className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-50 disabled:opacity-40" aria-label={`Remove ${item.schoolName}`} title="Remove"><Trash2 size={14} /> Remove</button> : null}
                         </div>
                       </td>
                     ) : null}
@@ -5921,7 +5921,7 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
                     <h3 className="font-black text-zinc-950">{item.schoolName}</h3>
                     <div className="mt-0.5 text-xs font-semibold text-zinc-500">{item.district || 'District not entered'}</div>
                   </div>
-                  {canEdit ? <button type="button" onClick={() => setEditing(item)} className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-600"><Pencil size={15} /></button> : null}
+                  {canEdit ? <button type="button" onClick={() => setEditing(item)} className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-bold text-zinc-700 shadow-sm"><Pencil size={14} /> Edit</button> : null}
                 </div>
                 {item.mailingAddress ? <div className="mt-3 text-sm text-zinc-700">{item.mailingAddress}</div> : null}
                 {item.otherContact ? <LinkifiedText text={item.otherContact} className="mt-2 text-sm" /> : null}
