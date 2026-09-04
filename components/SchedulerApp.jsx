@@ -2012,6 +2012,8 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
 
 const POST_PRODUCTION_BOARD_TRACKING_START = '2026-09-02';
 const POST_PRODUCTION_SELLING_RETENTION_MS = 4 * 24 * 60 * 60 * 1000;
+const POST_PRODUCTION_DEADLINE_DAYS = 7;
+const POST_PRODUCTION_UNASSIGNED_KEY = '__unassigned__';
 const POST_PRODUCTION_EVENT_TYPES = new Set([
   'Fall Picture Day',
   'Spring Picture Day',
@@ -2031,13 +2033,76 @@ const POST_PRODUCTION_STAGES = [
   { key: 'selling', label: 'Selling' }
 ];
 
+function postProductionPhotographerKey(name = '') {
+  const clean = canonicalPhotographerName(name).trim();
+  return clean ? clean.toLowerCase() : POST_PRODUCTION_UNASSIGNED_KEY;
+}
+
+function postProductionTileId(eventId = '', photographerKey = POST_PRODUCTION_UNASSIGNED_KEY) {
+  return `${String(eventId || '')}::${String(photographerKey || POST_PRODUCTION_UNASSIGNED_KEY)}`;
+}
+
+function postProductionStageLabel(stage = '') {
+  return POST_PRODUCTION_STAGES.find(item => item.key === stage)?.label || 'School Events';
+}
+
+function getPostProductionPhotographerEntries(event = {}) {
+  const dates = getEventDateKeys(event);
+  const eventDates = dates.length ? dates : (event?.date ? [event.date] : []);
+  const byKey = new Map();
+
+  eventDates.forEach(date => {
+    getScheduleLivePhotographersForDate(event, date).forEach(rawName => {
+      const name = canonicalPhotographerName(rawName);
+      if (!name) return;
+      const key = postProductionPhotographerKey(name);
+      const existing = byKey.get(key);
+      if (existing) {
+        if (!existing.workDates.includes(date)) existing.workDates.push(date);
+        existing.lastWorkDate = date;
+        return;
+      }
+      byKey.set(key, {
+        photographerKey: key,
+        photographerName: name,
+        workDates: [date],
+        firstWorkDate: date,
+        lastWorkDate: date
+      });
+    });
+  });
+
+  // Very old/imported events can occasionally lack staffing even after their shoot
+  // date. Keep one neutral tile so the production job does not disappear from The
+  // Board merely because a photographer assignment is missing.
+  if (!byKey.size) {
+    const fallbackDate = event?.endDate || event?.date || '';
+    byKey.set(POST_PRODUCTION_UNASSIGNED_KEY, {
+      photographerKey: POST_PRODUCTION_UNASSIGNED_KEY,
+      photographerName: 'Unassigned',
+      workDates: fallbackDate ? [fallbackDate] : [],
+      firstWorkDate: event?.date || fallbackDate,
+      lastWorkDate: fallbackDate
+    });
+  }
+
+  const entries = Array.from(byKey.values());
+  return entries.map((entry, index) => ({
+    ...entry,
+    index,
+    total: entries.length,
+    dueDate: entry.lastWorkDate ? addDays(entry.lastWorkDate, POST_PRODUCTION_DEADLINE_DAYS) : ''
+  }));
+}
+
 function supabaseRowToPostProductionRecord(row = {}) {
+  const photographerKey = String(row.photographer_key || POST_PRODUCTION_UNASSIGNED_KEY).trim().toLowerCase() || POST_PRODUCTION_UNASSIGNED_KEY;
   return {
     eventId: row.event_id || '',
+    photographerKey,
+    photographerName: row.photographer_name || (photographerKey === POST_PRODUCTION_UNASSIGNED_KEY ? 'Unassigned' : ''),
+    tileId: postProductionTileId(row.event_id || '', photographerKey),
     stage: row.stage || 'school_events',
-    // Legacy v2.03-v2.03b memo field is retained for backward compatibility only.
-    // v2.03c+ stores Post-Production Notes as separate appendable note rows.
-    notes: row.post_production_notes || '',
     stageChangedAt: row.stage_changed_at || row.created_at || '',
     createdBy: row.created_by || '',
     updatedBy: row.updated_by || '',
@@ -2076,21 +2141,46 @@ function isPostProductionRecordHidden(record = null, now = Date.now()) {
   return Number.isFinite(changedAt) && changedAt > 0 && now - changedAt >= POST_PRODUCTION_SELLING_RETENTION_MS;
 }
 
-function PostProductionBoardDetailsModal({ event, record, notes = [], canEdit, saving = false, noteSaving = false, onClose, onMove, onAddNote, onEditNote, onViewEvent }) {
+function postProductionDateDiffInDays(fromDate = '', toDate = '') {
+  if (!fromDate || !toDate) return 0;
+  const from = new Date(`${fromDate}T12:00:00`).getTime();
+  const to = new Date(`${toDate}T12:00:00`).getTime();
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
+  return Math.round((to - from) / (24 * 60 * 60 * 1000));
+}
+
+function formatPostProductionDueDate(date = '') {
+  if (!date) return '';
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+}
+
+function postProductionDeadlineLabel(tile = {}, stage = 'school_events', today = todayKey()) {
+  if (stage === 'selling') return 'Completed';
+  if (!tile?.dueDate) return '';
+  const days = postProductionDateDiffInDays(today, tile.dueDate);
+  const due = formatPostProductionDueDate(tile.dueDate);
+  if (days > 1) return `Due ${due} - ${days} Days Left`;
+  if (days === 1) return `Due ${due} - 1 Day Left`;
+  if (days === 0) return `Due ${due} - Today`;
+  const overdue = Math.abs(days);
+  return `Due ${due} - ${overdue} Day${overdue === 1 ? '' : 's'} Overdue`;
+}
+
+function PostProductionBoardDetailsModal({ tile, record, linkedTiles = [], recordsByTileId = {}, notes = [], canEdit, saving = false, noteSaving = false, onClose, onMove, onAddNote, onEditNote, onViewEvent }) {
   const [newNoteDraft, setNewNoteDraft] = useState('');
   const [editingNoteId, setEditingNoteId] = useState('');
   const [editingNoteDraft, setEditingNoteDraft] = useState('');
+  const event = tile?.event || null;
   const stage = record?.stage || 'school_events';
-  // The modal is mounted even when no Board card is selected. Keep the initial
-  // null state inert so simply opening The Board can never run event helpers.
-  const crew = event ? assignedCrewForWholeEvent(event) : [];
   const sortedNotes = sortPostProductionNotesNewestFirst(notes);
 
   useEffect(() => {
     setNewNoteDraft('');
     setEditingNoteId('');
     setEditingNoteDraft('');
-  }, [event?.supabaseId]);
+  }, [tile?.tileId]);
 
   const addNote = async () => {
     const text = String(newNoteDraft || '').trim();
@@ -2111,7 +2201,7 @@ function PostProductionBoardDetailsModal({ event, record, notes = [], canEdit, s
 
   return (
     <AnimatePresence>
-      {event ? (
+      {event && tile ? (
         <motion.div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 p-2 backdrop-blur-sm sm:items-center sm:p-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
           <motion.div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-zinc-200 bg-[#F8FAF7] p-4 shadow-2xl sm:p-6" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 18, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
@@ -2119,33 +2209,59 @@ function PostProductionBoardDetailsModal({ event, record, notes = [], canEdit, s
                 <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">The Board</div>
                 <h2 className="mt-1 text-xl font-black leading-tight text-zinc-950 sm:text-2xl">{event.title}</h2>
                 <div className="mt-1 text-sm font-semibold text-zinc-500">{getEventDateLabel(event)} · {event.type}</div>
-                {crew.length ? <div className="mt-1 text-sm text-zinc-600">{crew.join(', ')}</div> : null}
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-bold text-zinc-800">
+                  <span>{tile.photographerName}</span>
+                  {tile.total > 1 ? <span className="rounded-full border border-zinc-300 bg-white px-2 py-0.5 text-[11px] font-bold text-zinc-600">↔ {tile.index + 1} of {tile.total}</span> : null}
+                </div>
               </div>
               <button type="button" onClick={onClose} className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-500 shadow-sm hover:text-zinc-900" aria-label="Close Board details"><X size={18} /></button>
             </div>
 
+            {linkedTiles.length > 1 ? (
+              <section className="mt-5 rounded-3xl border border-zinc-200 bg-white/80 p-4">
+                <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Photographer Progress</div>
+                <div className="mt-3 space-y-2">
+                  {linkedTiles.map(linkedTile => {
+                    const linkedRecord = recordsByTileId[linkedTile.tileId] || null;
+                    const linkedStage = linkedRecord?.stage || 'school_events';
+                    const isCurrent = linkedTile.tileId === tile.tileId;
+                    return (
+                      <div key={linkedTile.tileId} className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 ${isCurrent ? 'border-zinc-400 bg-zinc-50' : 'border-zinc-100 bg-white'}`}>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-bold text-zinc-800">{linkedTile.photographerName} <span className="text-[11px] font-semibold text-zinc-400">{linkedTile.index + 1} of {linkedTile.total}</span></div>
+                          <div className="mt-0.5 text-[11px] font-semibold text-zinc-500">{postProductionDeadlineLabel(linkedTile, linkedStage)}</div>
+                        </div>
+                        <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold text-zinc-700">{postProductionStageLabel(linkedStage)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
             <section className="mt-5">
-              <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Board Status</div>
+              <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Board Status — {tile.photographerName}</div>
               <div className="mt-2 grid gap-2 sm:grid-cols-5">
                 {POST_PRODUCTION_STAGES.map(item => (
                   <button
                     key={item.key}
                     type="button"
                     disabled={!canEdit || saving || item.key === stage}
-                    onClick={() => onMove(event, item.key)}
-                    className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${item.key === stage ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/50'} disabled:cursor-default disabled:opacity-70`}
+                    onClick={() => onMove(tile, item.key)}
+                    className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${item.key === stage ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50'} disabled:cursor-default disabled:opacity-70`}
                   >
                     {item.label}
                   </button>
                 ))}
               </div>
-              {stage === 'selling' ? <div className="mt-2 text-xs text-zinc-500">Selling cards disappear from the active Board after 4 days. Their Board record and Post-Production Notes remain stored.</div> : null}
+              <div className="mt-2 text-xs font-semibold text-zinc-500">{postProductionDeadlineLabel(tile, stage)}</div>
+              {stage === 'selling' ? <div className="mt-1 text-xs text-zinc-500">This photographer tile disappears from the active Board after 4 days. The Board record and shared Post-Production Notes remain stored.</div> : null}
             </section>
 
             <section className="mt-5 rounded-3xl border border-zinc-200 bg-white/80 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Post-Production Notes ({sortedNotes.length})</div>
-                <div className="text-[11px] font-semibold text-zinc-400">Separate from Picture Day Notes</div>
+                <div className="text-[11px] font-semibold text-zinc-400">Shared by this event · Separate from Picture Day Notes</div>
               </div>
 
               <div className="mt-4 space-y-4">
@@ -2212,20 +2328,21 @@ function PostProductionBoardDetailsModal({ event, record, notes = [], canEdit, s
 }
 
 function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onViewEvent }) {
-  const [recordsByEventId, setRecordsByEventId] = useState({});
+  const [recordsByTileId, setRecordsByTileId] = useState({});
   const [notesByEventId, setNotesByEventId] = useState({});
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const [selectedBoardEvent, setSelectedBoardEvent] = useState(null);
-  const [savingEventId, setSavingEventId] = useState('');
+  const [selectedBoardTile, setSelectedBoardTile] = useState(null);
+  const [savingTileId, setSavingTileId] = useState('');
   const [savingNoteId, setSavingNoteId] = useState('');
-  const [draggedEventId, setDraggedEventId] = useState('');
+  const [draggedTileId, setDraggedTileId] = useState('');
   const [dragOverStage, setDragOverStage] = useState('');
+  const [linkedEventId, setLinkedEventId] = useState('');
   const [nowTick, setNowTick] = useState(Date.now());
 
   const loadBoardRecords = async () => {
     if (!hasSupabaseEnv()) {
-      setRecordsByEventId({});
+      setRecordsByTileId({});
       setNotesByEventId({});
       setLoading(false);
       setMessage('Supabase is not connected, so The Board cannot be shared yet.');
@@ -2239,21 +2356,21 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
     }
     setLoading(true);
     const [boardResult, notesResult] = await Promise.all([
-      supabase.from('post_production_board').select('*').order('updated_at', { ascending: false }),
+      supabase.from('post_production_board_photographers').select('*').order('updated_at', { ascending: false }),
       supabase.from('post_production_notes').select('*').order('created_at', { ascending: false })
     ]);
 
     if (boardResult.error) {
-      setRecordsByEventId({});
+      setRecordsByTileId({});
       setNotesByEventId({});
-      setMessage(`Could not load The Board: ${boardResult.error.message}. Run supabase/v2_03_post_production_board.sql if this feature has not been installed yet.`);
+      setMessage(`Could not load The Board: ${boardResult.error.message}. Run supabase/v2_04_board_photographer_tiles.sql before deploying v2.04.`);
       setLoading(false);
       return;
     }
     if (notesResult.error) {
-      setRecordsByEventId({});
+      setRecordsByTileId({});
       setNotesByEventId({});
-      setMessage(`Could not load Post-Production Notes: ${notesResult.error.message}. Run supabase/v2_03c_post_production_note_history.sql before deploying v2.03c.`);
+      setMessage(`Could not load Post-Production Notes: ${notesResult.error.message}. Run supabase/v2_03c_post_production_note_history.sql if the note history has not been installed yet.`);
       setLoading(false);
       return;
     }
@@ -2261,7 +2378,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
     const nextRecords = {};
     (boardResult.data || []).forEach(row => {
       const record = supabaseRowToPostProductionRecord(row);
-      if (record.eventId) nextRecords[record.eventId] = record;
+      if (record.eventId && record.tileId) nextRecords[record.tileId] = record;
     });
 
     const nextNotes = {};
@@ -2275,7 +2392,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       nextNotes[eventId] = sortPostProductionNotesNewestFirst(nextNotes[eventId]);
     });
 
-    setRecordsByEventId(nextRecords);
+    setRecordsByTileId(nextRecords);
     setNotesByEventId(nextNotes);
     setMessage('');
     setLoading(false);
@@ -2287,16 +2404,34 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
     return () => window.clearInterval(timer);
   }, []);
 
-  const eligibleEvents = useMemo(() => {
+  const allBoardTiles = useMemo(() => {
     const today = todayKey();
     return (events || [])
       .filter(event => isPostProductionBoardEligibleEvent(event, today))
-      .filter(event => !isPostProductionRecordHidden(recordsByEventId[event.supabaseId], nowTick))
-      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.title || '').localeCompare(String(b.title || '')));
-  }, [events, recordsByEventId, nowTick]);
+      .flatMap(event => getPostProductionPhotographerEntries(event).map(entry => {
+        const tileId = postProductionTileId(event.supabaseId, entry.photographerKey);
+        return { ...entry, event, eventId: event.supabaseId, tileId };
+      }))
+      .filter(tile => !tile.firstWorkDate || tile.firstWorkDate <= today)
+      .sort((a, b) => String(a.event?.date || '').localeCompare(String(b.event?.date || '')) || String(a.event?.title || '').localeCompare(String(b.event?.title || '')) || a.index - b.index);
+  }, [events]);
 
-  const saveBoardRecord = async (event, patch = {}) => {
-    if (!canEdit || !event?.supabaseId) return false;
+  const eligibleBoardTiles = useMemo(() => allBoardTiles
+    .filter(tile => !isPostProductionRecordHidden(recordsByTileId[tile.tileId], nowTick)), [allBoardTiles, recordsByTileId, nowTick]);
+
+  const tilesByEventId = useMemo(() => {
+    const map = {};
+    allBoardTiles.forEach(tile => {
+      if (!map[tile.eventId]) map[tile.eventId] = [];
+      map[tile.eventId].push(tile);
+    });
+    Object.values(map).forEach(list => list.sort((a, b) => a.index - b.index));
+    return map;
+  }, [allBoardTiles]);
+
+  const saveBoardRecord = async (tile, patch = {}) => {
+    const event = tile?.event;
+    if (!canEdit || !event?.supabaseId || !tile?.photographerKey) return false;
     if (!hasSupabaseEnv()) {
       setMessage('Supabase is not connected. Board changes were not saved.');
       return false;
@@ -2307,43 +2442,44 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       return false;
     }
 
-    const previous = recordsByEventId[event.supabaseId] || null;
+    const previous = recordsByTileId[tile.tileId] || null;
     const previousStage = previous?.stage || 'school_events';
     const nextStage = patch.stage || previousStage;
     const stageChanged = nextStage !== previousStage;
     const nowIso = new Date().toISOString();
     const payload = {
       event_id: event.supabaseId,
+      photographer_key: tile.photographerKey,
+      photographer_name: tile.photographerName,
       stage: nextStage,
-      post_production_notes: patch.notes !== undefined ? String(patch.notes || '') : (previous?.notes || ''),
       stage_changed_at: stageChanged ? nowIso : (previous?.stageChangedAt || nowIso),
       created_by: previous?.createdBy || authEmail || null,
       updated_by: authEmail || null,
       updated_at: nowIso
     };
 
-    setSavingEventId(event.supabaseId);
+    setSavingTileId(tile.tileId);
     const { data, error } = await supabase
-      .from('post_production_board')
-      .upsert(payload, { onConflict: 'event_id' })
+      .from('post_production_board_photographers')
+      .upsert(payload, { onConflict: 'event_id,photographer_key' })
       .select()
       .single();
-    setSavingEventId('');
+    setSavingTileId('');
 
     if (error || !data) {
-      setMessage(`The Board change was not saved: ${error?.message || 'Supabase did not return the saved record.'}`);
+      setMessage(`The Board change was not saved: ${error?.message || 'Supabase did not return the saved photographer tile.'}`);
       return false;
     }
 
     const saved = supabaseRowToPostProductionRecord(data);
-    setRecordsByEventId(current => ({ ...current, [event.supabaseId]: saved }));
+    setRecordsByTileId(current => ({ ...current, [saved.tileId]: saved }));
     setMessage('');
     return saved;
   };
 
-  const moveEvent = async (event, stage) => {
+  const moveTile = async (tile, stage) => {
     if (!POST_PRODUCTION_STAGES.some(item => item.key === stage)) return;
-    await saveBoardRecord(event, { stage });
+    await saveBoardRecord(tile, { stage });
   };
 
   const addPostProductionNote = async (event, text) => {
@@ -2429,13 +2565,13 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
   };
 
   const onDropStage = async (stage, transferredId = '') => {
-    const eventId = transferredId || draggedEventId;
+    const tileId = transferredId || draggedTileId;
     setDragOverStage('');
-    setDraggedEventId('');
-    if (!eventId || !canEdit) return;
-    const event = eligibleEvents.find(item => item.supabaseId === eventId);
-    if (!event) return;
-    await moveEvent(event, stage);
+    setDraggedTileId('');
+    if (!tileId || !canEdit) return;
+    const tile = eligibleBoardTiles.find(item => item.tileId === tileId);
+    if (!tile) return;
+    await moveTile(tile, stage);
   };
 
   return (
@@ -2443,11 +2579,11 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       <div className="flex flex-col gap-3 rounded-[1.75rem] border border-zinc-200 bg-white/75 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-black text-zinc-950">The Board</h2>
-          <p className="mt-1 max-w-3xl text-sm text-zinc-600">Post-production tracking only. Events enter School Events on their shoot date; Board status and Post-Production Notes never change the Scheduler event itself.</p>
-          <p className="mt-1 text-xs font-semibold text-zinc-500">Board tracking begins September 2, 2026. Selling items clear from the active Board after 4 days.</p>
+          <p className="mt-1 max-w-3xl text-sm text-zinc-600">Post-production tracking only. Each photographer gets an independent tile once the shoot date arrives; linked tiles share the same Post-Production Notes and never change the Scheduler event itself.</p>
+          <p className="mt-1 text-xs font-semibold text-zinc-500">Board tracking begins September 2, 2026. Deadline: 7 days after each photographer's final shoot day. Selling tiles clear from the active Board after 4 days.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Pill className="border-zinc-200 bg-white text-zinc-700">{eligibleEvents.length} active</Pill>
+          <Pill className="border-zinc-200 bg-white text-zinc-700">{eligibleBoardTiles.length} active tiles</Pill>
           <button type="button" onClick={loadBoardRecords} disabled={loading} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50">{loading ? 'Loading…' : 'Reload Board'}</button>
         </div>
       </div>
@@ -2457,7 +2593,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       <div className="overflow-x-auto pb-2">
         <div className="grid min-w-[1320px] grid-cols-5 gap-3">
           {POST_PRODUCTION_STAGES.map(stage => {
-            const stageEvents = eligibleEvents.filter(event => (recordsByEventId[event.supabaseId]?.stage || 'school_events') === stage.key);
+            const stageTiles = eligibleBoardTiles.filter(tile => (recordsByTileId[tile.tileId]?.stage || 'school_events') === stage.key);
             const isDropTarget = dragOverStage === stage.key;
             return (
               <section
@@ -2465,31 +2601,38 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
                 onDragOver={(e) => { if (canEdit) { e.preventDefault(); setDragOverStage(stage.key); } }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverStage(''); }}
                 onDrop={(e) => { e.preventDefault(); onDropStage(stage.key, e.dataTransfer.getData('text/plain')); }}
-                className={`min-h-[560px] rounded-[1.75rem] border p-2.5 transition sm:p-3 ${isDropTarget ? 'border-[#83966F] bg-[#DDE8D2]/55 shadow-soft' : 'border-zinc-200 bg-zinc-100/75'}`}
+                className={`min-h-[560px] rounded-[1.75rem] border p-2.5 transition sm:p-3 ${isDropTarget ? 'border-zinc-500 bg-zinc-200/65 shadow-soft' : 'border-zinc-200 bg-zinc-100/75'}`}
               >
                 <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl bg-white/90 px-3 py-2 shadow-sm">
                   <h3 className="text-sm font-black text-zinc-900">{stage.label}</h3>
-                  <Pill className="border-zinc-200 bg-zinc-50 text-zinc-600">{stageEvents.length}</Pill>
+                  <Pill className="border-zinc-200 bg-zinc-50 text-zinc-600">{stageTiles.length}</Pill>
                 </div>
                 <div className="space-y-2">
-                  {stageEvents.map(event => {
-                    const record = recordsByEventId[event.supabaseId] || null;
+                  {stageTiles.map(tile => {
+                    const event = tile.event;
+                    const record = recordsByTileId[tile.tileId] || null;
                     const eventNotes = notesByEventId[event.supabaseId] || [];
                     const latestNote = eventNotes[0] || null;
-                    const crew = assignedCrewForWholeEvent(event);
-                    const isSaving = savingEventId === event.supabaseId;
+                    const isSaving = savingTileId === tile.tileId;
+                    const linkedTiles = tilesByEventId[tile.eventId] || [tile];
+                    const partners = linkedTiles.filter(item => item.tileId !== tile.tileId);
+                    const linked = linkedTiles.length > 1;
+                    const relationshipActive = Boolean(linkedEventId);
+                    const isRelationshipMatch = linkedEventId === tile.eventId;
                     return (
                       <article
-                        key={event.supabaseId}
+                        key={tile.tileId}
                         draggable={canEdit && !isSaving}
                         onDragStart={(e) => {
-                          setDraggedEventId(event.supabaseId);
+                          setDraggedTileId(tile.tileId);
                           e.dataTransfer.effectAllowed = 'move';
-                          e.dataTransfer.setData('text/plain', event.supabaseId);
+                          e.dataTransfer.setData('text/plain', tile.tileId);
                         }}
-                        onDragEnd={() => { setDraggedEventId(''); setDragOverStage(''); }}
-                        onClick={() => setSelectedBoardEvent(event)}
-                        className={`cursor-pointer rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${canEdit ? 'sm:cursor-grab sm:active:cursor-grabbing' : ''} ${isSaving ? 'opacity-60' : ''}`}
+                        onDragEnd={() => { setDraggedTileId(''); setDragOverStage(''); }}
+                        onMouseEnter={() => { if (linked) setLinkedEventId(tile.eventId); }}
+                        onMouseLeave={() => { if (linkedEventId === tile.eventId) setLinkedEventId(''); }}
+                        onClick={() => setSelectedBoardTile(tile)}
+                        className={`cursor-pointer rounded-2xl border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${canEdit ? 'sm:cursor-grab sm:active:cursor-grabbing' : ''} ${isSaving ? 'opacity-60' : ''} ${isRelationshipMatch ? 'border-zinc-500 ring-2 ring-zinc-300 shadow-md' : 'border-zinc-200'} ${relationshipActive && !isRelationshipMatch ? 'opacity-45' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
@@ -2498,13 +2641,30 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
                           </div>
                           <Pill className={`${TYPE_COLORS[event.type] || 'border-zinc-200 bg-zinc-100 text-zinc-800'} shrink-0 px-2 py-0.5 text-[9px]`}>{event.type === 'Studio Assigned Schools (SAS)' ? 'SAS' : event.type}</Pill>
                         </div>
-                        {crew.length ? <div className="mt-2 text-xs leading-5 text-zinc-600">{crew.join(', ')}</div> : null}
+
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-bold text-zinc-800">
+                          <span>{tile.photographerName}</span>
+                          {linked ? <span className="rounded-full border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-[10px] font-bold text-zinc-600">↔ {tile.index + 1} of {tile.total}</span> : null}
+                        </div>
+
+                        <div className="mt-1.5 text-[11px] font-black text-zinc-600">{postProductionDeadlineLabel(tile, record?.stage || 'school_events')}</div>
+
                         {latestNote ? <div className="mt-2 line-clamp-2 rounded-xl bg-[#F8FAF7] px-2.5 py-2 text-[11px] leading-4 text-zinc-600">Note: {latestNote.text}</div> : null}
+
+                        {partners.length ? (
+                          <div className="mt-2 space-y-0.5 border-t border-zinc-100 pt-2">
+                            {partners.map(partner => {
+                              const partnerStage = recordsByTileId[partner.tileId]?.stage || 'school_events';
+                              return <div key={partner.tileId} className="truncate text-[10px] font-semibold text-zinc-500">↔ {partner.photographerName} — {postProductionStageLabel(partnerStage)}</div>;
+                            })}
+                          </div>
+                        ) : null}
+
                         {isSaving ? <div className="mt-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400">Saving…</div> : null}
                       </article>
                     );
                   })}
-                  {!stageEvents.length ? <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/45 px-3 py-8 text-center text-xs font-semibold text-zinc-400">No events</div> : null}
+                  {!stageTiles.length ? <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/45 px-3 py-8 text-center text-xs font-semibold text-zinc-400">No events</div> : null}
                 </div>
               </section>
             );
@@ -2513,18 +2673,20 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       </div>
 
       <PostProductionBoardDetailsModal
-        event={selectedBoardEvent}
-        record={selectedBoardEvent ? recordsByEventId[selectedBoardEvent.supabaseId] : null}
-        notes={selectedBoardEvent ? (notesByEventId[selectedBoardEvent.supabaseId] || []) : []}
+        tile={selectedBoardTile}
+        record={selectedBoardTile ? recordsByTileId[selectedBoardTile.tileId] : null}
+        linkedTiles={selectedBoardTile ? (tilesByEventId[selectedBoardTile.eventId] || [selectedBoardTile]) : []}
+        recordsByTileId={recordsByTileId}
+        notes={selectedBoardTile ? (notesByEventId[selectedBoardTile.eventId] || []) : []}
         canEdit={canEdit}
-        saving={selectedBoardEvent ? savingEventId === selectedBoardEvent.supabaseId : false}
+        saving={selectedBoardTile ? savingTileId === selectedBoardTile.tileId : false}
         noteSaving={Boolean(savingNoteId)}
-        onClose={() => setSelectedBoardEvent(null)}
-        onMove={moveEvent}
+        onClose={() => setSelectedBoardTile(null)}
+        onMove={moveTile}
         onAddNote={addPostProductionNote}
         onEditNote={editPostProductionNote}
         onViewEvent={(event) => {
-          setSelectedBoardEvent(null);
+          setSelectedBoardTile(null);
           onViewEvent?.(event);
         }}
       />
