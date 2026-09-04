@@ -2035,6 +2035,8 @@ function supabaseRowToPostProductionRecord(row = {}) {
   return {
     eventId: row.event_id || '',
     stage: row.stage || 'school_events',
+    // Legacy v2.03-v2.03b memo field is retained for backward compatibility only.
+    // v2.03c+ stores Post-Production Notes as separate appendable note rows.
     notes: row.post_production_notes || '',
     stageChangedAt: row.stage_changed_at || row.created_at || '',
     createdBy: row.created_by || '',
@@ -2042,6 +2044,23 @@ function supabaseRowToPostProductionRecord(row = {}) {
     createdAt: row.created_at || '',
     updatedAt: row.updated_at || ''
   };
+}
+
+function supabaseRowToPostProductionNote(row = {}) {
+  return {
+    id: row.id || '',
+    eventId: row.event_id || '',
+    text: String(row.note_text || '').trim(),
+    createdBy: row.created_by || '',
+    createdAt: row.created_at || '',
+    editedBy: row.edited_by || '',
+    editedAt: row.edited_at || '',
+    updatedAt: row.updated_at || row.created_at || ''
+  };
+}
+
+function sortPostProductionNotesNewestFirst(notes = []) {
+  return [...(notes || [])].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 }
 
 function isPostProductionBoardEligibleEvent(event = {}, today = todayKey()) {
@@ -2057,22 +2076,44 @@ function isPostProductionRecordHidden(record = null, now = Date.now()) {
   return Number.isFinite(changedAt) && changedAt > 0 && now - changedAt >= POST_PRODUCTION_SELLING_RETENTION_MS;
 }
 
-function PostProductionBoardDetailsModal({ event, record, canEdit, saving = false, onClose, onMove, onSaveNotes, onViewEvent }) {
-  const [notesDraft, setNotesDraft] = useState(record?.notes || '');
+function PostProductionBoardDetailsModal({ event, record, notes = [], canEdit, saving = false, noteSaving = false, onClose, onMove, onAddNote, onEditNote, onViewEvent }) {
+  const [newNoteDraft, setNewNoteDraft] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState('');
+  const [editingNoteDraft, setEditingNoteDraft] = useState('');
   const stage = record?.stage || 'school_events';
   // The modal is mounted even when no Board card is selected. Keep the initial
   // null state inert so simply opening The Board can never run event helpers.
   const crew = event ? assignedCrewForWholeEvent(event) : [];
+  const sortedNotes = sortPostProductionNotesNewestFirst(notes);
 
   useEffect(() => {
-    setNotesDraft(record?.notes || '');
+    setNewNoteDraft('');
+    setEditingNoteId('');
+    setEditingNoteDraft('');
   }, [event?.supabaseId]);
+
+  const addNote = async () => {
+    const text = String(newNoteDraft || '').trim();
+    if (!event || !text || noteSaving) return;
+    const saved = await onAddNote?.(event, text);
+    if (saved) setNewNoteDraft('');
+  };
+
+  const saveNoteEdit = async (noteId) => {
+    const text = String(editingNoteDraft || '').trim();
+    if (!event || !noteId || !text || noteSaving) return;
+    const saved = await onEditNote?.(event, noteId, text);
+    if (saved) {
+      setEditingNoteId('');
+      setEditingNoteDraft('');
+    }
+  };
 
   return (
     <AnimatePresence>
       {event ? (
         <motion.div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 p-2 backdrop-blur-sm sm:items-center sm:p-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-          <motion.div className="w-full max-w-2xl rounded-[2rem] border border-zinc-200 bg-[#F8FAF7] p-4 shadow-2xl sm:p-6" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 18, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
+          <motion.div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-zinc-200 bg-[#F8FAF7] p-4 shadow-2xl sm:p-6" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 18, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">The Board</div>
@@ -2098,28 +2139,69 @@ function PostProductionBoardDetailsModal({ event, record, canEdit, saving = fals
                   </button>
                 ))}
               </div>
-              {stage === 'selling' ? <div className="mt-2 text-xs text-zinc-500">Selling cards disappear from the active Board after 4 days. Their Board record and notes remain stored.</div> : null}
+              {stage === 'selling' ? <div className="mt-2 text-xs text-zinc-500">Selling cards disappear from the active Board after 4 days. Their Board record and Post-Production Notes remain stored.</div> : null}
             </section>
 
             <section className="mt-5 rounded-3xl border border-zinc-200 bg-white/80 p-4">
-              <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Post-Production Notes</div>
-              <textarea
-                value={notesDraft}
-                onChange={(e) => setNotesDraft(e.target.value)}
-                readOnly={!canEdit}
-                rows={7}
-                placeholder="Add post-production notes for this event..."
-                className="mt-3 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E] disabled:bg-zinc-50"
-              />
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Post-Production Notes ({sortedNotes.length})</div>
+                <div className="text-[11px] font-semibold text-zinc-400">Separate from Picture Day Notes</div>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {sortedNotes.map(note => {
+                  const isEditing = editingNoteId === note.id;
+                  const creatorName = displayNameFromEmail(note.createdBy || '') || note.createdBy || 'Unknown User';
+                  const editedName = displayNameFromEmail(note.editedBy || '') || note.editedBy || 'Unknown User';
+                  return (
+                    <div key={note.id} className={`rounded-2xl border p-3 ${isEditing ? 'border-[#AEBB9E] bg-[#F8FAF7]' : 'border-zinc-100 bg-white'}`}>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <textarea value={editingNoteDraft} onChange={(e) => setEditingNoteDraft(e.target.value)} rows={4} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
+                          <div className="flex justify-end gap-2">
+                            <button type="button" disabled={noteSaving} onClick={() => { setEditingNoteId(''); setEditingNoteDraft(''); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 disabled:opacity-50">Cancel</button>
+                            <button type="button" disabled={noteSaving || !String(editingNoteDraft || '').trim()} onClick={() => saveNoteEdit(note.id)} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{noteSaving ? 'Saving…' : 'Save Note Edit'}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <LinkifiedText text={note.text} className="text-sm leading-6 text-zinc-800" />
+                          <div className="mt-2 flex items-end justify-between gap-3">
+                            <div className="min-w-0">
+                              <span className="inline-flex select-none items-center rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/80 px-2.5 py-1 text-[11px] font-semibold text-zinc-800 shadow-sm">
+                                {creatorName}{note.createdAt ? ` • ${formatAttributionTime(note.createdAt)} ${formatShortAttributionDate(note.createdAt)}` : ''}
+                              </span>
+                              {note.editedAt ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">Edited by {editedName} • {formatAttributionTime(note.editedAt)} {formatShortAttributionDate(note.editedAt)}</div> : null}
+                            </div>
+                            {canEdit ? <button type="button" onClick={() => { setEditingNoteId(note.id); setEditingNoteDraft(note.text); }} className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-600 transition hover:bg-zinc-50">Edit</button> : null}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+                {!sortedNotes.length ? <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-5 text-center text-xs font-semibold text-zinc-400">No Post-Production Notes yet.</div> : null}
+              </div>
+
               {canEdit ? (
-                <div className="mt-3 flex justify-end">
-                  <button type="button" disabled={saving} onClick={() => onSaveNotes(event, notesDraft)} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-sm disabled:opacity-50">{saving ? 'Saving…' : 'Save Post-Production Notes'}</button>
+                <div className="mt-4 border-t border-zinc-100 pt-4">
+                  <div className="text-xs font-bold text-zinc-600">Add Post-Production Note</div>
+                  <textarea
+                    value={newNoteDraft}
+                    onChange={(e) => setNewNoteDraft(e.target.value)}
+                    rows={3}
+                    placeholder="Add a new post-production note…"
+                    className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]"
+                  />
+                  <div className="mt-2 flex justify-end">
+                    <button type="button" disabled={noteSaving || !String(newNoteDraft || '').trim()} onClick={addNote} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-sm disabled:opacity-50">{noteSaving ? 'Saving…' : 'Add Post-Production Note'}</button>
+                  </div>
                 </div>
               ) : null}
             </section>
 
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-              <div className="text-xs text-zinc-500">{record?.updatedBy ? `Last Board update: ${displayNameFromEmail(record.updatedBy) || record.updatedBy}` : 'No Board-specific updates yet.'}</div>
+              <div className="text-xs text-zinc-500">{record?.updatedBy ? `Last Board status update: ${displayNameFromEmail(record.updatedBy) || record.updatedBy}` : 'No Board status updates yet.'}</div>
               <button type="button" onClick={() => onViewEvent(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2 text-sm font-bold text-zinc-900 shadow-sm transition hover:bg-[#DDE8D2]">View Event Details</button>
             </div>
           </motion.div>
@@ -2131,10 +2213,12 @@ function PostProductionBoardDetailsModal({ event, record, canEdit, saving = fals
 
 function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onViewEvent }) {
   const [recordsByEventId, setRecordsByEventId] = useState({});
+  const [notesByEventId, setNotesByEventId] = useState({});
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [selectedBoardEvent, setSelectedBoardEvent] = useState(null);
   const [savingEventId, setSavingEventId] = useState('');
+  const [savingNoteId, setSavingNoteId] = useState('');
   const [draggedEventId, setDraggedEventId] = useState('');
   const [dragOverStage, setDragOverStage] = useState('');
   const [nowTick, setNowTick] = useState(Date.now());
@@ -2142,6 +2226,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
   const loadBoardRecords = async () => {
     if (!hasSupabaseEnv()) {
       setRecordsByEventId({});
+      setNotesByEventId({});
       setLoading(false);
       setMessage('Supabase is not connected, so The Board cannot be shared yet.');
       return;
@@ -2153,22 +2238,45 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from('post_production_board')
-      .select('*')
-      .order('updated_at', { ascending: false });
-    if (error) {
+    const [boardResult, notesResult] = await Promise.all([
+      supabase.from('post_production_board').select('*').order('updated_at', { ascending: false }),
+      supabase.from('post_production_notes').select('*').order('created_at', { ascending: false })
+    ]);
+
+    if (boardResult.error) {
       setRecordsByEventId({});
-      setMessage(`Could not load The Board: ${error.message}. Run supabase/v2_03_post_production_board.sql if this feature has not been installed yet.`);
+      setNotesByEventId({});
+      setMessage(`Could not load The Board: ${boardResult.error.message}. Run supabase/v2_03_post_production_board.sql if this feature has not been installed yet.`);
       setLoading(false);
       return;
     }
-    const next = {};
-    (data || []).forEach(row => {
+    if (notesResult.error) {
+      setRecordsByEventId({});
+      setNotesByEventId({});
+      setMessage(`Could not load Post-Production Notes: ${notesResult.error.message}. Run supabase/v2_03c_post_production_note_history.sql before deploying v2.03c.`);
+      setLoading(false);
+      return;
+    }
+
+    const nextRecords = {};
+    (boardResult.data || []).forEach(row => {
       const record = supabaseRowToPostProductionRecord(row);
-      if (record.eventId) next[record.eventId] = record;
+      if (record.eventId) nextRecords[record.eventId] = record;
     });
-    setRecordsByEventId(next);
+
+    const nextNotes = {};
+    (notesResult.data || []).forEach(row => {
+      const note = supabaseRowToPostProductionNote(row);
+      if (!note.eventId || !note.text) return;
+      if (!nextNotes[note.eventId]) nextNotes[note.eventId] = [];
+      nextNotes[note.eventId].push(note);
+    });
+    Object.keys(nextNotes).forEach(eventId => {
+      nextNotes[eventId] = sortPostProductionNotesNewestFirst(nextNotes[eventId]);
+    });
+
+    setRecordsByEventId(nextRecords);
+    setNotesByEventId(nextNotes);
     setMessage('');
     setLoading(false);
   };
@@ -2238,8 +2346,86 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
     await saveBoardRecord(event, { stage });
   };
 
-  const saveNotes = async (event, notes) => {
-    await saveBoardRecord(event, { notes });
+  const addPostProductionNote = async (event, text) => {
+    const cleanText = String(text || '').trim();
+    if (!canEdit || !event?.supabaseId || !cleanText) return false;
+    if (!hasSupabaseEnv()) {
+      setMessage('Supabase is not connected. Post-Production Note was not saved.');
+      return false;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setMessage('Supabase client was not available. Post-Production Note was not saved.');
+      return false;
+    }
+
+    setSavingNoteId('new');
+    const { data, error } = await supabase
+      .from('post_production_notes')
+      .insert({
+        event_id: event.supabaseId,
+        note_text: cleanText,
+        created_by: authEmail || null
+      })
+      .select()
+      .single();
+    setSavingNoteId('');
+
+    if (error || !data) {
+      setMessage(`Post-Production Note was not saved: ${error?.message || 'Supabase did not return the saved note.'}`);
+      return false;
+    }
+
+    const saved = supabaseRowToPostProductionNote(data);
+    setNotesByEventId(current => ({
+      ...current,
+      [event.supabaseId]: sortPostProductionNotesNewestFirst([saved, ...(current[event.supabaseId] || [])])
+    }));
+    setMessage('');
+    return saved;
+  };
+
+  const editPostProductionNote = async (event, noteId, text) => {
+    const cleanText = String(text || '').trim();
+    if (!canEdit || !event?.supabaseId || !noteId || !cleanText) return false;
+    if (!hasSupabaseEnv()) {
+      setMessage('Supabase is not connected. Post-Production Note edit was not saved.');
+      return false;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setMessage('Supabase client was not available. Post-Production Note edit was not saved.');
+      return false;
+    }
+
+    const nowIso = new Date().toISOString();
+    setSavingNoteId(noteId);
+    const { data, error } = await supabase
+      .from('post_production_notes')
+      .update({
+        note_text: cleanText,
+        edited_by: authEmail || null,
+        edited_at: nowIso,
+        updated_at: nowIso
+      })
+      .eq('id', noteId)
+      .eq('event_id', event.supabaseId)
+      .select()
+      .single();
+    setSavingNoteId('');
+
+    if (error || !data) {
+      setMessage(`Post-Production Note edit was not saved: ${error?.message || 'Supabase did not return the updated note.'}`);
+      return false;
+    }
+
+    const saved = supabaseRowToPostProductionNote(data);
+    setNotesByEventId(current => ({
+      ...current,
+      [event.supabaseId]: sortPostProductionNotesNewestFirst((current[event.supabaseId] || []).map(note => note.id === saved.id ? saved : note))
+    }));
+    setMessage('');
+    return saved;
   };
 
   const onDropStage = async (stage, transferredId = '') => {
@@ -2288,6 +2474,8 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
                 <div className="space-y-2">
                   {stageEvents.map(event => {
                     const record = recordsByEventId[event.supabaseId] || null;
+                    const eventNotes = notesByEventId[event.supabaseId] || [];
+                    const latestNote = eventNotes[0] || null;
                     const crew = assignedCrewForWholeEvent(event);
                     const isSaving = savingEventId === event.supabaseId;
                     return (
@@ -2311,7 +2499,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
                           <Pill className={`${TYPE_COLORS[event.type] || 'border-zinc-200 bg-zinc-100 text-zinc-800'} shrink-0 px-2 py-0.5 text-[9px]`}>{event.type === 'Studio Assigned Schools (SAS)' ? 'SAS' : event.type}</Pill>
                         </div>
                         {crew.length ? <div className="mt-2 text-xs leading-5 text-zinc-600">{crew.join(', ')}</div> : null}
-                        {record?.notes ? <div className="mt-2 line-clamp-2 rounded-xl bg-[#F8FAF7] px-2.5 py-2 text-[11px] leading-4 text-zinc-600">Note: {record.notes}</div> : null}
+                        {latestNote ? <div className="mt-2 line-clamp-2 rounded-xl bg-[#F8FAF7] px-2.5 py-2 text-[11px] leading-4 text-zinc-600">Note: {latestNote.text}</div> : null}
                         {isSaving ? <div className="mt-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400">Saving…</div> : null}
                       </article>
                     );
@@ -2327,11 +2515,14 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       <PostProductionBoardDetailsModal
         event={selectedBoardEvent}
         record={selectedBoardEvent ? recordsByEventId[selectedBoardEvent.supabaseId] : null}
+        notes={selectedBoardEvent ? (notesByEventId[selectedBoardEvent.supabaseId] || []) : []}
         canEdit={canEdit}
         saving={selectedBoardEvent ? savingEventId === selectedBoardEvent.supabaseId : false}
+        noteSaving={Boolean(savingNoteId)}
         onClose={() => setSelectedBoardEvent(null)}
         onMove={moveEvent}
-        onSaveNotes={saveNotes}
+        onAddNote={addPostProductionNote}
+        onEditNote={editPostProductionNote}
         onViewEvent={(event) => {
           setSelectedBoardEvent(null);
           onViewEvent?.(event);
