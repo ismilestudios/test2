@@ -2010,7 +2010,7 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
   );
 }
 
-const POST_PRODUCTION_BOARD_TRACKING_START = '2026-09-04';
+const POST_PRODUCTION_BOARD_TRACKING_START = '2026-09-02';
 const POST_PRODUCTION_SELLING_RETENTION_MS = 4 * 24 * 60 * 60 * 1000;
 const POST_PRODUCTION_EVENT_TYPES = new Set([
   'Fall Picture Day',
@@ -2258,7 +2258,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
         <div>
           <h2 className="text-xl font-black text-zinc-950">The Board</h2>
           <p className="mt-1 max-w-3xl text-sm text-zinc-600">Post-production tracking only. Events enter School Events on their shoot date; Board status and Post-Production Notes never change the Scheduler event itself.</p>
-          <p className="mt-1 text-xs font-semibold text-zinc-500">Board tracking begins September 4, 2026. Selling items clear from the active Board after 4 days.</p>
+          <p className="mt-1 text-xs font-semibold text-zinc-500">Board tracking begins September 2, 2026. Selling items clear from the active Board after 4 days.</p>
         </div>
         <div className="flex items-center gap-2">
           <Pill className="border-zinc-200 bg-white text-zinc-700">{eligibleEvents.length} active</Pill>
