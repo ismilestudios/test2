@@ -5629,7 +5629,321 @@ function supabaseRowToEvent(row = {}) {
   };
 }
 
-function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schools, setSchools, reloadSchools, schoolsMessage, authEmail, canEditSchools = true, canMergeSchools = true }) {
+
+function supabaseRowToSchoolAcquisition(row = {}) {
+  return {
+    id: row.id,
+    schoolName: row.school_name || '',
+    district: row.district || '',
+    mailingAddress: row.mailing_address || '',
+    otherContact: row.other_contact || '',
+    reachedOutBy: Array.isArray(row.reached_out_by) ? row.reached_out_by.filter(Boolean) : [],
+    notes: row.notes || '',
+    createdBy: row.created_by || '',
+    updatedBy: row.updated_by || '',
+    createdAt: row.created_at || '',
+    updatedAt: row.updated_at || ''
+  };
+}
+
+function normalizeAcquisitionOutreachNames(names = []) {
+  return Array.from(new Set((names || []).map(name => String(name || '').trim()).filter(Boolean)));
+}
+
+function SchoolAcquisitionModal({ acquisition = null, photographers = [], onClose, onSave }) {
+  const [schoolName, setSchoolName] = useState(acquisition?.schoolName || '');
+  const [district, setDistrict] = useState(acquisition?.district || '');
+  const [mailingAddress, setMailingAddress] = useState(acquisition?.mailingAddress || '');
+  const [otherContact, setOtherContact] = useState(acquisition?.otherContact || '');
+  const [reachedOutBy, setReachedOutBy] = useState(normalizeAcquisitionOutreachNames(acquisition?.reachedOutBy || []));
+  const [notes, setNotes] = useState(acquisition?.notes || '');
+  const [saving, setSaving] = useState(false);
+  const outreachOptions = useMemo(() => Array.from(new Set([
+    ...(photographers || []).map(name => String(name || '').trim()).filter(Boolean),
+    ...normalizeAcquisitionOutreachNames(acquisition?.reachedOutBy || [])
+  ])).sort((a, b) => a.localeCompare(b)), [photographers, acquisition]);
+
+  const toggleOutreach = (name) => {
+    setReachedOutBy(prev => prev.includes(name) ? prev.filter(item => item !== name) : [...prev, name]);
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!schoolName.trim()) return;
+    setSaving(true);
+    const saved = await onSave?.({
+      ...(acquisition || {}),
+      schoolName: schoolName.trim(),
+      district: district.trim(),
+      mailingAddress: mailingAddress.trim(),
+      otherContact: otherContact.trim(),
+      reachedOutBy: normalizeAcquisitionOutreachNames(reachedOutBy),
+      notes: notes.trim()
+    });
+    setSaving(false);
+    if (saved !== false) onClose?.();
+  };
+
+  return (
+    <motion.div className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.form onSubmit={submit} onClick={(event) => event.stopPropagation()} className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-zinc-200 bg-[#F8FAF7] p-4 shadow-2xl sm:p-6" initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">School Acquisitions</div>
+            <h2 className="mt-1 text-2xl font-black text-zinc-950">{acquisition ? 'Edit prospective school' : 'Add prospective school'}</h2>
+            <p className="mt-1 text-sm text-zinc-600">This record is kept completely separate from the canonical School List.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-500 shadow-sm hover:text-zinc-900" aria-label="Close"><X size={18} /></button>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <label className="sm:col-span-1">
+            <div className="text-xs font-black uppercase tracking-wide text-zinc-500">School Name</div>
+            <input required value={schoolName} onChange={(event) => setSchoolName(event.target.value)} className="mt-1.5 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none ring-sage/30 focus:ring-4" />
+          </label>
+          <label className="sm:col-span-1">
+            <div className="text-xs font-black uppercase tracking-wide text-zinc-500">District</div>
+            <input value={district} onChange={(event) => setDistrict(event.target.value)} className="mt-1.5 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-sage/30 focus:ring-4" />
+          </label>
+          <label className="sm:col-span-2">
+            <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Mailing Address</div>
+            <input value={mailingAddress} onChange={(event) => setMailingAddress(event.target.value)} className="mt-1.5 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-sage/30 focus:ring-4" />
+          </label>
+          <label className="sm:col-span-2">
+            <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Other Contact</div>
+            <input value={otherContact} onChange={(event) => setOtherContact(event.target.value)} placeholder="Email, phone, website, contact name, etc." className="mt-1.5 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-sage/30 focus:ring-4" />
+          </label>
+        </div>
+
+        <div className="mt-5">
+          <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Who Reached Out</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {outreachOptions.map(name => {
+              const selected = reachedOutBy.includes(name);
+              return (
+                <button key={name} type="button" onClick={() => toggleOutreach(name)} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${selected ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>
+              );
+            })}
+            {!outreachOptions.length ? <span className="text-sm text-zinc-500">No active photographers are available.</span> : null}
+          </div>
+        </div>
+
+        <label className="mt-5 block">
+          <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Notes</div>
+          <textarea rows={5} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Contact attempts, response, follow-up details, links, etc." className="mt-1.5 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none ring-sage/30 focus:ring-4" />
+        </label>
+
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-700 disabled:opacity-50">Cancel</button>
+          <button type="submit" disabled={saving || !schoolName.trim()} className="rounded-2xl bg-zinc-900 px-5 py-2.5 text-sm font-black text-white shadow-sm disabled:bg-zinc-300">{saving ? 'Saving...' : acquisition ? 'Save Changes' : 'Add to Acquisitions'}</button>
+        </div>
+      </motion.form>
+    </motion.div>
+  );
+}
+
+function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit = true, canRemove = false }) {
+  const [acquisitions, setAcquisitions] = useState([]);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [removingId, setRemovingId] = useState('');
+
+  const loadAcquisitions = async () => {
+    if (!hasSupabaseEnv()) {
+      setLoading(false);
+      setMessage('Supabase is not connected, so the shared Acquisitions list cannot be loaded.');
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setLoading(false);
+      setMessage('Supabase client was not available for School Acquisitions.');
+      return;
+    }
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('school_acquisitions')
+      .select('*')
+      .order('district', { ascending: true })
+      .order('school_name', { ascending: true });
+    if (error) {
+      setMessage(`Could not load School Acquisitions: ${error.message}. Run supabase/v2_02_school_acquisitions.sql if this feature has not been installed yet.`);
+      setLoading(false);
+      return;
+    }
+    setAcquisitions((data || []).map(supabaseRowToSchoolAcquisition));
+    setMessage('');
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadAcquisitions();
+  }, []);
+
+  const saveAcquisition = async (values) => {
+    if (!canEdit) return false;
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected. No Acquisition changes were saved.');
+      return false;
+    }
+    const payload = {
+      school_name: String(values.schoolName || '').trim(),
+      district: String(values.district || '').trim(),
+      mailing_address: String(values.mailingAddress || '').trim(),
+      other_contact: String(values.otherContact || '').trim(),
+      reached_out_by: normalizeAcquisitionOutreachNames(values.reachedOutBy || []),
+      notes: String(values.notes || '').trim(),
+      updated_by: authEmail || null,
+      updated_at: new Date().toISOString()
+    };
+    if (!payload.school_name) {
+      setMessage('School Name is required. No Acquisition changes were saved.');
+      return false;
+    }
+
+    const isEditing = Boolean(values.id);
+    const result = isEditing
+      ? await supabase.from('school_acquisitions').update(payload).eq('id', values.id).select().single()
+      : await supabase.from('school_acquisitions').insert({ ...payload, created_by: authEmail || null }).select().single();
+
+    if (result.error) {
+      setMessage(`Could not ${isEditing ? 'update' : 'add'} Acquisition: ${result.error.message}`);
+      return false;
+    }
+    const saved = supabaseRowToSchoolAcquisition(result.data);
+    setAcquisitions(prev => {
+      const without = (prev || []).filter(item => item.id !== saved.id);
+      return [...without, saved].sort((a, b) => `${a.district}\n${a.schoolName}`.localeCompare(`${b.district}\n${b.schoolName}`));
+    });
+    setMessage(`${saved.schoolName} ${isEditing ? 'updated' : 'added'} in the shared Acquisitions list.`);
+    return true;
+  };
+
+  const removeAcquisition = async (acquisition) => {
+    if (!canRemove || !acquisition?.id) return;
+    if (typeof window !== 'undefined' && !window.confirm(`Remove ${acquisition.schoolName} from the Acquisitions list? This does not affect the School List.`)) return;
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected. Nothing was removed.');
+      return;
+    }
+    setRemovingId(acquisition.id);
+    const { error } = await supabase.from('school_acquisitions').delete().eq('id', acquisition.id);
+    setRemovingId('');
+    if (error) {
+      setMessage(`Could not remove Acquisition: ${error.message}`);
+      return;
+    }
+    setAcquisitions(prev => (prev || []).filter(item => item.id !== acquisition.id));
+    setMessage(`${acquisition.schoolName} removed from Acquisitions. The canonical School List was not changed.`);
+  };
+
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    const rows = [...(acquisitions || [])].sort((a, b) => `${a.district}\n${a.schoolName}`.localeCompare(`${b.district}\n${b.schoolName}`));
+    if (!q) return rows;
+    return rows.filter(item => [item.schoolName, item.district, item.mailingAddress, item.otherContact, ...(item.reachedOutBy || []), item.notes].filter(Boolean).join('\n').toLowerCase().includes(q));
+  }, [acquisitions, q]);
+
+  return (
+    <section className="rounded-3xl border border-zinc-200 bg-white/70 p-3 shadow-sm sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-black text-zinc-950">School Acquisitions</h2>
+            <Pill className="border-zinc-200 bg-white text-zinc-700">{acquisitions.length}</Pill>
+          </div>
+          <p className="mt-1 max-w-3xl text-sm text-zinc-600">Prospective schools only. This shared list is stored separately and never becomes part of the canonical School List or Carrie View automatically.</p>
+        </div>
+        {canEdit ? (
+          <button type="button" onClick={() => setAdding(true)} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-zinc-800"><Plus size={16} /> Add Acquisition</button>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search acquisitions..." className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm outline-none ring-sage/30 focus:ring-4 sm:max-w-md" />
+        <button type="button" onClick={loadAcquisitions} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50">Reload</button>
+      </div>
+
+      {message ? <div className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 px-3 py-2 text-sm text-zinc-700">{message}</div> : null}
+      {loading ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-5 text-center text-sm font-semibold text-zinc-500">Loading shared Acquisitions...</div> : null}
+
+      {!loading ? (
+        <>
+          <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-zinc-200 bg-white md:block">
+            <table className="min-w-[1180px] w-full text-left">
+              <thead className="bg-zinc-50 text-[11px] font-black uppercase tracking-wide text-zinc-500">
+                <tr>
+                  <th className="px-3 py-2.5">School</th>
+                  <th className="px-3 py-2.5">District</th>
+                  <th className="px-3 py-2.5">Mailing Address</th>
+                  <th className="px-3 py-2.5">Other Contact</th>
+                  <th className="px-3 py-2.5">Who Reached Out</th>
+                  <th className="px-3 py-2.5">Notes</th>
+                  {canEdit ? <th className="px-3 py-2.5 text-right">Actions</th> : null}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {filtered.map(item => (
+                  <tr key={item.id} className="align-top text-sm text-zinc-700">
+                    <td className="min-w-[190px] px-3 py-3 font-black text-zinc-950">{item.schoolName}</td>
+                    <td className="min-w-[160px] px-3 py-3 font-semibold">{item.district || '—'}</td>
+                    <td className="min-w-[230px] px-3 py-3">{item.mailingAddress || '—'}</td>
+                    <td className="min-w-[180px] px-3 py-3">{item.otherContact ? <LinkifiedText text={item.otherContact} className="text-sm" /> : '—'}</td>
+                    <td className="min-w-[170px] px-3 py-3">
+                      {item.reachedOutBy?.length ? <div className="flex flex-wrap gap-1">{item.reachedOutBy.map(name => <Pill key={name} className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-xs text-zinc-800">{name}</Pill>)}</div> : <span className="font-semibold text-amber-700">No outreach yet</span>}
+                    </td>
+                    <td className="min-w-[240px] max-w-[360px] px-3 py-3">{item.notes ? <LinkifiedText text={item.notes} className="text-sm" /> : <span className="text-zinc-400">—</span>}</td>
+                    {canEdit ? (
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <button type="button" onClick={() => setEditing(item)} className="rounded-xl border border-zinc-200 bg-white p-2 text-zinc-600 hover:text-zinc-950" aria-label={`Edit ${item.schoolName}`} title="Edit"><Pencil size={15} /></button>
+                          {canRemove ? <button type="button" onClick={() => removeAcquisition(item)} disabled={removingId === item.id} className="rounded-xl border border-zinc-200 bg-white p-2 text-zinc-400 hover:text-rose-600 disabled:opacity-40" aria-label={`Remove ${item.schoolName}`} title="Remove"><Trash2 size={15} /></button> : null}
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+                {!filtered.length ? <tr><td colSpan={canEdit ? 7 : 6} className="px-3 py-8 text-center text-sm font-semibold text-zinc-500">No acquisitions match that search.</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 space-y-2 md:hidden">
+            {filtered.map(item => (
+              <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-black text-zinc-950">{item.schoolName}</h3>
+                    <div className="mt-0.5 text-xs font-semibold text-zinc-500">{item.district || 'District not entered'}</div>
+                  </div>
+                  {canEdit ? <button type="button" onClick={() => setEditing(item)} className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-600"><Pencil size={15} /></button> : null}
+                </div>
+                {item.mailingAddress ? <div className="mt-3 text-sm text-zinc-700">{item.mailingAddress}</div> : null}
+                {item.otherContact ? <LinkifiedText text={item.otherContact} className="mt-2 text-sm" /> : null}
+                <div className="mt-3 flex flex-wrap gap-1.5">{item.reachedOutBy?.length ? item.reachedOutBy.map(name => <Pill key={name} className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-xs text-zinc-800">{name}</Pill>) : <span className="text-xs font-black text-amber-700">No outreach yet</span>}</div>
+                {item.notes ? <LinkifiedText text={item.notes} className="mt-3 rounded-xl bg-zinc-50 p-2.5 text-sm text-zinc-700" /> : null}
+                {canRemove ? <button type="button" onClick={() => removeAcquisition(item)} disabled={removingId === item.id} className="mt-3 text-xs font-bold text-rose-600 disabled:opacity-40">Remove from Acquisitions</button> : null}
+              </article>
+            ))}
+            {!filtered.length ? <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-5 text-center text-sm font-semibold text-zinc-500">No acquisitions match that search.</div> : null}
+          </div>
+        </>
+      ) : null}
+
+      <AnimatePresence>
+        {adding ? <SchoolAcquisitionModal photographers={photographers} onClose={() => setAdding(false)} onSave={saveAcquisition} /> : null}
+        {editing ? <SchoolAcquisitionModal acquisition={editing} photographers={photographers} onClose={() => setEditing(null)} onSave={saveAcquisition} /> : null}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedName, schools, setSchools, reloadSchools, schoolsMessage, authEmail, photographers = [], canEditSchools = true, canMergeSchools = true, canEditAcquisitions = true, canRemoveAcquisitions = false }) {
   const [schoolListQuery, setSchoolListQuery] = useState('');
   const q = (schoolListQuery || query).trim().toLowerCase();
   const [editingSchool, setEditingSchool] = useState(null);
@@ -5921,6 +6235,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         </section>
         <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={canEditSchools ? setEditingSchool : null} onMerge={canMergeSchools ? setMergingSchool : null} />
       </div>
+      <SchoolAcquisitionsSection photographers={photographers} authEmail={authEmail} canEdit={canEditAcquisitions} canRemove={canRemoveAcquisitions} />
       <AnimatePresence>
         {editingSchool && <EditSchoolModal school={editingSchool} onClose={() => setEditingSchool(null)} onSave={saveSchool} />}
         {addingSchool && <AddSchoolModal onClose={() => setAddingSchool(false)} onSave={async (schoolValues) => {
@@ -8592,7 +8907,7 @@ export default function SchedulerApp() {
           </>}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} assistants={assistants} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
-          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} />}
+          {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} photographers={photographers} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} canEditAcquisitions={canEditScheduler} canRemoveAcquisitions={isAdminUser} />}
           {activeTab === 'Team Members' && authEmail && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
           {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} rolloutCapacityOverrides={rolloutCapacityOverrides} setRolloutCapacityOverrides={setRolloutCapacityOverrides} />}
         </section>
