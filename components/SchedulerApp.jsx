@@ -8,7 +8,7 @@ import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
 import { SCHEDULER_VERSION, SCHEDULER_LAST_UPDATED } from '../lib/schedulerVersion';
 
-const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'School List', 'Team Members', 'Admin'];
+const tabs = ['Overview', 'Calendar View', 'Mobile View', 'Carrie View', 'The Board', 'School List', 'Team Members', 'Admin'];
 const DEFAULT_WEEKLY_ROLLOUT_CAPACITY = 25;
 const MIN_WEEKLY_ROLLOUT_CAPACITY = 1;
 const MAX_WEEKLY_ROLLOUT_CAPACITY = 50;
@@ -1522,7 +1522,7 @@ function getEventIrm(event) {
   return null;
 }
 
-function EventCard({ event, onClick, compact = false, actionLabel = '', onAction = null }) {
+function EventCard({ event, onClick, compact = false, actionLabel = '', onAction = null, reserveCopySpace = false }) {
   return (
     <motion.button
       layout
@@ -1554,6 +1554,7 @@ function EventCard({ event, onClick, compact = false, actionLabel = '', onAction
           <span className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2] px-3 py-1.5 text-xs font-bold text-zinc-900">{actionLabel}</span>
         </div>
       ) : null}
+      {reserveCopySpace ? <div className="h-7" aria-hidden="true" /> : null}
     </motion.button>
   );
 }
@@ -1623,12 +1624,13 @@ function MobileBottomNav({ activeTab, setActiveTab, canAdmin = false }) {
     { label: 'Overview', tab: 'Overview' },
     { label: 'Mobile', tab: 'Mobile View' },
     { label: 'Calendar', tab: 'Calendar View' },
+    { label: 'Board', tab: 'The Board' },
     { label: 'Schools', tab: 'School List' },
     ...(canAdmin ? [{ label: 'Admin', tab: 'Admin' }] : [])
   ];
   return (
     <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[1.5rem] border border-zinc-200 bg-white/95 p-1 shadow-2xl backdrop-blur sm:hidden">
-      <div className={`grid gap-1 ${canAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
+      <div className={`grid gap-1 ${canAdmin ? 'grid-cols-6' : 'grid-cols-5'}`}>
         {mobileTabs.map(item => (
           <button
             key={item.tab}
@@ -1692,6 +1694,53 @@ function buildDayCopyText(title, dayEvents, occurrenceDate = '') {
     return `${event.canonicalSchool || event.title}${crew.length ? ` (${crew.join(', ')})` : ''}`;
   });
   return items.join('\n');
+}
+
+function assignedCrewForWholeEvent(event = {}) {
+  const photographerNames = [];
+  const assistantNames = [];
+  const seenPhotographers = new Set();
+  const seenAssistants = new Set();
+  const dates = getEventDateKeys(event);
+  const eventDates = dates.length ? dates : (event.date ? [event.date] : []);
+
+  const addPhotographer = (name) => {
+    const clean = canonicalPhotographerName(name);
+    if (!clean || seenPhotographers.has(clean)) return;
+    if (seenAssistants.has(clean)) {
+      seenAssistants.delete(clean);
+      const assistantIndex = assistantNames.indexOf(clean);
+      if (assistantIndex >= 0) assistantNames.splice(assistantIndex, 1);
+    }
+    seenPhotographers.add(clean);
+    photographerNames.push(clean);
+  };
+  const addAssistant = (name) => {
+    const clean = String(name || '').trim();
+    if (!clean || seenAssistants.has(clean) || seenPhotographers.has(clean)) return;
+    seenAssistants.add(clean);
+    assistantNames.push(clean);
+  };
+
+  if (eventDates.length) {
+    eventDates.forEach(date => {
+      getScheduleLivePhotographersForDate(event, date).forEach(addPhotographer);
+      getScheduleLiveAssistantsForDate(event, date).forEach(addAssistant);
+    });
+  } else {
+    uniqueCanonicalPhotographers(event.photographers || []).forEach(addPhotographer);
+    (event.assistants || []).filter(Boolean).forEach(addAssistant);
+  }
+
+  const displayedPhotographers = photographerNames.map((name, index) =>
+    index === 0 && shouldMarkPrimaryPhotographer(event) ? `${name}*` : name
+  );
+  return [...displayedPhotographers, ...assistantNames];
+}
+
+function buildOverviewEventCopyText(event = {}) {
+  const crew = assignedCrewForWholeEvent(event);
+  return `${event.title || 'Untitled Event'}${crew.length ? ` — ${crew.join(', ')}` : ''}`;
 }
 
 function TodayTomorrowList({ title, date, events, onClickEvent }) {
@@ -1878,6 +1927,7 @@ function QuickAssignmentModal({ event, mode, photographers, assistants, onClose,
 }
 
 function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = true }) {
+  const [copiedEventId, setCopiedEventId] = useState('');
   const overviewColumns = [
     {
       key: 'needs-photographers',
@@ -1901,6 +1951,18 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
     }
   ];
 
+  const copyEvent = async (event) => {
+    const text = buildOverviewEventCopyText(event);
+    const key = event?.supabaseId || event?.id || event?.title || '';
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedEventId(key);
+      window.setTimeout(() => setCopiedEventId(current => current === key ? '' : current), 1600);
+    } catch (error) {
+      window.prompt('Copy this text:', text);
+    }
+  };
+
   return (
     <div className="space-y-3 sm:space-y-4">
       {canEdit ? (
@@ -1919,12 +1981,360 @@ function PlanningBoard({ events, onClick, onAddEvent, onQuickAssign, canEdit = t
             </div>
             <div className="space-y-2 md:max-h-[430px] md:overflow-y-auto md:overscroll-contain md:pr-1">{columnEvents.map(event => {
               const isQuickColumn = ['needs-photographers', 'needs-assistant'].includes(column.key);
-              return <EventCard key={event.id} event={event} onClick={onClick} compact={column.key === 'sas'} onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null} />;
+              const copyKey = event?.supabaseId || event?.id || event?.title || '';
+              return (
+                <div key={event.id} className="relative">
+                  <EventCard
+                    event={event}
+                    onClick={onClick}
+                    compact={column.key === 'sas'}
+                    onAction={canEdit && isQuickColumn ? (clickedEvent) => onQuickAssign?.(clickedEvent, column.key) : null}
+                    reserveCopySpace
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyEvent(event)}
+                    className="absolute bottom-2 right-2 z-10 rounded-full border border-zinc-200 bg-white/95 px-2.5 py-1 text-[10px] font-black text-zinc-600 shadow-sm transition hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/60 hover:text-zinc-900"
+                    aria-label={`Copy ${event.title} and assigned staff`}
+                  >
+                    {copiedEventId === copyKey ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              );
             })}</div>
           </div>
         );
       })}
       </div>
+    </div>
+  );
+}
+
+const POST_PRODUCTION_BOARD_TRACKING_START = '2026-09-04';
+const POST_PRODUCTION_SELLING_RETENTION_MS = 4 * 24 * 60 * 60 * 1000;
+const POST_PRODUCTION_EVENT_TYPES = new Set([
+  'Fall Picture Day',
+  'Spring Picture Day',
+  'Sports',
+  'Seniors',
+  'Makeup Day',
+  'Family Photos',
+  'Headshots',
+  'Special Event',
+  'Studio Assigned Schools (SAS)'
+]);
+const POST_PRODUCTION_STAGES = [
+  { key: 'school_events', label: 'School Events' },
+  { key: 'editing', label: 'Editing' },
+  { key: 'cutting_retouching', label: 'Cutting/Retouching' },
+  { key: 'uploaded', label: 'Uploaded' },
+  { key: 'selling', label: 'Selling' }
+];
+
+function supabaseRowToPostProductionRecord(row = {}) {
+  return {
+    eventId: row.event_id || '',
+    stage: row.stage || 'school_events',
+    notes: row.post_production_notes || '',
+    stageChangedAt: row.stage_changed_at || row.created_at || '',
+    createdBy: row.created_by || '',
+    updatedBy: row.updated_by || '',
+    createdAt: row.created_at || '',
+    updatedAt: row.updated_at || ''
+  };
+}
+
+function isPostProductionBoardEligibleEvent(event = {}, today = todayKey()) {
+  if (!event?.supabaseId || event.active === false) return false;
+  if (!POST_PRODUCTION_EVENT_TYPES.has(event.type)) return false;
+  const firstDate = String(event.date || '');
+  return firstDate >= POST_PRODUCTION_BOARD_TRACKING_START && firstDate <= today;
+}
+
+function isPostProductionRecordHidden(record = null, now = Date.now()) {
+  if (!record || record.stage !== 'selling' || !record.stageChangedAt) return false;
+  const changedAt = new Date(record.stageChangedAt).getTime();
+  return Number.isFinite(changedAt) && changedAt > 0 && now - changedAt >= POST_PRODUCTION_SELLING_RETENTION_MS;
+}
+
+function PostProductionBoardDetailsModal({ event, record, canEdit, saving = false, onClose, onMove, onSaveNotes, onViewEvent }) {
+  const [notesDraft, setNotesDraft] = useState(record?.notes || '');
+  const stage = record?.stage || 'school_events';
+  const crew = assignedCrewForWholeEvent(event);
+
+  useEffect(() => {
+    setNotesDraft(record?.notes || '');
+  }, [event?.supabaseId]);
+
+  return (
+    <AnimatePresence>
+      {event ? (
+        <motion.div className="fixed inset-0 z-[70] flex items-end justify-center bg-zinc-950/35 p-2 backdrop-blur-sm sm:items-center sm:p-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+          <motion.div className="w-full max-w-2xl rounded-[2rem] border border-zinc-200 bg-[#F8FAF7] p-4 shadow-2xl sm:p-6" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 18, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">The Board</div>
+                <h2 className="mt-1 text-xl font-black leading-tight text-zinc-950 sm:text-2xl">{event.title}</h2>
+                <div className="mt-1 text-sm font-semibold text-zinc-500">{getEventDateLabel(event)} · {event.type}</div>
+                {crew.length ? <div className="mt-1 text-sm text-zinc-600">{crew.join(', ')}</div> : null}
+              </div>
+              <button type="button" onClick={onClose} className="rounded-full border border-zinc-200 bg-white p-2 text-zinc-500 shadow-sm hover:text-zinc-900" aria-label="Close Board details"><X size={18} /></button>
+            </div>
+
+            <section className="mt-5">
+              <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Board Status</div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-5">
+                {POST_PRODUCTION_STAGES.map(item => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    disabled={!canEdit || saving || item.key === stage}
+                    onClick={() => onMove(event, item.key)}
+                    className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${item.key === stage ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/50'} disabled:cursor-default disabled:opacity-70`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              {stage === 'selling' ? <div className="mt-2 text-xs text-zinc-500">Selling cards disappear from the active Board after 4 days. Their Board record and notes remain stored.</div> : null}
+            </section>
+
+            <section className="mt-5 rounded-3xl border border-zinc-200 bg-white/80 p-4">
+              <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Post-Production Notes</div>
+              <textarea
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                readOnly={!canEdit}
+                rows={7}
+                placeholder="Add post-production notes for this event..."
+                className="mt-3 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E] disabled:bg-zinc-50"
+              />
+              {canEdit ? (
+                <div className="mt-3 flex justify-end">
+                  <button type="button" disabled={saving} onClick={() => onSaveNotes(event, notesDraft)} className="rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-sm disabled:opacity-50">{saving ? 'Saving…' : 'Save Post-Production Notes'}</button>
+                </div>
+              ) : null}
+            </section>
+
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+              <div className="text-xs text-zinc-500">{record?.updatedBy ? `Last Board update: ${displayNameFromEmail(record.updatedBy) || record.updatedBy}` : 'No Board-specific updates yet.'}</div>
+              <button type="button" onClick={() => onViewEvent(event)} className="rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2 text-sm font-bold text-zinc-900 shadow-sm transition hover:bg-[#DDE8D2]">View Event Details</button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onViewEvent }) {
+  const [recordsByEventId, setRecordsByEventId] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [selectedBoardEvent, setSelectedBoardEvent] = useState(null);
+  const [savingEventId, setSavingEventId] = useState('');
+  const [draggedEventId, setDraggedEventId] = useState('');
+  const [dragOverStage, setDragOverStage] = useState('');
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  const loadBoardRecords = async () => {
+    if (!hasSupabaseEnv()) {
+      setRecordsByEventId({});
+      setLoading(false);
+      setMessage('Supabase is not connected, so The Board cannot be shared yet.');
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setLoading(false);
+      setMessage('Supabase client was not available.');
+      return;
+    }
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('post_production_board')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    if (error) {
+      setRecordsByEventId({});
+      setMessage(`Could not load The Board: ${error.message}. Run supabase/v2_03_post_production_board.sql if this feature has not been installed yet.`);
+      setLoading(false);
+      return;
+    }
+    const next = {};
+    (data || []).forEach(row => {
+      const record = supabaseRowToPostProductionRecord(row);
+      if (record.eventId) next[record.eventId] = record;
+    });
+    setRecordsByEventId(next);
+    setMessage('');
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadBoardRecords();
+    const timer = window.setInterval(() => setNowTick(Date.now()), 30 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const eligibleEvents = useMemo(() => {
+    const today = todayKey();
+    return (events || [])
+      .filter(event => isPostProductionBoardEligibleEvent(event, today))
+      .filter(event => !isPostProductionRecordHidden(recordsByEventId[event.supabaseId], nowTick))
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+  }, [events, recordsByEventId, nowTick]);
+
+  const saveBoardRecord = async (event, patch = {}) => {
+    if (!canEdit || !event?.supabaseId) return false;
+    if (!hasSupabaseEnv()) {
+      setMessage('Supabase is not connected. Board changes were not saved.');
+      return false;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setMessage('Supabase client was not available. Board changes were not saved.');
+      return false;
+    }
+
+    const previous = recordsByEventId[event.supabaseId] || null;
+    const previousStage = previous?.stage || 'school_events';
+    const nextStage = patch.stage || previousStage;
+    const stageChanged = nextStage !== previousStage;
+    const nowIso = new Date().toISOString();
+    const payload = {
+      event_id: event.supabaseId,
+      stage: nextStage,
+      post_production_notes: patch.notes !== undefined ? String(patch.notes || '') : (previous?.notes || ''),
+      stage_changed_at: stageChanged ? nowIso : (previous?.stageChangedAt || nowIso),
+      created_by: previous?.createdBy || authEmail || null,
+      updated_by: authEmail || null,
+      updated_at: nowIso
+    };
+
+    setSavingEventId(event.supabaseId);
+    const { data, error } = await supabase
+      .from('post_production_board')
+      .upsert(payload, { onConflict: 'event_id' })
+      .select()
+      .single();
+    setSavingEventId('');
+
+    if (error || !data) {
+      setMessage(`The Board change was not saved: ${error?.message || 'Supabase did not return the saved record.'}`);
+      return false;
+    }
+
+    const saved = supabaseRowToPostProductionRecord(data);
+    setRecordsByEventId(current => ({ ...current, [event.supabaseId]: saved }));
+    setMessage('');
+    return saved;
+  };
+
+  const moveEvent = async (event, stage) => {
+    if (!POST_PRODUCTION_STAGES.some(item => item.key === stage)) return;
+    await saveBoardRecord(event, { stage });
+  };
+
+  const saveNotes = async (event, notes) => {
+    await saveBoardRecord(event, { notes });
+  };
+
+  const onDropStage = async (stage, transferredId = '') => {
+    const eventId = transferredId || draggedEventId;
+    setDragOverStage('');
+    setDraggedEventId('');
+    if (!eventId || !canEdit) return;
+    const event = eligibleEvents.find(item => item.supabaseId === eventId);
+    if (!event) return;
+    await moveEvent(event, stage);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-[1.75rem] border border-zinc-200 bg-white/75 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-black text-zinc-950">The Board</h2>
+          <p className="mt-1 max-w-3xl text-sm text-zinc-600">Post-production tracking only. Events enter School Events on their shoot date; Board status and Post-Production Notes never change the Scheduler event itself.</p>
+          <p className="mt-1 text-xs font-semibold text-zinc-500">Board tracking begins September 4, 2026. Selling items clear from the active Board after 4 days.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Pill className="border-zinc-200 bg-white text-zinc-700">{eligibleEvents.length} active</Pill>
+          <button type="button" onClick={loadBoardRecords} disabled={loading} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50">{loading ? 'Loading…' : 'Reload Board'}</button>
+        </div>
+      </div>
+
+      {message ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{message}</div> : null}
+
+      <div className="overflow-x-auto pb-2">
+        <div className="grid min-w-[1320px] grid-cols-5 gap-3">
+          {POST_PRODUCTION_STAGES.map(stage => {
+            const stageEvents = eligibleEvents.filter(event => (recordsByEventId[event.supabaseId]?.stage || 'school_events') === stage.key);
+            const isDropTarget = dragOverStage === stage.key;
+            return (
+              <section
+                key={stage.key}
+                onDragOver={(e) => { if (canEdit) { e.preventDefault(); setDragOverStage(stage.key); } }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverStage(''); }}
+                onDrop={(e) => { e.preventDefault(); onDropStage(stage.key, e.dataTransfer.getData('text/plain')); }}
+                className={`min-h-[560px] rounded-[1.75rem] border p-2.5 transition sm:p-3 ${isDropTarget ? 'border-[#83966F] bg-[#DDE8D2]/55 shadow-soft' : 'border-zinc-200 bg-zinc-100/75'}`}
+              >
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl bg-white/90 px-3 py-2 shadow-sm">
+                  <h3 className="text-sm font-black text-zinc-900">{stage.label}</h3>
+                  <Pill className="border-zinc-200 bg-zinc-50 text-zinc-600">{stageEvents.length}</Pill>
+                </div>
+                <div className="space-y-2">
+                  {stageEvents.map(event => {
+                    const record = recordsByEventId[event.supabaseId] || null;
+                    const crew = assignedCrewForWholeEvent(event);
+                    const isSaving = savingEventId === event.supabaseId;
+                    return (
+                      <article
+                        key={event.supabaseId}
+                        draggable={canEdit && !isSaving}
+                        onDragStart={(e) => {
+                          setDraggedEventId(event.supabaseId);
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', event.supabaseId);
+                        }}
+                        onDragEnd={() => { setDraggedEventId(''); setDragOverStage(''); }}
+                        onClick={() => setSelectedBoardEvent(event)}
+                        className={`cursor-pointer rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${canEdit ? 'sm:cursor-grab sm:active:cursor-grabbing' : ''} ${isSaving ? 'opacity-60' : ''}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-black leading-5 text-zinc-950">{event.title}</div>
+                            <div className="mt-1 text-[11px] font-semibold text-zinc-500">{getEventDateLabel(event)}</div>
+                          </div>
+                          <Pill className={`${TYPE_COLORS[event.type] || 'border-zinc-200 bg-zinc-100 text-zinc-800'} shrink-0 px-2 py-0.5 text-[9px]`}>{event.type === 'Studio Assigned Schools (SAS)' ? 'SAS' : event.type}</Pill>
+                        </div>
+                        {crew.length ? <div className="mt-2 text-xs leading-5 text-zinc-600">{crew.join(', ')}</div> : null}
+                        {record?.notes ? <div className="mt-2 line-clamp-2 rounded-xl bg-[#F8FAF7] px-2.5 py-2 text-[11px] leading-4 text-zinc-600">Note: {record.notes}</div> : null}
+                        {isSaving ? <div className="mt-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400">Saving…</div> : null}
+                      </article>
+                    );
+                  })}
+                  {!stageEvents.length ? <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/45 px-3 py-8 text-center text-xs font-semibold text-zinc-400">No events</div> : null}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+
+      <PostProductionBoardDetailsModal
+        event={selectedBoardEvent}
+        record={selectedBoardEvent ? recordsByEventId[selectedBoardEvent.supabaseId] : null}
+        canEdit={canEdit}
+        saving={selectedBoardEvent ? savingEventId === selectedBoardEvent.supabaseId : false}
+        onClose={() => setSelectedBoardEvent(null)}
+        onMove={moveEvent}
+        onSaveNotes={saveNotes}
+        onViewEvent={(event) => {
+          setSelectedBoardEvent(null);
+          onViewEvent?.(event);
+        }}
+      />
     </div>
   );
 }
@@ -8867,7 +9277,7 @@ export default function SchedulerApp() {
           </div>
         </div>
       ) : null}
-      <div className={`${activeTab === 'Schedule Live!' ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-3 sm:space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : activeTab === 'Schedule Live!' ? 'px-1 sm:px-6' : 'px-2 sm:px-6'} ${activeTab === 'Overview' ? 'pb-36' : 'pb-28'} pt-3 sm:pb-6 sm:pt-6`}>
+      <div className={`${['Schedule Live!', 'The Board'].includes(activeTab) ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-3 sm:space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : ['Schedule Live!', 'The Board'].includes(activeTab) ? 'px-1 sm:px-6' : 'px-2 sm:px-6'} ${activeTab === 'Overview' ? 'pb-36' : 'pb-28'} pt-3 sm:pb-6 sm:pt-6`}>
         <LoginRequiredNotice />
         <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
         {activeTab === 'Overview' && !query.trim() ? <OperationalSummary events={allEvents} onClickEvent={setSelected} rolloutCapacityOverrides={rolloutCapacityOverrides} /> : null}
@@ -8907,6 +9317,7 @@ export default function SchedulerApp() {
           </>}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} assistants={assistants} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
+          {activeTab === 'The Board' && <PostProductionBoard events={allEvents} authEmail={authEmail} canEdit={canEditScheduler} onViewEvent={setSelected} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} photographers={photographers} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} canEditAcquisitions={canEditScheduler} canRemoveAcquisitions={isAdminUser} />}
           {activeTab === 'Team Members' && authEmail && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
           {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} rolloutCapacityOverrides={rolloutCapacityOverrides} setRolloutCapacityOverrides={setRolloutCapacityOverrides} />}
