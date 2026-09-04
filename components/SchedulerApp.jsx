@@ -1573,7 +1573,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
     <header className={`sticky top-0 z-50 border-b border-zinc-200/70 bg-[#F8FAF7]/95 shadow-[0_8px_24px_rgba(39,39,42,0.05)] backdrop-blur ${mobileViewCompact ? 'sm:py-0' : ''}`}>
       <div className={`mx-auto max-w-7xl ${mobileViewCompact ? 'px-2 sm:px-6' : 'px-4 sm:px-6'} ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-3 sm:py-4'}`}>
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-3 sm:gap-4'}`}>
-          <div className="sm:rounded-[2rem] sm:border sm:border-white/80 sm:bg-white/55 sm:p-3 sm:shadow-[0_10px_30px_rgba(39,39,42,0.06)]">
+          <div>
             <div className="flex items-center gap-3 sm:gap-4">
               <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#AEBB9E] bg-white shadow-sm sm:h-28 sm:w-28 sm:rounded-3xl"><img src="/scheduler-icon-192.png" alt="Scheduler" className="h-12 w-12 object-contain sm:h-[6.5rem] sm:w-[6.5rem]" /></span>
               <div className="min-w-0">
