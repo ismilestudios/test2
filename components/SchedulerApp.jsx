@@ -2168,6 +2168,42 @@ function postProductionDeadlineLabel(tile = {}, stage = 'school_events', today =
   return `Due ${due} - ${overdue} Day${overdue === 1 ? '' : 's'} Overdue`;
 }
 
+function postProductionCompactDateLabel(event = {}) {
+  const dates = getEventDateKeys(event);
+  const start = dates[0] || event?.date || '';
+  const end = dates[dates.length - 1] || event?.endDate || start;
+  if (!start) return '';
+  const startDate = new Date(`${start}T12:00:00`);
+  const endDate = new Date(`${end}T12:00:00`);
+  if (Number.isNaN(startDate.getTime())) return '';
+  const startMonth = startDate.toLocaleDateString('en-US', { month: 'short' });
+  const startDay = startDate.getDate();
+  if (!end || end === start || Number.isNaN(endDate.getTime())) return `${startMonth} ${startDay}`;
+  const endMonth = endDate.toLocaleDateString('en-US', { month: 'short' });
+  const endDay = endDate.getDate();
+  return startMonth === endMonth ? `${startMonth} ${startDay}–${endDay}` : `${startMonth} ${startDay}–${endMonth} ${endDay}`;
+}
+
+function postProductionLinkedSummary(partners = [], recordsByTileId = {}) {
+  if (!partners.length) return '';
+  const counts = new Map();
+  for (const partner of partners) {
+    const stage = recordsByTileId[partner.tileId]?.stage || 'school_events';
+    const label = postProductionStageLabel(stage);
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  const total = partners.length;
+  if (counts.size === 1) {
+    const label = Array.from(counts.keys())[0];
+    return `↔ ${total} linked - ${total > 1 ? 'all ' : ''}${label}`;
+  }
+  const order = POST_PRODUCTION_STAGES.map(item => item.label);
+  const pieces = Array.from(counts.entries())
+    .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
+    .map(([label, count]) => `${count} ${label}`);
+  return `↔ ${total} linked - ${pieces.join(' / ')}`;
+}
+
 function PostProductionBoardDetailsModal({ tile, record, linkedTiles = [], recordsByTileId = {}, notes = [], canEdit, saving = false, noteSaving = false, onClose, onMove, onAddNote, onEditNote, onViewEvent }) {
   const [newNoteDraft, setNewNoteDraft] = useState('');
   const [editingNoteId, setEditingNoteId] = useState('');
@@ -2607,12 +2643,10 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
                   <h3 className="text-sm font-black text-zinc-900">{stage.label}</h3>
                   <Pill className="border-zinc-200 bg-zinc-50 text-zinc-600">{stageTiles.length}</Pill>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {stageTiles.map(tile => {
                     const event = tile.event;
                     const record = recordsByTileId[tile.tileId] || null;
-                    const eventNotes = notesByEventId[event.supabaseId] || [];
-                    const latestNote = eventNotes[0] || null;
                     const isSaving = savingTileId === tile.tileId;
                     const linkedTiles = tilesByEventId[tile.eventId] || [tile];
                     const partners = linkedTiles.filter(item => item.tileId !== tile.tileId);
@@ -2632,35 +2666,22 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
                         onMouseEnter={() => { if (linked) setLinkedEventId(tile.eventId); }}
                         onMouseLeave={() => { if (linkedEventId === tile.eventId) setLinkedEventId(''); }}
                         onClick={() => setSelectedBoardTile(tile)}
-                        className={`cursor-pointer rounded-2xl border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${canEdit ? 'sm:cursor-grab sm:active:cursor-grabbing' : ''} ${isSaving ? 'opacity-60' : ''} ${isRelationshipMatch ? 'border-zinc-500 ring-2 ring-zinc-300 shadow-md' : 'border-zinc-200'} ${relationshipActive && !isRelationshipMatch ? 'opacity-45' : ''}`}
+                        className={`cursor-pointer rounded-xl border bg-white p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${canEdit ? 'sm:cursor-grab sm:active:cursor-grabbing' : ''} ${isSaving ? 'opacity-60' : ''} ${isRelationshipMatch ? 'border-zinc-500 ring-2 ring-zinc-300 shadow-md' : 'border-zinc-200'} ${relationshipActive && !isRelationshipMatch ? 'opacity-45' : ''}`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-sm font-black leading-5 text-zinc-950">{event.title}</div>
-                            <div className="mt-1 text-[11px] font-semibold text-zinc-500">{getEventDateLabel(event)}</div>
-                          </div>
-                          <Pill className={`${TYPE_COLORS[event.type] || 'border-zinc-200 bg-zinc-100 text-zinc-800'} shrink-0 px-2 py-0.5 text-[9px]`}>{event.type === 'Studio Assigned Schools (SAS)' ? 'SAS' : event.type}</Pill>
+                        <div className="min-w-0 text-[12px] font-black leading-4 text-zinc-950">{event.title}</div>
+
+                        <div className="mt-1 flex min-w-0 items-center gap-1 text-[9px] font-bold leading-3 text-zinc-500">
+                          <span className="shrink-0">{postProductionCompactDateLabel(event)}</span>
+                          <span className="shrink-0 text-zinc-300">·</span>
+                          <span className="min-w-0 truncate text-zinc-700">{tile.photographerName}</span>
+                          {linked ? <><span className="shrink-0 text-zinc-300">·</span><span className="shrink-0 text-zinc-600">↔ {tile.index + 1} of {tile.total}</span></> : null}
                         </div>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-bold text-zinc-800">
-                          <span>{tile.photographerName}</span>
-                          {linked ? <span className="rounded-full border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-[10px] font-bold text-zinc-600">↔ {tile.index + 1} of {tile.total}</span> : null}
-                        </div>
+                        <div className="mt-1 text-[10px] font-black leading-3 text-zinc-600">{postProductionDeadlineLabel(tile, record?.stage || 'school_events')}</div>
 
-                        <div className="mt-1.5 text-[11px] font-black text-zinc-600">{postProductionDeadlineLabel(tile, record?.stage || 'school_events')}</div>
+                        {partners.length ? <div className="mt-1 border-t border-zinc-100 pt-1 text-[9px] font-semibold leading-3 text-zinc-500">{postProductionLinkedSummary(partners, recordsByTileId)}</div> : null}
 
-                        {latestNote ? <div className="mt-2 line-clamp-2 rounded-xl bg-[#F8FAF7] px-2.5 py-2 text-[11px] leading-4 text-zinc-600">Note: {latestNote.text}</div> : null}
-
-                        {partners.length ? (
-                          <div className="mt-2 space-y-0.5 border-t border-zinc-100 pt-2">
-                            {partners.map(partner => {
-                              const partnerStage = recordsByTileId[partner.tileId]?.stage || 'school_events';
-                              return <div key={partner.tileId} className="truncate text-[10px] font-semibold text-zinc-500">↔ {partner.photographerName} — {postProductionStageLabel(partnerStage)}</div>;
-                            })}
-                          </div>
-                        ) : null}
-
-                        {isSaving ? <div className="mt-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400">Saving…</div> : null}
+                        {isSaving ? <div className="mt-1 text-[9px] font-bold uppercase tracking-wide text-zinc-400">Saving…</div> : null}
                       </article>
                     );
                   })}
