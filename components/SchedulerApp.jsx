@@ -1572,7 +1572,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
   const showAdminTab = visibleTabs.includes('Admin');
   return (
     <header className={`sticky top-0 z-50 border-b border-zinc-200/70 bg-[#F8FAF7]/95 shadow-[0_8px_24px_rgba(39,39,42,0.05)] backdrop-blur ${mobileViewCompact ? 'sm:py-0' : ''}`}>
-      <div className={`mx-auto max-w-7xl ${mobileViewCompact ? 'px-2 sm:px-6' : 'px-4 sm:px-6'} ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-3 sm:py-4'}`}>
+      <div className={`mx-auto max-w-[1500px] ${mobileViewCompact ? 'px-2 sm:px-6' : 'px-4 sm:px-6'} ${mobileViewCompact ? 'py-2 sm:py-4' : 'py-3 sm:py-4'}`}>
         <div className={`flex flex-col lg:flex-row lg:items-center lg:justify-between ${mobileViewCompact ? 'gap-2 sm:gap-4' : 'gap-3 sm:gap-4'}`}>
           <div>
             <div className="flex items-center gap-3 sm:gap-4">
@@ -1596,7 +1596,7 @@ function Header({ query, setQuery, activeTab, setActiveTab, visibleTabs = tabs }
             </label>
             <div className={`${mobileViewCompact ? 'hidden sm:flex' : 'flex'} justify-end`}><AuthStatus /></div>
             <nav className="hidden flex-col gap-2 sm:flex">
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex flex-nowrap justify-start gap-2 overflow-x-auto lg:justify-end">
                 {primaryTabs.map((tab) => (
                   <button key={tab} onClick={() => setActiveTab(tab)} className={`min-w-[96px] rounded-2xl px-3 py-2 text-sm font-medium transition ${activeTab === tab ? 'bg-zinc-900 text-white shadow-soft' : 'bg-white/75 text-zinc-700 hover:bg-white'}`}>
                     {tab}
@@ -2060,7 +2060,9 @@ function isPostProductionRecordHidden(record = null, now = Date.now()) {
 function PostProductionBoardDetailsModal({ event, record, canEdit, saving = false, onClose, onMove, onSaveNotes, onViewEvent }) {
   const [notesDraft, setNotesDraft] = useState(record?.notes || '');
   const stage = record?.stage || 'school_events';
-  const crew = assignedCrewForWholeEvent(event);
+  // The modal is mounted even when no Board card is selected. Keep the initial
+  // null state inert so simply opening The Board can never run event helpers.
+  const crew = event ? assignedCrewForWholeEvent(event) : [];
 
   useEffect(() => {
     setNotesDraft(record?.notes || '');
