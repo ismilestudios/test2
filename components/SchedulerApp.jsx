@@ -952,13 +952,13 @@ function getHolidayLabels(dateKey) {
   return getHolidayMapForYear(year).get(dateKey) || [];
 }
 
-function HolidayText({ date }) {
+function HolidayText({ date, className = '' }) {
   const holidays = getHolidayLabels(date);
   if (!holidays.length) return null;
   return (
-    <div className="mb-1 space-y-0.5 text-xs font-semibold italic leading-tight text-zinc-500" title={holidays.join(', ')}>
-      {holidays.map(label => <div key={label} className="truncate">{label}</div>)}
-    </div>
+    <span className={`min-w-0 truncate text-xs font-semibold italic leading-tight text-zinc-500 ${className}`} title={holidays.join(', ')}>
+      {holidays.join(', ')}
+    </span>
   );
 }
 
@@ -2309,20 +2309,17 @@ function PostProductionBoardDetailsModal({ tile, record, linkedTiles = [], recor
             </div>
 
             {linkedTiles.length > 1 ? (
-              <section className="mt-5 rounded-3xl border border-zinc-200 bg-white/80 p-4">
-                <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Photographer Progress</div>
-                <div className="mt-3 space-y-2">
+              <section className="mt-3 rounded-2xl border border-zinc-200 bg-white/80 px-3 py-2.5">
+                <div className="text-[10px] font-black uppercase tracking-wide text-zinc-500">Staff Progress</div>
+                <div className="mt-1.5 grid gap-1 sm:grid-cols-2">
                   {linkedTiles.map(linkedTile => {
                     const linkedRecord = recordsByTileId[linkedTile.tileId] || null;
                     const linkedStage = linkedRecord?.stage || 'school_events';
                     const isCurrent = linkedTile.tileId === tile.tileId;
                     return (
-                      <div key={linkedTile.tileId} className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 ${isCurrent ? 'border-zinc-400 bg-zinc-50' : 'border-zinc-100 bg-white'}`}>
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-bold text-zinc-800">{linkedTile.photographerName} <span className="text-[11px] font-semibold text-zinc-400">{linkedTile.index + 1} of {linkedTile.total}</span></div>
-                          <div className="mt-0.5 text-[11px] font-semibold text-zinc-500">{postProductionDeadlineLabel(linkedTile, linkedStage)}</div>
-                        </div>
-                        <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold text-zinc-700">{postProductionStageLabel(linkedStage)}</span>
+                      <div key={linkedTile.tileId} title={`${linkedTile.photographerName}: ${postProductionStageLabel(linkedStage)} · ${postProductionDeadlineLabel(linkedTile, linkedStage)}`} className={`flex min-w-0 items-center justify-between gap-2 rounded-xl border px-2 py-1.5 ${isCurrent ? 'border-zinc-400 bg-zinc-50' : 'border-zinc-100 bg-white'}`}>
+                        <div className="min-w-0 truncate text-xs font-bold text-zinc-800">{linkedTile.photographerName} <span className="text-[10px] font-semibold text-zinc-400">{linkedTile.index + 1}/{linkedTile.total}</span></div>
+                        <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-bold text-zinc-700">{postProductionStageLabel(linkedStage)}</span>
                       </div>
                     );
                   })}
@@ -3884,8 +3881,7 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
           const dates = weekDays.map(cell => cell.date);
           const segments = buildMonthWeekSegments(events, dates, null);
           const visibleRows = Math.max(2, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
-          const hasHolidayInWeek = dates.some(date => getHolidayLabels(date).length);
-          const eventLayerTop = hasHolidayInWeek ? 34 : 22;
+          const eventLayerTop = 22;
           const rowMinHeight = Math.max(72, eventLayerTop + 3 + (visibleRows * 19));
           return (
             <div key={`mobile-week-${weekIndex}`} className="relative grid grid-cols-7 overflow-hidden rounded-xl border border-zinc-100" style={{ minHeight: rowMinHeight }}>
@@ -3902,9 +3898,9 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
                     className={`relative min-h-[72px] border-r border-zinc-100 p-1 text-left last:border-r-0 ${isSelected ? 'bg-[#DDE8D2]/70' : cell.inCurrentMonth ? 'bg-white/45' : 'bg-zinc-50/70 opacity-60'}`}
                     title={holidays.length ? holidays.join(', ') : undefined}
                   >
-                    <div className="absolute inset-x-1 top-1 z-20 min-w-0">
-                      <span className={`block text-[10px] font-black leading-none ${isSelected ? 'text-zinc-950' : cell.inCurrentMonth ? 'text-zinc-650' : 'text-zinc-400'}`}>{Number(date.slice(-2))}</span>
-                      {holidays.length ? <span className="mt-1 block truncate text-[7px] font-semibold leading-2.5 text-zinc-500" aria-label={holidays.join(', ')}>{holidays.join(', ')}</span> : null}
+                    <div className="absolute inset-x-1 top-1 z-20 flex min-w-0 items-center gap-1 overflow-hidden">
+                      <span className={`shrink-0 text-[10px] font-black leading-none ${isSelected ? 'text-zinc-950' : cell.inCurrentMonth ? 'text-zinc-650' : 'text-zinc-400'}`}>{Number(date.slice(-2))}</span>
+                      {holidays.length ? <span className="min-w-0 truncate text-[7px] font-semibold italic leading-none text-zinc-500" aria-label={holidays.join(', ')}>{holidays.join(', ')}</span> : null}
                     </div>
                   </button>
                 );
@@ -3970,8 +3966,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
             const dates = weekDays.map(cell => cell.date);
             const segments = buildMonthWeekSegments(events, dates, null);
             const visibleRows = Math.max(3, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
-            const hasHolidayInWeek = dates.some(date => date && getHolidayLabels(date).length);
-            const eventLayerTop = hasHolidayInWeek ? 58 : 40;
+            const eventLayerTop = 40;
             const rowMinHeight = Math.max(132, eventLayerTop + 18 + (visibleRows * 34));
             return (
               <div key={`week-${weekIndex}`} className="relative grid grid-cols-7 gap-2 overflow-hidden" style={{ minHeight: rowMinHeight }}>
@@ -3985,8 +3980,10 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
                       title="Double-click to add an event"
                       className={`min-h-[132px] rounded-2xl border p-2 transition ${selectedDate === date ? 'border-[#AEBB9E] bg-[#DDE8D2]/60' : cell.inCurrentMonth ? 'border-zinc-200 bg-cream/80' : 'border-zinc-200 bg-zinc-100/70 opacity-75 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]'}`}
                     >
-                      <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className={`mb-1 text-xs font-semibold hover:text-zinc-900 ${cell.inCurrentMonth ? 'text-zinc-500' : 'text-zinc-400'}`}>{day}</button>
-                      <div className="relative z-20"><HolidayText date={date} /></div>
+                      <div className="relative z-20 mb-1 flex min-w-0 items-center gap-1.5 overflow-hidden">
+                        <button type="button" onClick={() => { setSelectedDate(date); setViewMode('Day'); }} className={`shrink-0 text-xs font-semibold hover:text-zinc-900 ${cell.inCurrentMonth ? 'text-zinc-500' : 'text-zinc-400'}`}>{day}</button>
+                        <HolidayText date={date} className="text-[10px]" />
+                      </div>
                     </div>
                   );
                 })}
@@ -4315,8 +4312,7 @@ function WeekView({ events, selectedDate, onClick, rolloutCapacityOverrides = {}
   const pct = Math.min(100, Math.round((weeklyRollouts / weeklyCapacity) * 100));
   const segments = buildMonthWeekSegments(events, days, null);
   const visibleRows = Math.max(4, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
-  const hasHolidayInWeek = days.some(date => getHolidayLabels(date).length);
-  const eventLayerTop = hasHolidayInWeek ? 64 : 44;
+  const eventLayerTop = 44;
   const rowMinHeight = Math.max(220, eventLayerTop + 16 + (visibleRows * 34));
 
   return (
@@ -4346,8 +4342,10 @@ function WeekView({ events, selectedDate, onClick, rolloutCapacityOverrides = {}
           <div className="mt-2 relative grid grid-cols-7 gap-2 overflow-hidden" style={{ minHeight: rowMinHeight }}>
             {days.map(date => (
               <div key={date} className="min-h-[220px] sm:min-h-[320px] rounded-2xl border border-zinc-200 bg-cream/80 p-2">
-                <div className="mb-1 text-xs font-semibold text-zinc-500">{Number(date.slice(-2))}</div>
-                <div className="relative z-20"><HolidayText date={date} /></div>
+                <div className="relative z-20 mb-1 flex min-w-0 items-center gap-1.5 overflow-hidden">
+                  <span className="shrink-0 text-xs font-semibold text-zinc-500">{Number(date.slice(-2))}</span>
+                  <HolidayText date={date} className="text-[10px]" />
+                </div>
               </div>
             ))}
             <div className="pointer-events-none absolute left-0 right-0 z-10 grid grid-cols-7 gap-x-2 gap-y-1.5" style={{ top: eventLayerTop }}>
@@ -4385,15 +4383,19 @@ function DayView({ events, onClick, selectedDate }) {
   const dayEvents = events.filter(event => isDateInEventRange(event, selectedDate));
   if (!dayEvents.length) return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">
-      <div className="mb-2 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</div>
-      <HolidayText date={selectedDate} />
+      <div className="mb-2 flex min-w-0 items-center justify-center gap-2 overflow-hidden text-sm font-semibold text-zinc-800">
+        <span className="shrink-0">{formatDate(selectedDate)}</span>
+        <HolidayText date={selectedDate} className="text-xs" />
+      </div>
       <div>No events scheduled yet.</div>
     </div>
   );
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-4 shadow-sm">
-      <h2 className="mb-1 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</h2>
-      <HolidayText date={selectedDate} />
+      <div className="mb-2 flex min-w-0 items-center gap-2 overflow-hidden">
+        <h2 className="shrink-0 text-sm font-semibold text-zinc-800">{formatDate(selectedDate)}</h2>
+        <HolidayText date={selectedDate} className="text-xs" />
+      </div>
       <div className="grid gap-3 md:grid-cols-2">{dayEvents.map(event => <EventCard key={event.id} event={event} onClick={onClick} />)}</div>
     </div>
   );
@@ -4749,7 +4751,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
   const totalSchoolNoteCount = schoolNoteHistory.length + plainSchoolNoteCount;
 
   return (
-    <section className={`${compact ? 'rounded-2xl p-0' : `rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm ${scrollable ? 'max-h-[700px] overflow-y-auto overscroll-contain pr-2' : ''}`}`}>
+    <section className={`${compact ? 'rounded-2xl p-0' : `rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm ${scrollable ? 'max-h-[1000px] overflow-y-auto overscroll-contain pr-2' : ''}`}`}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -6840,8 +6842,17 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
 
       {!loading ? (
         <>
-          <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-zinc-200 bg-white md:block">
-            <table className="min-w-[1480px] w-full text-left">
+          <div className="mt-4 hidden overflow-hidden rounded-2xl border border-zinc-200 bg-white xl:block">
+            <table className="w-full table-fixed text-left">
+              <colgroup>
+                <col className="w-[12%]" />
+                <col className="w-[9%]" />
+                <col className="w-[14%]" />
+                <col className="w-[12%]" />
+                <col className="w-[14%]" />
+                <col className={canEdit ? 'w-[27%]' : 'w-[39%]'} />
+                {canEdit ? <col className="w-[12%]" /> : null}
+              </colgroup>
               <thead className="bg-zinc-50 text-[11px] font-black uppercase tracking-wide text-zinc-500">
                 <tr>
                   <th className="px-3 py-2.5">School</th>
@@ -6850,25 +6861,25 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
                   <th className="px-3 py-2.5">Other Contact</th>
                   <th className="px-3 py-2.5">Who Reached Out</th>
                   <th className="px-3 py-2.5">Notes</th>
-                  {canEdit ? <th className="sticky right-0 z-10 w-[180px] border-l border-zinc-200 bg-zinc-50 px-3 py-2.5 text-right">Actions</th> : null}
+                  {canEdit ? <th className="border-l border-zinc-200 bg-zinc-50 px-3 py-2.5 text-right">Actions</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {filtered.map(item => (
                   <tr key={item.id} className="align-top text-sm text-zinc-700">
-                    <td className="min-w-[190px] px-3 py-3 font-black text-zinc-950">{item.schoolName}</td>
-                    <td className="min-w-[160px] px-3 py-3 font-semibold">{item.district || '—'}</td>
-                    <td className="min-w-[230px] px-3 py-3">{item.mailingAddress || '—'}</td>
-                    <td className="min-w-[180px] px-3 py-3">{item.otherContact ? <LinkifiedText text={item.otherContact} className="text-sm" /> : '—'}</td>
-                    <td className="min-w-[170px] px-3 py-3">
+                    <td className="break-words px-3 py-3 font-black text-zinc-950">{item.schoolName}</td>
+                    <td className="break-words px-3 py-3 font-semibold">{item.district || '—'}</td>
+                    <td className="break-words px-3 py-3">{item.mailingAddress || '—'}</td>
+                    <td className="break-words px-3 py-3">{item.otherContact ? <LinkifiedText text={item.otherContact} className="break-words text-sm" /> : '—'}</td>
+                    <td className="px-3 py-3">
                       {item.reachedOutBy?.length ? <div className="flex flex-wrap gap-1">{item.reachedOutBy.map(name => <Pill key={name} className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-xs text-zinc-800">{name}</Pill>)}</div> : <span className="font-semibold text-amber-700">No outreach yet</span>}
                     </td>
-                    <td className="min-w-[460px] max-w-[680px] px-3 py-3">{item.notes ? <LinkifiedText text={item.notes} className="text-sm leading-6" /> : <span className="text-zinc-400">—</span>}</td>
+                    <td className="break-words px-3 py-3">{item.notes ? <LinkifiedText text={item.notes} className="break-words text-sm leading-6" /> : <span className="text-zinc-400">—</span>}</td>
                     {canEdit ? (
-                      <td className="sticky right-0 z-[1] w-[180px] border-l border-zinc-100 bg-white px-3 py-3 text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <button type="button" onClick={() => setEditing(item)} className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-bold text-zinc-700 shadow-sm hover:bg-zinc-50 hover:text-zinc-950" aria-label={`Edit ${item.schoolName}`} title="Edit"><Pencil size={14} /> Edit</button>
-                          {canRemove ? <button type="button" onClick={() => removeAcquisition(item)} disabled={removingId === item.id} className="inline-flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-50 disabled:opacity-40" aria-label={`Remove ${item.schoolName}`} title="Remove"><Trash2 size={14} /> Remove</button> : null}
+                      <td className="border-l border-zinc-100 bg-white px-3 py-3 text-right">
+                        <div className="flex flex-col items-stretch gap-1.5">
+                          <button type="button" onClick={() => setEditing(item)} className="inline-flex items-center justify-center gap-1 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-bold text-zinc-700 shadow-sm hover:bg-zinc-50 hover:text-zinc-950" aria-label={`Edit ${item.schoolName}`} title="Edit"><Pencil size={14} /> Edit</button>
+                          {canRemove ? <button type="button" onClick={() => removeAcquisition(item)} disabled={removingId === item.id} className="inline-flex items-center justify-center gap-1 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-50 disabled:opacity-40" aria-label={`Remove ${item.schoolName}`} title="Remove"><Trash2 size={14} /> Remove</button> : null}
                         </div>
                       </td>
                     ) : null}
@@ -6879,7 +6890,7 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
             </table>
           </div>
 
-          <div className="mt-4 space-y-2 md:hidden">
+          <div className="mt-4 space-y-2 xl:hidden">
             {filtered.map(item => (
               <article key={item.id} className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -7167,7 +7178,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
       </div>
 
       <div className="hidden items-start gap-4 md:grid xl:grid-cols-[340px_1fr]">
-        <section className="flex max-h-[700px] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
+        <section className="flex max-h-[1000px] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
             <div className="flex items-center gap-2">
@@ -7258,13 +7269,14 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   ])).filter(Boolean).sort((a, b) => a.localeCompare(b));
   const [selectedStaff, setSelectedStaff] = useState('Stephanie');
   const [viewMode, setViewMode] = useState('Day');
+  const [staffScheduleCopied, setStaffScheduleCopied] = useState(false);
   const [plainViewMode, setPlainViewMode] = useState('Week');
   const [plainViewCopied, setPlainViewCopied] = useState(false);
   const plainViewCopyRef = useRef(null);
 
   const today = todayKey();
-  const allActiveEvents = useMemo(() => (events || []).filter(event => event?.active !== false), [events]);
-  // Mobile View should mirror Overview WWPT and Staff Schedule coverage: all active event types
+  const allActiveEvents = useMemo(() => (events || []).filter(event => event?.active !== false && !event?.removed), [events]);
+  // Mobile View should mirror Overview WWPT and Staff Schedule coverage: all current, non-removed event types
   // (including Call or Meeting / Edit Day) are eligible to appear when dated/assigned.
   const productionEvents = useMemo(() => allActiveEvents, [allActiveEvents]);
 
@@ -7272,31 +7284,59 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
     .filter(event => isDateInEventRange(event, today))
     .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
 
+  const staffScheduleRange = useMemo(() => {
+    if (viewMode === 'Month') return getMonthDateRange(monthKey(selectedDate));
+    if (viewMode === 'Week') return weekBounds(selectedDate);
+    return { start: selectedDate, end: selectedDate };
+  }, [selectedDate, viewMode]);
+
   const visibleEvents = useMemo(() => {
     const selected = String(selectedStaff || '').trim();
     const canonical = canonicalPhotographerName(selected);
-    const assigned = productionEvents.filter(event => {
-      const staffing = getEventStaffingByDate(event, 'photographers');
-      const assistantStaffing = getEventStaffingByDate(event, 'assistants');
-      const photogMatch = staffing.some(day => uniqueCanonicalPhotographers(day.names || []).includes(canonical));
-      const assistantMatch = assistantStaffing.some(day => (day.names || []).map(name => String(name || '').trim()).includes(selected));
-      return photogMatch || assistantMatch;
-    });
-    if (viewMode === 'Month') {
-      const key = monthKey(selectedDate);
-      return assigned.filter(event => monthKey(event.date) <= key && monthKey(event.endDate || event.date) >= key);
-    }
-    if (viewMode === 'Week') {
-      const { start, end } = weekBounds(selectedDate);
-      return assigned.filter(event => event.date <= end && (event.endDate || event.date) >= start);
-    }
-    return assigned.filter(event => isDateInEventRange(event, selectedDate));
-  }, [productionEvents, selectedStaff, selectedDate, viewMode]);
+    const selectedLower = selected.toLowerCase();
+    if (!selected) return [];
+
+    return productionEvents.flatMap(event => getEventDateKeysInRange(event, staffScheduleRange.start, staffScheduleRange.end)
+      .filter(instanceDate => {
+        const photographersForDay = getScheduleLivePhotographersForDate(event, instanceDate);
+        const assistantsForDay = getScheduleLiveAssistantsForDate(event, instanceDate);
+        const photogMatch = photographersForDay.includes(canonical);
+        const assistantMatch = assistantsForDay.some(name => String(name || '').trim().toLowerCase() === selectedLower);
+        return photogMatch || assistantMatch;
+      })
+      .map(instanceDate => ({ ...event, instanceDate }))
+    ).sort((a, b) => String(a.instanceDate || a.date || '').localeCompare(String(b.instanceDate || b.date || '')) || String(a.time || '').localeCompare(String(b.time || '')) || String(a.title || '').localeCompare(String(b.title || '')));
+  }, [productionEvents, selectedStaff, staffScheduleRange]);
 
   const move = (delta) => {
     if (viewMode === 'Month') setSelectedDate(addDays(selectedDate, delta * 30));
     else if (viewMode === 'Week') setSelectedDate(addDays(selectedDate, delta * 7));
     else setSelectedDate(addDays(selectedDate, delta));
+  };
+
+  const staffScheduleLabel = viewMode === 'Month'
+    ? monthLabel(monthKey(selectedDate))
+    : viewMode === 'Week'
+      ? `${shortDate(staffScheduleRange.start)} – ${shortDate(staffScheduleRange.end)}`
+      : formatDate(selectedDate);
+
+  const copyStaffSchedule = async () => {
+    const header = `${selectedStaff} — ${staffScheduleLabel}`;
+    const lines = visibleEvents.length
+      ? visibleEvents.map(event => {
+          const occurrenceDate = event.instanceDate || event.date || '';
+          const timeLabel = getEventTimeLabel(event);
+          return `${formatDate(occurrenceDate)} — ${event.title || 'Untitled Event'}${timeLabel ? ` — ${timeLabel}` : ''}`;
+        })
+      : ['No events scheduled.'];
+    const text = [header, ...lines].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setStaffScheduleCopied(true);
+      window.setTimeout(() => setStaffScheduleCopied(false), 1600);
+    } catch (error) {
+      window.prompt('Copy this schedule:', text);
+    }
   };
 
   const movePlainView = (delta) => {
@@ -7370,7 +7410,10 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
       </section>
 
       <section className="rounded-[1.5rem] border border-zinc-200 bg-white/80 p-3 shadow-sm sm:rounded-[2rem] sm:p-4">
-        <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Staff Schedule</div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Staff Schedule</div>
+          <button type="button" onClick={copyStaffSchedule} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-black text-zinc-600 transition hover:bg-zinc-50">{staffScheduleCopied ? 'Copied' : 'Copy Schedule'}</button>
+        </div>
         <select value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-900 outline-none sm:py-3 sm:text-base">
           {staffOptions.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
@@ -7384,19 +7427,22 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
           <button type="button" onClick={() => move(1)} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold sm:py-2 sm:text-sm">Next</button>
         </div>
         <div className="mt-3 space-y-1.5">
-          {visibleEvents.length ? visibleEvents.slice().sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || ''))).map(event => (
-            <button key={event.id} type="button" onClick={() => onClick(event)} className="w-full rounded-xl border border-zinc-200 bg-white p-2 text-left shadow-sm sm:rounded-2xl sm:p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400 sm:text-xs">{getEventDateLabel(event)}</div>
-                  <div className="mt-0.5 truncate text-sm font-black text-zinc-950 sm:text-base">{event.title}</div>
-                  <div className="mt-0.5 text-xs text-zinc-600 sm:text-sm">{getEventTimeLabel(event)}</div>
-                  <div className="mt-0.5 text-[11px] font-semibold text-zinc-500">Assistant: {displayAssistants(event)}</div>
+          {visibleEvents.length ? visibleEvents.map(event => {
+            const occurrenceDate = event.instanceDate || event.date;
+            return (
+              <button key={`${event.id}-${occurrenceDate}`} type="button" onClick={() => onClick(event)} className="w-full rounded-xl border border-zinc-200 bg-white p-2 text-left shadow-sm sm:rounded-2xl sm:p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400 sm:text-xs">{formatDate(occurrenceDate)}</div>
+                    <div className="mt-0.5 truncate text-sm font-black text-zinc-950 sm:text-base">{event.title}</div>
+                    <div className="mt-0.5 text-xs text-zinc-600 sm:text-sm">{getEventTimeLabel(event)}</div>
+                    <div className="mt-0.5 text-[11px] font-semibold text-zinc-500">Assistant: {formatAssistantAssignmentForDate(event, occurrenceDate)}</div>
+                  </div>
+                  <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} text-[10px]`}>{event.type}</Pill>
                 </div>
-                <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} text-[10px]`}>{event.type}</Pill>
-              </div>
-            </button>
-          )) : <div className="rounded-xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-center text-sm text-zinc-500">No {viewMode.toLowerCase()} events for {selectedStaff}.</div>}
+              </button>
+            );
+          }) : <div className="rounded-xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-center text-sm text-zinc-500">No {viewMode.toLowerCase()} events for {selectedStaff}.</div>}
         </div>
       </section>
 
