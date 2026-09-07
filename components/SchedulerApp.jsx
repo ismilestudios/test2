@@ -1687,13 +1687,48 @@ function compactCrewList(event = {}, occurrenceDate = '') {
   ].filter(Boolean);
 }
 
-function buildDayCopyText(title, dayEvents, occurrenceDate = '') {
-  if (!dayEvents.length) return 'Nothing scheduled';
-  const items = dayEvents.map(event => {
-    const crew = compactCrewList(event, occurrenceDate);
-    return `${event.canonicalSchool || event.title}${crew.length ? ` (${crew.join(', ')})` : ''}`;
+function isTodayTomorrowCopyableShootEvent(event = {}) {
+  const excludedTypes = new Set([
+    'time off',
+    'personal appointment',
+    'time off / personal appointment',
+    'call or meeting',
+    'call/meeting',
+    'call / meeting',
+    'edit day',
+    'school holiday calendar'
+  ]);
+  return !excludedTypes.has(String(event?.type || '').trim().toLowerCase());
+}
+
+function actualAssignedCrewForDate(event = {}, occurrenceDate = '') {
+  const photographers = occurrenceDate
+    ? getScheduleLivePhotographersForDate(event, occurrenceDate)
+    : uniqueCanonicalPhotographers(event.photographers || []);
+  const assistants = occurrenceDate
+    ? getScheduleLiveAssistantsForDate(event, occurrenceDate)
+    : (event.assistants || []).filter(Boolean);
+
+  const result = [];
+  const seen = new Set();
+  [...photographers.map(canonicalPhotographerName), ...assistants].forEach(rawName => {
+    const name = String(rawName || '').trim();
+    const normalized = name.toLowerCase();
+    if (!name || normalized === 'tbd' || normalized === '--' || seen.has(normalized)) return;
+    seen.add(normalized);
+    result.push(name);
   });
-  return items.join('\n');
+  return result;
+}
+
+function buildDayCopyText(title, dayEvents, occurrenceDate = '') {
+  const copyableEvents = (dayEvents || []).filter(isTodayTomorrowCopyableShootEvent);
+  if (!copyableEvents.length) return 'Nothing scheduled';
+  const items = copyableEvents.map(event => {
+    const crew = actualAssignedCrewForDate(event, occurrenceDate);
+    return `${event.title || 'Untitled Event'}${crew.length ? ` (${crew.join(', ')})` : ''}`;
+  });
+  return items.join(', ');
 }
 
 function assignedCrewForWholeEvent(event = {}) {
@@ -2014,6 +2049,7 @@ const POST_PRODUCTION_BOARD_TRACKING_START = '2026-09-02';
 const POST_PRODUCTION_SELLING_RETENTION_MS = 4 * 24 * 60 * 60 * 1000;
 const POST_PRODUCTION_DEADLINE_DAYS = 7;
 const POST_PRODUCTION_UNASSIGNED_KEY = '__unassigned__';
+const POST_PRODUCTION_EVENT_CONTROL_KEY = '__event__';
 const POST_PRODUCTION_EVENT_TYPES = new Set([
   'Fall Picture Day',
   'Spring Picture Day',
@@ -2040,6 +2076,10 @@ function postProductionPhotographerKey(name = '') {
 
 function postProductionTileId(eventId = '', photographerKey = POST_PRODUCTION_UNASSIGNED_KEY) {
   return `${String(eventId || '')}::${String(photographerKey || POST_PRODUCTION_UNASSIGNED_KEY)}`;
+}
+
+function postProductionAdminControlId(eventId = '', photographerKey = POST_PRODUCTION_EVENT_CONTROL_KEY) {
+  return `${String(eventId || '')}::${String(photographerKey || POST_PRODUCTION_EVENT_CONTROL_KEY).trim().toLowerCase()}`;
 }
 
 function postProductionStageLabel(stage = '') {
@@ -2106,6 +2146,21 @@ function supabaseRowToPostProductionRecord(row = {}) {
     stageChangedAt: row.stage_changed_at || row.created_at || '',
     createdBy: row.created_by || '',
     updatedBy: row.updated_by || '',
+    createdAt: row.created_at || '',
+    updatedAt: row.updated_at || ''
+  };
+}
+
+function supabaseRowToPostProductionAdminControl(row = {}) {
+  const photographerKey = String(row.photographer_key || POST_PRODUCTION_EVENT_CONTROL_KEY).trim().toLowerCase() || POST_PRODUCTION_EVENT_CONTROL_KEY;
+  return {
+    eventId: row.event_id || '',
+    photographerKey,
+    controlId: postProductionAdminControlId(row.event_id || '', photographerKey),
+    hiddenAt: row.hidden_at || '',
+    hiddenBy: row.hidden_by || '',
+    completedAt: row.completed_at || '',
+    completedBy: row.completed_by || '',
     createdAt: row.created_at || '',
     updatedAt: row.updated_at || ''
   };
@@ -2363,14 +2418,17 @@ function PostProductionBoardDetailsModal({ tile, record, linkedTiles = [], recor
   );
 }
 
-function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onViewEvent }) {
+function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isAdmin = false, onViewEvent }) {
   const [recordsByTileId, setRecordsByTileId] = useState({});
   const [notesByEventId, setNotesByEventId] = useState({});
+  const [adminControlsById, setAdminControlsById] = useState({});
+  const [adminControlsReady, setAdminControlsReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [selectedBoardTile, setSelectedBoardTile] = useState(null);
   const [savingTileId, setSavingTileId] = useState('');
   const [savingNoteId, setSavingNoteId] = useState('');
+  const [savingAdminControlId, setSavingAdminControlId] = useState('');
   const [draggedTileId, setDraggedTileId] = useState('');
   const [dragOverStage, setDragOverStage] = useState('');
   const [linkedEventId, setLinkedEventId] = useState('');
@@ -2380,6 +2438,8 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
     if (!hasSupabaseEnv()) {
       setRecordsByTileId({});
       setNotesByEventId({});
+      setAdminControlsById({});
+      setAdminControlsReady(false);
       setLoading(false);
       setMessage('Supabase is not connected, so The Board cannot be shared yet.');
       return;
@@ -2391,14 +2451,16 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       return;
     }
     setLoading(true);
-    const [boardResult, notesResult] = await Promise.all([
+    const [boardResult, notesResult, adminControlsResult] = await Promise.all([
       supabase.from('post_production_board_photographers').select('*').order('updated_at', { ascending: false }),
-      supabase.from('post_production_notes').select('*').order('created_at', { ascending: false })
+      supabase.from('post_production_notes').select('*').order('created_at', { ascending: false }),
+      supabase.from('post_production_board_admin_controls').select('*').order('updated_at', { ascending: false })
     ]);
 
     if (boardResult.error) {
       setRecordsByTileId({});
       setNotesByEventId({});
+      setAdminControlsById({});
       setMessage(`Could not load The Board: ${boardResult.error.message}. Run supabase/v2_04_board_photographer_tiles.sql before deploying v2.04.`);
       setLoading(false);
       return;
@@ -2406,6 +2468,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
     if (notesResult.error) {
       setRecordsByTileId({});
       setNotesByEventId({});
+      setAdminControlsById({});
       setMessage(`Could not load Post-Production Notes: ${notesResult.error.message}. Run supabase/v2_03c_post_production_note_history.sql if the note history has not been installed yet.`);
       setLoading(false);
       return;
@@ -2428,9 +2491,19 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
       nextNotes[eventId] = sortPostProductionNotesNewestFirst(nextNotes[eventId]);
     });
 
+    const nextAdminControls = {};
+    if (!adminControlsResult.error) {
+      (adminControlsResult.data || []).forEach(row => {
+        const control = supabaseRowToPostProductionAdminControl(row);
+        if (control.eventId && control.controlId) nextAdminControls[control.controlId] = control;
+      });
+    }
+
     setRecordsByTileId(nextRecords);
     setNotesByEventId(nextNotes);
-    setMessage('');
+    setAdminControlsById(nextAdminControls);
+    setAdminControlsReady(!adminControlsResult.error);
+    setMessage(adminControlsResult.error ? `The Board loaded, but Admin Hide/Done controls are unavailable: ${adminControlsResult.error.message}. Run supabase/v2_06_board_admin_controls.sql before using those controls.` : '');
     setLoading(false);
   };
 
@@ -2453,7 +2526,12 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
   }, [events]);
 
   const eligibleBoardTiles = useMemo(() => allBoardTiles
-    .filter(tile => !isPostProductionRecordHidden(recordsByTileId[tile.tileId], nowTick)), [allBoardTiles, recordsByTileId, nowTick]);
+    .filter(tile => {
+      const eventControl = adminControlsById[postProductionAdminControlId(tile.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY)] || null;
+      const tileControl = adminControlsById[postProductionAdminControlId(tile.eventId, tile.photographerKey)] || null;
+      if (eventControl?.hiddenAt || tileControl?.completedAt) return false;
+      return !isPostProductionRecordHidden(recordsByTileId[tile.tileId], nowTick);
+    }), [allBoardTiles, recordsByTileId, adminControlsById, nowTick]);
 
   const tilesByEventId = useMemo(() => {
     const map = {};
@@ -2516,6 +2594,75 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
   const moveTile = async (tile, stage) => {
     if (!POST_PRODUCTION_STAGES.some(item => item.key === stage)) return;
     await saveBoardRecord(tile, { stage });
+  };
+
+  const savePostProductionAdminControl = async (eventId, photographerKey, patch = {}) => {
+    if (!isAdmin || !eventId || !photographerKey) return false;
+    if (!hasSupabaseEnv()) {
+      setMessage('Supabase is not connected. Board Admin control was not saved.');
+      return false;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setMessage('Supabase client was not available. Board Admin control was not saved.');
+      return false;
+    }
+
+    const controlId = postProductionAdminControlId(eventId, photographerKey);
+    const previous = adminControlsById[controlId] || null;
+    const nowIso = new Date().toISOString();
+    const payload = {
+      event_id: eventId,
+      photographer_key: String(photographerKey || '').trim().toLowerCase(),
+      hidden_at: patch.hiddenAt !== undefined ? patch.hiddenAt : (previous?.hiddenAt || null),
+      hidden_by: patch.hiddenBy !== undefined ? patch.hiddenBy : (previous?.hiddenBy || null),
+      completed_at: patch.completedAt !== undefined ? patch.completedAt : (previous?.completedAt || null),
+      completed_by: patch.completedBy !== undefined ? patch.completedBy : (previous?.completedBy || null),
+      updated_at: nowIso
+    };
+
+    setSavingAdminControlId(controlId);
+    const { data, error } = await supabase
+      .from('post_production_board_admin_controls')
+      .upsert(payload, { onConflict: 'event_id,photographer_key' })
+      .select()
+      .single();
+    setSavingAdminControlId('');
+
+    if (error || !data) {
+      setAdminControlsReady(false);
+      setMessage(`Board Admin control was not saved: ${error?.message || 'Supabase did not return the saved control.'}. Run supabase/v2_06_board_admin_controls.sql if needed.`);
+      return false;
+    }
+
+    const saved = supabaseRowToPostProductionAdminControl(data);
+    setAdminControlsById(current => ({ ...current, [saved.controlId]: saved }));
+    setAdminControlsReady(true);
+    setMessage('');
+    return saved;
+  };
+
+  const hideBoardEvent = async (tile) => {
+    if (!isAdmin || !tile?.eventId) return;
+    const eventTitle = tile.event?.title || 'this event';
+    if (typeof window !== 'undefined' && !window.confirm(`Hide ${eventTitle} from The Board? This hides all photographer tiles for this event, but does not change the Scheduler event or delete Board history.`)) return;
+    const saved = await savePostProductionAdminControl(tile.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY, {
+      hiddenAt: new Date().toISOString(),
+      hiddenBy: authEmail || null
+    });
+    if (saved && selectedBoardTile?.eventId === tile.eventId) setSelectedBoardTile(null);
+  };
+
+  const completeBoardTile = async (tile) => {
+    if (!isAdmin || !tile?.eventId || !tile?.photographerKey) return;
+    const currentStage = recordsByTileId[tile.tileId]?.stage || 'school_events';
+    if (currentStage !== 'selling') return;
+    if (typeof window !== 'undefined' && !window.confirm(`Mark ${tile.photographerName} done for ${tile.event?.title || 'this event'} and remove this tile from the active Board now? Board history remains stored.`)) return;
+    const saved = await savePostProductionAdminControl(tile.eventId, tile.photographerKey, {
+      completedAt: new Date().toISOString(),
+      completedBy: authEmail || null
+    });
+    if (saved && selectedBoardTile?.tileId === tile.tileId) setSelectedBoardTile(null);
   };
 
   const addPostProductionNote = async (event, text) => {
@@ -2616,7 +2763,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
         <div>
           <h2 className="text-xl font-black text-zinc-950">The Board</h2>
           <p className="mt-1 max-w-3xl text-sm text-zinc-600">Post-production tracking only. Each photographer gets an independent tile once the shoot date arrives; linked tiles share the same Post-Production Notes and never change the Scheduler event itself.</p>
-          <p className="mt-1 text-xs font-semibold text-zinc-500">Board tracking begins September 2, 2026. Deadline: 7 days after each photographer's final shoot day. Selling tiles clear from the active Board after 4 days.</p>
+          <p className="mt-1 text-xs font-semibold text-zinc-500">Board tracking begins September 2, 2026. Deadline: 7 days after each photographer's final shoot day. Selling tiles clear after 4 days; Admins can also Hide irrelevant events or mark Selling work Done.</p>
         </div>
         <div className="flex items-center gap-2">
           <Pill className="border-zinc-200 bg-white text-zinc-700">{eligibleBoardTiles.length} active tiles</Pill>
@@ -2647,7 +2794,10 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
                   {stageTiles.map(tile => {
                     const event = tile.event;
                     const record = recordsByTileId[tile.tileId] || null;
-                    const isSaving = savingTileId === tile.tileId;
+                    const eventControlId = postProductionAdminControlId(tile.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY);
+                    const tileControlId = postProductionAdminControlId(tile.eventId, tile.photographerKey);
+                    const isAdminControlSaving = savingAdminControlId === eventControlId || savingAdminControlId === tileControlId;
+                    const isSaving = savingTileId === tile.tileId || isAdminControlSaving;
                     const linkedTiles = tilesByEventId[tile.eventId] || [tile];
                     const partners = linkedTiles.filter(item => item.tileId !== tile.tileId);
                     const linked = linkedTiles.length > 1;
@@ -2668,7 +2818,37 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, onV
                         onClick={() => setSelectedBoardTile(tile)}
                         className={`cursor-pointer rounded-xl border bg-white p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${canEdit ? 'sm:cursor-grab sm:active:cursor-grabbing' : ''} ${isSaving ? 'opacity-60' : ''} ${isRelationshipMatch ? 'border-zinc-500 ring-2 ring-zinc-300 shadow-md' : 'border-zinc-200'} ${relationshipActive && !isRelationshipMatch ? 'opacity-45' : ''}`}
                       >
-                        <div className="min-w-0 text-[12px] font-black leading-4 text-zinc-950">{event.title}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 text-[12px] font-black leading-4 text-zinc-950">{event.title}</div>
+                          {isAdmin ? (
+                            <div className="flex shrink-0 gap-1">
+                              <button
+                                type="button"
+                                draggable={false}
+                                disabled={isSaving || !adminControlsReady}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); hideBoardEvent(tile); }}
+                                className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-40"
+                                title="Hide this entire event from The Board"
+                              >
+                                Hide
+                              </button>
+                              {(record?.stage || 'school_events') === 'selling' ? (
+                                <button
+                                  type="button"
+                                  draggable={false}
+                                  disabled={isSaving || !adminControlsReady}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => { e.stopPropagation(); completeBoardTile(tile); }}
+                                  className="rounded-md border border-[#AEBB9E] bg-[#DDE8D2]/70 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-zinc-700 transition hover:bg-[#DDE8D2] disabled:opacity-40"
+                                  title="Mark this Selling tile done and clear it from the active Board"
+                                >
+                                  Done
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
 
                         <div className="mt-1 flex min-w-0 items-center gap-1 text-[9px] font-bold leading-3 text-zinc-500">
                           <span className="shrink-0">{postProductionCompactDateLabel(event)}</span>
@@ -4544,7 +4724,7 @@ function getCarrie2026To2027Availability(events = EVENTS, photographers = PHOTOG
   return dates;
 }
 
-function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = false }) {
+function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = false, scrollable = false }) {
   if (!school) {
     return (
       <div className="rounded-3xl border border-dashed border-zinc-200 bg-white/60 p-6 text-sm text-zinc-500">
@@ -4569,7 +4749,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
   const totalSchoolNoteCount = schoolNoteHistory.length + plainSchoolNoteCount;
 
   return (
-    <section className={`${compact ? 'rounded-2xl p-0' : 'rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm'}`}>
+    <section className={`${compact ? 'rounded-2xl p-0' : `rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm ${scrollable ? 'max-h-[700px] overflow-y-auto overscroll-contain pr-2' : ''}`}`}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -6661,7 +6841,7 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
       {!loading ? (
         <>
           <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-zinc-200 bg-white md:block">
-            <table className="min-w-[1180px] w-full text-left">
+            <table className="min-w-[1480px] w-full text-left">
               <thead className="bg-zinc-50 text-[11px] font-black uppercase tracking-wide text-zinc-500">
                 <tr>
                   <th className="px-3 py-2.5">School</th>
@@ -6683,7 +6863,7 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
                     <td className="min-w-[170px] px-3 py-3">
                       {item.reachedOutBy?.length ? <div className="flex flex-wrap gap-1">{item.reachedOutBy.map(name => <Pill key={name} className="border-[#AEBB9E] bg-[#DDE8D2]/70 text-xs text-zinc-800">{name}</Pill>)}</div> : <span className="font-semibold text-amber-700">No outreach yet</span>}
                     </td>
-                    <td className="min-w-[240px] max-w-[360px] px-3 py-3">{item.notes ? <LinkifiedText text={item.notes} className="text-sm" /> : <span className="text-zinc-400">—</span>}</td>
+                    <td className="min-w-[460px] max-w-[680px] px-3 py-3">{item.notes ? <LinkifiedText text={item.notes} className="text-sm leading-6" /> : <span className="text-zinc-400">—</span>}</td>
                     {canEdit ? (
                       <td className="sticky right-0 z-[1] w-[180px] border-l border-zinc-100 bg-white px-3 py-3 text-right">
                         <div className="flex justify-end gap-1.5">
@@ -6986,8 +7166,8 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         )}
       </div>
 
-      <div className="hidden gap-4 md:grid xl:grid-cols-[340px_1fr]">
-        <section className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
+      <div className="hidden items-start gap-4 md:grid xl:grid-cols-[340px_1fr]">
+        <section className="flex max-h-[700px] min-h-0 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 p-4 shadow-sm xl:sticky xl:top-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-zinc-950">School List</h2>
             <div className="flex items-center gap-2">
@@ -7019,7 +7199,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
             ))}
           </div>
         </section>
-        <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={canEditSchools ? setEditingSchool : null} onMerge={canMergeSchools ? setMergingSchool : null} />
+        <SchoolHistoryPanel school={selected} onClickEvent={onClickEvent} onEdit={canEditSchools ? setEditingSchool : null} onMerge={canMergeSchools ? setMergingSchool : null} scrollable />
       </div>
       <SchoolAcquisitionsSection photographers={photographers} authEmail={authEmail} canEdit={canEditAcquisitions} canRemove={canRemoveAcquisitions} />
       <AnimatePresence>
@@ -9693,7 +9873,7 @@ export default function SchedulerApp() {
           </>}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} assistants={assistants} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
-          {activeTab === 'The Board' && <PostProductionBoard events={allEvents} authEmail={authEmail} canEdit={canEditScheduler} onViewEvent={setSelected} />}
+          {activeTab === 'The Board' && <PostProductionBoard events={allEvents} authEmail={authEmail} canEdit={canEditScheduler} isAdmin={isAdminUser} onViewEvent={setSelected} />}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} photographers={photographers} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} canEditAcquisitions={canEditScheduler} canRemoveAcquisitions={isAdminUser} />}
           {activeTab === 'Team Members' && authEmail && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
           {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} rolloutCapacityOverrides={rolloutCapacityOverrides} setRolloutCapacityOverrides={setRolloutCapacityOverrides} />}
