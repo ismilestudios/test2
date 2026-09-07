@@ -1060,28 +1060,82 @@ function getScheduleLiveAssignmentForDate(event = {}, date = '') {
   return assignment && typeof assignment === 'object' ? assignment : {};
 }
 
-function getScheduleLivePhotographersForDate(event = {}, date = '') {
-  if (date && isMultiDayScheduleEvent(event)) {
-    const dayAssignments = getScheduleLiveDayAssignments(event);
-    const hasSavedDayAssignment = Object.prototype.hasOwnProperty.call(dayAssignments, date);
-    const assignment = getScheduleLiveAssignmentForDate(event, date);
-    const fallbackPhotographers = Array.isArray(event.photographers) ? event.photographers : [];
-    const dayPhotographers = Array.isArray(assignment.photographers) ? assignment.photographers : [];
-    return uniqueCanonicalPhotographers(hasSavedDayAssignment ? dayPhotographers : fallbackPhotographers);
+function hasCurrentPerDayScheduleAssignments(event = {}) {
+  if (!isMultiDayScheduleEvent(event)) return false;
+  const dayAssignments = getScheduleLiveDayAssignments(event);
+  // Only assignments for dates that still belong to this event count as current
+  // per-day schedule data. Stale keys outside the present date range must not
+  // change how the current schedule is interpreted.
+  return getEventDateKeys(event).some(date => Object.prototype.hasOwnProperty.call(dayAssignments, date));
+}
+
+function getCurrentScheduleStaffForDate(event = {}, date = '') {
+  const fallbackPhotographers = uniqueCanonicalPhotographers(event.photographers || []);
+  const fallbackAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
+
+  if (!date || !isMultiDayScheduleEvent(event)) {
+    return { photographers: fallbackPhotographers, assistants: fallbackAssistants };
   }
-  return uniqueCanonicalPhotographers(event.photographers || []);
+
+  const dayAssignments = getScheduleLiveDayAssignments(event);
+  const usesPerDaySchedule = hasCurrentPerDayScheduleAssignments(event);
+
+  // Legacy multi-day events that have never had per-day Schedule Live staffing
+  // continue to read their event-level crew. Once a multi-day event has current
+  // per-day staffing, however, that data is authoritative for every date. A
+  // missing date is therefore unassigned rather than an invitation to resurrect
+  // an older event-level photographer/assistant value.
+  if (!usesPerDaySchedule) {
+    return { photographers: fallbackPhotographers, assistants: fallbackAssistants };
+  }
+
+  const hasSavedDayAssignment = Object.prototype.hasOwnProperty.call(dayAssignments, date);
+  const assignment = hasSavedDayAssignment ? getScheduleLiveAssignmentForDate(event, date) : {};
+  return {
+    photographers: uniqueCanonicalPhotographers(Array.isArray(assignment.photographers) ? assignment.photographers : []),
+    assistants: Array.isArray(assignment.assistants) ? assignment.assistants.filter(Boolean) : []
+  };
+}
+
+function getScheduleLivePhotographersForDate(event = {}, date = '') {
+  return getCurrentScheduleStaffForDate(event, date).photographers;
 }
 
 function getScheduleLiveAssistantsForDate(event = {}, date = '') {
-  if (date && isMultiDayScheduleEvent(event)) {
-    const dayAssignments = getScheduleLiveDayAssignments(event);
-    const hasSavedDayAssignment = Object.prototype.hasOwnProperty.call(dayAssignments, date);
-    const assignment = getScheduleLiveAssignmentForDate(event, date);
-    const fallbackAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
-    const dayAssistants = Array.isArray(assignment.assistants) ? assignment.assistants.filter(Boolean) : [];
-    return hasSavedDayAssignment ? dayAssistants : fallbackAssistants;
-  }
-  return Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
+  return getCurrentScheduleStaffForDate(event, date).assistants;
+}
+
+function getCurrentSchedulePhotographersForWholeEvent(event = {}) {
+  const names = [];
+  const seen = new Set();
+  const dates = getEventDateKeys(event);
+  const eventDates = dates.length ? dates : (event?.date ? [event.date] : []);
+  const add = (name) => {
+    const canonical = canonicalPhotographerName(name);
+    if (!canonical || seen.has(canonical)) return;
+    seen.add(canonical);
+    names.push(canonical);
+  };
+  if (eventDates.length) eventDates.forEach(date => getScheduleLivePhotographersForDate(event, date).forEach(add));
+  else uniqueCanonicalPhotographers(event.photographers || []).forEach(add);
+  return names;
+}
+
+function getCurrentScheduleAssistantsForWholeEvent(event = {}) {
+  const names = [];
+  const seen = new Set();
+  const dates = getEventDateKeys(event);
+  const eventDates = dates.length ? dates : (event?.date ? [event.date] : []);
+  const add = (name) => {
+    const clean = String(name || '').trim();
+    const key = clean.toLowerCase();
+    if (!clean || seen.has(key)) return;
+    seen.add(key);
+    names.push(clean);
+  };
+  if (eventDates.length) eventDates.forEach(date => getScheduleLiveAssistantsForDate(event, date).forEach(add));
+  else (event.assistants || []).filter(Boolean).forEach(add);
+  return names;
 }
 
 function setScheduleLiveAssignmentForDate(event = {}, date = '', patch = {}) {
@@ -1092,14 +1146,13 @@ function setScheduleLiveAssignmentForDate(event = {}, date = '', patch = {}) {
 }
 
 function normalizeScheduleLiveDayAssignmentsForDates(event = {}, dates = []) {
-  const existing = getScheduleLiveDayAssignments(event);
-  const fallbackPhotographers = uniqueCanonicalPhotographers(event.photographers || []);
-  const fallbackAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
+  // Seed the editor from the same current-schedule resolver used everywhere
+  // else. This prevents merely opening/editing a multi-day event from reviving
+  // stale event-level staffing on dates that are currently unassigned.
   return (dates || []).reduce((map, date) => {
-    const assignment = existing[date] && typeof existing[date] === 'object' ? existing[date] : {};
     map[date] = {
-      photographers: uniqueCanonicalPhotographers(assignment.photographers || fallbackPhotographers),
-      assistants: Array.isArray(assignment.assistants) ? assignment.assistants.filter(Boolean) : fallbackAssistants
+      photographers: getScheduleLivePhotographersForDate(event, date),
+      assistants: getScheduleLiveAssistantsForDate(event, date)
     };
     return map;
   }, {});
@@ -2995,7 +3048,7 @@ function getScheduleLiveHistoricalRows(event, events) {
     })
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
     .filter(item => {
-      const names = uniqueCanonicalPhotographers(item.photographers || []).join(', ');
+      const names = getCurrentSchedulePhotographersForWholeEvent(item).join(', ');
       const dedupeKey = `${item.date}|${item.type}|${names}`;
       if (seen.has(dedupeKey)) return false;
       seen.add(dedupeKey);
@@ -3006,7 +3059,7 @@ function getScheduleLiveHistoricalRows(event, events) {
       date: item.date,
       title: item.title,
       type: item.type,
-      photographers: uniqueCanonicalPhotographers(item.photographers || [])
+      photographers: getCurrentSchedulePhotographersForWholeEvent(item)
     }));
 }
 
@@ -3096,7 +3149,7 @@ function ScheduleLiveEventCard({ event, occurrenceDate = '', events, photographe
       </div>
 
       <div className="mt-2 text-[11px] font-semibold text-zinc-600">
-        Need: {getRequirementStatusLabel(event)}
+        Need: {getRequirementStatusLabel(event, occurrenceDate)}
       </div>
 
       {canEdit ? (
@@ -4098,10 +4151,14 @@ function getRequiredAssistantCount(event = {}) {
   return Math.max(parseRequiredAssistantCountFromTitle(event.title), assigned);
 }
 
-function getRequirementStatusLabel(event = {}) {
-  const assignedPhotogs = getAssignedPhotographerCount(event);
+function getRequirementStatusLabel(event = {}, occurrenceDate = '') {
+  const assignedPhotogs = occurrenceDate
+    ? getScheduleLivePhotographersForDate(event, occurrenceDate).length
+    : getAssignedPhotographerCount(event);
   const requiredPhotogs = getRequiredPhotographerCount(event);
-  const assignedAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean).length : 0;
+  const assignedAssistants = occurrenceDate
+    ? getScheduleLiveAssistantsForDate(event, occurrenceDate).length
+    : (Array.isArray(event.assistants) ? event.assistants.filter(Boolean).length : 0);
   const requiredAssistants = getRequiredAssistantCount(event);
   const photogLabel = `${assignedPhotogs}/${requiredPhotogs} photographer${requiredPhotogs === 1 ? '' : 's'}`;
   const assistantLabel = event.noAssistant ? 'No assistant' : `${assignedAssistants}/${requiredAssistants} assistant${requiredAssistants === 1 ? '' : 's'}`;
@@ -4242,7 +4299,7 @@ function getRecentSchoolPhotographers(schoolName, events) {
 
   const seen = new Set();
   const names = [];
-  matches.forEach(event => uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
+  matches.forEach(event => getCurrentSchedulePhotographersForWholeEvent(event).forEach(name => {
     if (name && !seen.has(name)) {
       seen.add(name);
       names.push(name);
@@ -4254,7 +4311,7 @@ function getRecentSchoolPhotographers(schoolName, events) {
 function getSchoolPhotographerHistory(history = []) {
   const map = {};
   history.forEach(event => {
-    uniqueCanonicalPhotographers(event.photographers || []).forEach(name => {
+    getCurrentSchedulePhotographersForWholeEvent(event).forEach(name => {
       if (!name) return;
       map[name] ||= { name, count: 0, lastDate: '', lastTitle: '' };
       map[name].count += 1;
@@ -4832,7 +4889,7 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
                     <button key={event.id} onClick={() => onClickEvent(event)} className="w-full rounded-xl border border-zinc-200 bg-white/80 p-2 text-left text-xs transition hover:bg-white hover:shadow-sm">
                       <div className="font-semibold text-zinc-900">{formatDate(event.date)}</div>
                       <div className="mt-1 text-zinc-600">{event.title}</div>
-                      <div className="mt-1 text-zinc-500">Assigned: {formatPrimaryPhotographerList(event.photographers || [], '—', event)}</div>
+                      <div className="mt-1 text-zinc-500">Assigned: {formatPrimaryPhotographerList(getCurrentSchedulePhotographersForWholeEvent(event), '—', event)}</div>
                     </button>
                   ))}
                 </div>
@@ -6170,7 +6227,7 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
                     <div className="min-w-0">
                       <div className="text-[11px] font-black text-zinc-500">{formatDate(event.date)} · {event.season || getSeasonLabel(event.date)}</div>
                       <div className="mt-0.5 truncate text-sm font-black text-zinc-950">{event.title}</div>
-                      <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">Assigned: {formatPrimaryPhotographerList(event.photographers || [], '—', event)}</div>
+                      <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">Assigned: {formatPrimaryPhotographerList(getCurrentSchedulePhotographersForWholeEvent(event), '—', event)}</div>
                     </div>
                     <Pill className={`${TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'} shrink-0 text-[9px]`}>{event.type}</Pill>
                   </div>
@@ -8065,7 +8122,7 @@ function GlobalSearchResults({ query, schools = SCHOOLS, events, onSelectEvent, 
   const eventMatches = (events || [])
     .filter(event => {
       if (!event || event.active === false) return false;
-      const textMatch = [event.title, event.canonicalSchool, event.type, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])]
+      const textMatch = [event.title, event.canonicalSchool, event.type, event.notes, event.history, ...getCurrentSchedulePhotographersForWholeEvent(event), ...getCurrentScheduleAssistantsForWholeEvent(event)]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -9832,7 +9889,7 @@ export default function SchedulerApp() {
   const queryFilteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allEvents;
-    return allEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...(event.photographers || []), ...(event.assistants || [])].filter(Boolean).join('\n').toLowerCase().includes(q));
+    return allEvents.filter(event => event && [event.title, event.canonicalSchool, event.type, event.status, event.notes, event.history, ...getCurrentSchedulePhotographersForWholeEvent(event), ...getCurrentScheduleAssistantsForWholeEvent(event)].filter(Boolean).join('\n').toLowerCase().includes(q));
   }, [query, allEvents]);
 
   const normalizedCurrentUserRole = normalizePermissionRole(currentUserRole);
