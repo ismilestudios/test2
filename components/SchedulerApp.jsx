@@ -1101,7 +1101,14 @@ function hasCurrentPerDayScheduleAssignments(event = {}) {
 
 function getCurrentScheduleStaffForDate(event = {}, date = '') {
   const fallbackPhotographers = uniqueCanonicalPhotographers(event.photographers || []);
-  const fallbackAssistants = Array.isArray(event.assistants) ? event.assistants.filter(Boolean) : [];
+  // Assistant requirement is authoritative for the CURRENT schedule. Historical
+  // assistant names can remain stored harmlessly, but an event explicitly set to
+  // No Assistant / 0 Assistants Needed must resolve to zero current assistants in
+  // every schedule-facing view.
+  const assistantsAreCurrentlyRequired = !event.noAssistant && getRequiredAssistantCount(event) > 0;
+  const fallbackAssistants = assistantsAreCurrentlyRequired && Array.isArray(event.assistants)
+    ? event.assistants.filter(Boolean)
+    : [];
 
   if (!date || !isMultiDayScheduleEvent(event)) {
     return { photographers: fallbackPhotographers, assistants: fallbackAssistants };
@@ -1123,7 +1130,9 @@ function getCurrentScheduleStaffForDate(event = {}, date = '') {
   const assignment = hasSavedDayAssignment ? getScheduleLiveAssignmentForDate(event, date) : {};
   return {
     photographers: uniqueCanonicalPhotographers(Array.isArray(assignment.photographers) ? assignment.photographers : []),
-    assistants: Array.isArray(assignment.assistants) ? assignment.assistants.filter(Boolean) : []
+    assistants: assistantsAreCurrentlyRequired && Array.isArray(assignment.assistants)
+      ? assignment.assistants.filter(Boolean)
+      : []
   };
 }
 
