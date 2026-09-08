@@ -1017,6 +1017,36 @@ function mergeEventsById(primary = [], backup = []) {
   return Array.from(map.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
 }
 
+function supabaseEventRowStableKey(row = {}) {
+  return String(row?.client_event_id || row?.id || '').trim();
+}
+
+function supabaseEventRowTimestamp(row = {}) {
+  const value = Date.parse(row?.updated_at || row?.created_at || '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+function chooseCurrentSupabaseEventRow(current, candidate) {
+  if (!current) return candidate;
+  const currentTime = supabaseEventRowTimestamp(current);
+  const candidateTime = supabaseEventRowTimestamp(candidate);
+  if (candidateTime !== currentTime) return candidateTime > currentTime ? candidate : current;
+  // If timestamps tie, prefer the later row in the authoritative Supabase read.
+  // This is display/read-path deduplication only; no database rows are changed.
+  return candidate;
+}
+
+function dedupeSupabaseEventRowsByStableIdentity(rows = []) {
+  const byStableKey = new Map();
+  (rows || []).forEach(row => {
+    if (!row) return;
+    const key = supabaseEventRowStableKey(row);
+    if (!key) return;
+    byStableKey.set(key, chooseCurrentSupabaseEventRow(byStableKey.get(key), row));
+  });
+  return Array.from(byStableKey.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+}
+
 function addDays(date, delta) {
   const d = new Date(date + 'T12:00:00');
   d.setDate(d.getDate() + delta);
@@ -9240,6 +9270,7 @@ export default function SchedulerApp() {
   const [teamMembersMessage, setTeamMembersMessage] = useState('Loading team members from Supabase...');
   const [staffMembers, setStaffMembers] = useState(builtInStaffMembers());
   const [supabaseEvents, setSupabaseEvents] = useState([]);
+  const [supabaseEventsLoaded, setSupabaseEventsLoaded] = useState(false);
   const [localManualEvents, setLocalManualEvents] = useState([]);
   const [eventsMessage, setEventsMessage] = useState('Loading events from Supabase...');
   const [addingEvent, setAddingEvent] = useState(false);
@@ -9330,7 +9361,7 @@ export default function SchedulerApp() {
     if (!sessionData?.session) {
       const localBackup = loadLocalManualEvents();
       setLocalManualEvents(localBackup);
-      setEventsMessage(`Waiting for login before loading Supabase events${localBackup.length ? ` (${localBackup.length} browser backup event${localBackup.length === 1 ? '' : 's'} visible)` : ''}.`);
+      setEventsMessage(`Waiting for login before loading Supabase events${localBackup.length ? ` (${localBackup.length} browser safety backup event${localBackup.length === 1 ? '' : 's'} retained locally; not used as the current schedule)` : ''}.`);
       return;
     }
 
@@ -9369,25 +9400,36 @@ export default function SchedulerApp() {
 
     if (importResult.error) {
       setSupabaseEvents((data || []).map(supabaseRowToEvent));
+      setSupabaseEventsLoaded(true);
       setEventsMessage(`Supabase events loaded, but historical import failed: ${importResult.error.message}. Run supabase/events_historical_import_migration.sql and refresh.`);
       return;
     }
 
     const manualRows = await loadManualEventsFromSupabase(supabase);
 
-    const rowsById = new Map();
+    const combinedRowsBySupabaseId = new Map();
     [
       ...(initialRows || []),
       ...(importResult.importedCount ? (importResult.data || []) : []),
       ...manualRows
     ].forEach(row => {
-      if (row?.id) rowsById.set(row.id, row);
+      if (row?.id) combinedRowsBySupabaseId.set(row.id, row);
     });
 
-    const finalRows = Array.from(rowsById.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    // The Supabase events table is the authoritative current schedule. Collapse
+    // only exact stable event identities (client_event_id) in the read path so
+    // duplicate DB rows for the same saved event cannot present competing crews.
+    // No rows are updated, deleted, normalized, or backfilled here.
+    const combinedRows = Array.from(combinedRowsBySupabaseId.values());
+    const finalRows = dedupeSupabaseEventRowsByStableIdentity(combinedRows);
+    const duplicateStableIdentityCount = Math.max(0, combinedRows.length - finalRows.length);
+    if (duplicateStableIdentityCount) {
+      console.warn(`Ignored ${duplicateStableIdentityCount} duplicate Supabase event row${duplicateStableIdentityCount === 1 ? '' : 's'} with the same client_event_id while building the current schedule.`);
+    }
 
     const loadedEvents = finalRows.map(row => ({ ...supabaseRowToEvent(row), localBackupOnly: false }));
     setSupabaseEvents(loadedEvents);
+    setSupabaseEventsLoaded(true);
 
     const localBackup = loadLocalManualEvents();
     const localOnlyBackup = localBackup.filter(localEvent => !loadedEvents.some(loaded => loaded.id === localEvent.id || loaded.supabaseId === localEvent.supabaseId));
@@ -9396,7 +9438,7 @@ export default function SchedulerApp() {
     const manualCount = finalRows.filter(row => row.source === 'manual_app' || row.source === 'app' || row.client_event_id?.startsWith('custom-')).length;
     const googleImportCount = finalRows.filter(row => row.source === 'google_calendar_import').length;
     const localOnlyCount = localOnlyBackup.length;
-    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Loaded ${finalRows.length} Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${localOnlyCount ? `, plus ${localOnlyCount} browser-only backup` : ''}.`);
+    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Loaded ${finalRows.length} authoritative Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${duplicateStableIdentityCount ? `; ignored ${duplicateStableIdentityCount} duplicate row${duplicateStableIdentityCount === 1 ? '' : 's'} with the same stable event ID` : ''}${localOnlyCount ? `; ${localOnlyCount} browser safety backup${localOnlyCount === 1 ? '' : 's'} retained locally but excluded from the current schedule` : ''}.`);
   };
 
   const loadSchoolsFromSupabase = async () => {
@@ -9575,7 +9617,7 @@ export default function SchedulerApp() {
       setAuthEmail(data.session?.user?.email || null);
 
       if (!data.session) {
-        setEventsMessage(`Please log in to load shared Supabase events${localBackup.length ? ` (${localBackup.length} browser backup event${localBackup.length === 1 ? '' : 's'} visible)` : ''}.`);
+        setEventsMessage(`Please log in to load shared Supabase events${localBackup.length ? ` (${localBackup.length} browser safety backup event${localBackup.length === 1 ? '' : 's'} retained locally; not used as the current schedule)` : ''}.`);
         setInitialLoading(false);
         return;
       }
@@ -9616,10 +9658,19 @@ export default function SchedulerApp() {
 
   const isValidEvent = (event) => event && typeof event.date === 'string' && event.date.length >= 10 && typeof event.title === 'string' && event.active !== false && event.source !== 'imported_code_baseline';
   const allEvents = useMemo(() => {
-    if (hasSupabaseEnv() && authReady && !authEmail) return [];
-    const baseEvents = supabaseEvents.length ? supabaseEvents.filter(event => event.active !== false) : EVENTS;
-    return mergeEventsById(baseEvents, localManualEvents).filter(isValidEvent);
-  }, [supabaseEvents, localManualEvents, authReady, authEmail]);
+    if (hasSupabaseEnv()) {
+      // Production/shared Scheduler rule: once authenticated, every schedule-facing
+      // view reads the same authoritative Supabase event set. Browser backups are
+      // retained for safety but are never merged into the live/current schedule.
+      // If the authoritative read has not succeeded yet, show no alternate/stale
+      // schedule rather than silently substituting bundled or browser-cached data.
+      if (!authReady || !authEmail || !supabaseEventsLoaded) return [];
+      return supabaseEvents.filter(event => event.active !== false).filter(isValidEvent);
+    }
+
+    // Local/dev fallback only when this build has no Supabase configuration.
+    return mergeEventsById(EVENTS, localManualEvents).filter(isValidEvent);
+  }, [supabaseEvents, supabaseEventsLoaded, localManualEvents, authReady, authEmail]);
   const removedEvents = useMemo(() => {
     if (hasSupabaseEnv() && authReady && !authEmail) return [];
     return supabaseEvents.filter(event => event.active === false);
