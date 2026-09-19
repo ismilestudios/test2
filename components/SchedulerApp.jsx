@@ -2938,7 +2938,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
                 onDragOver={(e) => { if (canEdit) { e.preventDefault(); setDragOverStage(stage.key); } }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverStage(''); }}
                 onDrop={(e) => { e.preventDefault(); onDropStage(stage.key, e.dataTransfer.getData('text/plain')); }}
-                className={`flex min-h-[560px] flex-col rounded-[1.75rem] border p-2.5 transition sm:p-3 lg:h-[78vh] lg:max-h-[960px] ${isDropTarget ? 'border-zinc-500 bg-zinc-200/65 shadow-soft' : 'border-zinc-200 bg-zinc-100/75'}`}
+                className={`flex min-h-[560px] flex-col rounded-[1.75rem] border p-2.5 transition sm:p-3 lg:h-[97.5vh] lg:max-h-[1200px] ${isDropTarget ? 'border-zinc-500 bg-zinc-200/65 shadow-soft' : 'border-zinc-200 bg-zinc-100/75'}`}
               >
                 <div className="mb-2 flex shrink-0 items-center justify-between gap-2 rounded-2xl bg-white/90 px-3 py-2 shadow-sm">
                   <h3 className="text-sm font-black text-zinc-900">{stage.label}</h3>
