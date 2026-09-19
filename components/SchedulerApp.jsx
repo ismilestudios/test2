@@ -2552,6 +2552,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
   const [linkedEventId, setLinkedEventId] = useState('');
   const [boardPhotographerFilter, setBoardPhotographerFilter] = useState('all');
   const [nowTick, setNowTick] = useState(Date.now());
+  const boardColumnsRef = useRef(null);
 
   const loadBoardRecords = async () => {
     if (!hasSupabaseEnv()) {
@@ -2630,6 +2631,26 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     loadBoardRecords();
     const timer = window.setInterval(() => setNowTick(Date.now()), 30 * 60 * 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const boardColumns = boardColumnsRef.current;
+    if (!boardColumns) return undefined;
+
+    const handleBoardColumnWheel = (event) => {
+      if (window.innerWidth < 1024 || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const target = event.target;
+      const scrollColumn = target && typeof target.closest === 'function'
+        ? target.closest('[data-board-scroll-column="true"]')
+        : null;
+      if (!scrollColumn || !boardColumns.contains(scrollColumn)) return;
+
+      event.preventDefault();
+      window.scrollBy({ top: event.deltaY, left: 0, behavior: 'auto' });
+    };
+
+    boardColumns.addEventListener('wheel', handleBoardColumnWheel, { passive: false });
+    return () => boardColumns.removeEventListener('wheel', handleBoardColumnWheel);
   }, []);
 
   const allBoardTiles = useMemo(() => {
@@ -2922,7 +2943,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div className="grid min-w-[1410px] items-start gap-3 lg:items-stretch" style={{ gridTemplateColumns: 'minmax(255px,1.15fr) minmax(255px,1.15fr) minmax(255px,1.15fr) minmax(235px,1fr) minmax(190px,0.73fr)' }}>
+        <div ref={boardColumnsRef} className="grid min-w-[1410px] items-start gap-3 lg:items-stretch" style={{ gridTemplateColumns: 'minmax(255px,1.15fr) minmax(255px,1.15fr) minmax(255px,1.15fr) minmax(235px,1fr) minmax(190px,0.73fr)' }}>
           {POST_PRODUCTION_STAGES.map(stage => {
             const stageTiles = visibleBoardTiles.filter(tile => (recordsByTileId[tile.tileId]?.stage || 'school_events') === stage.key);
             const isSelling = stage.key === 'selling';
@@ -2944,7 +2965,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
                   <h3 className="text-sm font-black text-zinc-900">{stage.label}</h3>
                   <Pill className="border-zinc-200 bg-zinc-50 text-zinc-600">{stageTiles.length}</Pill>
                 </div>
-                <div className="min-h-0 flex-1 space-y-2 lg:overflow-y-auto lg:overscroll-contain lg:pr-1" aria-label={`${stage.label} work tiles`}>
+                <div data-board-scroll-column="true" className="board-column-scroll min-h-0 flex-1 space-y-2 lg:overflow-y-scroll lg:pr-1" aria-label={`${stage.label} work tiles`}>
                   {stageGroups.map(group => (
                     <div key={group.key} className="space-y-1.5">
                       {!isSelling ? (

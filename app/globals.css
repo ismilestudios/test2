@@ -14,3 +14,30 @@ body {
   margin: 0;
   background: linear-gradient(180deg, #F3F5F2 0%, #F7F8F5 48%, #F1F3F0 100%);
 }
+
+@media (min-width: 1024px) {
+  .board-column-scroll {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #a1a1aa #e4e4e7;
+  }
+
+  .board-column-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .board-column-scroll::-webkit-scrollbar-track {
+    background: #e4e4e7;
+    border-radius: 9999px;
+  }
+
+  .board-column-scroll::-webkit-scrollbar-thumb {
+    background: #a1a1aa;
+    border: 2px solid #e4e4e7;
+    border-radius: 9999px;
+  }
+
+  .board-column-scroll::-webkit-scrollbar-thumb:hover {
+    background: #71717a;
+  }
+}
