@@ -2315,6 +2315,35 @@ function postProductionDeadlineLabel(tile = {}, stage = 'school_events', today =
   return `Due ${due} - ${overdue} Day${overdue === 1 ? '' : 's'} Overdue`;
 }
 
+// Presentation-only grouping: stage ownership is still read exclusively from the
+// existing photographer Board records. No record is saved when the order changes.
+const POST_PRODUCTION_URGENCY_GROUPS = [
+  { key: 'overdue', label: 'Overdue', color: 'text-rose-700' },
+  { key: 'soon', label: 'Due Soon', color: 'text-amber-800' },
+  { key: 'upcoming', label: 'Upcoming', color: 'text-zinc-600' }
+];
+
+function postProductionUrgencyGroup(tile = {}, today = todayKey()) {
+  if (!tile.dueDate) return 'upcoming';
+  const daysRemaining = postProductionDateDiffInDays(today, tile.dueDate);
+  if (daysRemaining < 0) return 'overdue';
+  if (daysRemaining <= 3) return 'soon';
+  return 'upcoming';
+}
+
+function sortPostProductionTilesByUrgency(tiles = [], today = todayKey()) {
+  const groupOrder = { overdue: 0, soon: 1, upcoming: 2 };
+  return [...tiles].sort((a, b) => {
+    const urgencyDifference = groupOrder[postProductionUrgencyGroup(a, today)] - groupOrder[postProductionUrgencyGroup(b, today)];
+    if (urgencyDifference) return urgencyDifference;
+    // The nearer deadline goes first. Missing deadlines remain at the end.
+    const dueDifference = String(a.dueDate || '9999-12-31').localeCompare(String(b.dueDate || '9999-12-31'));
+    if (dueDifference) return dueDifference;
+    // Stable sorting retains the existing chronological/event order on ties.
+    return 0;
+  });
+}
+
 function postProductionCompactDateLabel(event = {}) {
   const dates = getEventDateKeys(event);
   const start = dates[0] || event?.date || '';
@@ -2521,6 +2550,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
   const [draggedTileId, setDraggedTileId] = useState('');
   const [dragOverStage, setDragOverStage] = useState('');
   const [linkedEventId, setLinkedEventId] = useState('');
+  const [boardPhotographerFilter, setBoardPhotographerFilter] = useState('all');
   const [nowTick, setNowTick] = useState(Date.now());
 
   const loadBoardRecords = async () => {
@@ -2621,6 +2651,20 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       if (eventControl?.hiddenAt || tileControl?.completedAt) return false;
       return !isPostProductionRecordHidden(recordsByTileId[tile.tileId], nowTick);
     }), [allBoardTiles, recordsByTileId, adminControlsById, nowTick]);
+
+  const boardPhotographerFilters = useMemo(() => {
+    const namesByKey = new Map();
+    eligibleBoardTiles.forEach(tile => {
+      if (!namesByKey.has(tile.photographerKey)) namesByKey.set(tile.photographerKey, tile.photographerName);
+    });
+    return Array.from(namesByKey, ([key, name]) => ({ key, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [eligibleBoardTiles]);
+
+  const visibleBoardTiles = useMemo(() => boardPhotographerFilter === 'all'
+    ? eligibleBoardTiles
+    : eligibleBoardTiles.filter(tile => tile.photographerKey === boardPhotographerFilter),
+  [eligibleBoardTiles, boardPhotographerFilter]);
 
   const tilesByEventId = useMemo(() => {
     const map = {};
@@ -2862,10 +2906,31 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
 
       {message ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{message}</div> : null}
 
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-2xl border border-zinc-200 bg-white/85 px-3 py-2 shadow-sm" aria-label="Filter The Board by photographer">
+        <span className="mr-1 shrink-0 text-xs font-black text-zinc-600">Photographer:</span>
+        <button type="button" aria-pressed={boardPhotographerFilter === 'all'} onClick={() => setBoardPhotographerFilter('all')}
+          className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${boardPhotographerFilter === 'all' ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50'}`}>
+          Everyone
+        </button>
+        {boardPhotographerFilters.map(person => (
+          <button key={person.key} type="button" aria-pressed={boardPhotographerFilter === person.key} onClick={() => setBoardPhotographerFilter(person.key)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${boardPhotographerFilter === person.key ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50'}`}>
+            {person.name}
+          </button>
+        ))}
+        <span className="ml-auto shrink-0 text-[11px] font-semibold text-zinc-500">{visibleBoardTiles.length} shown</span>
+      </div>
+
       <div className="overflow-x-auto pb-2">
-        <div className="grid min-w-[1320px] grid-cols-5 gap-3">
+        <div className="grid min-w-[1410px] items-start gap-3 lg:items-stretch" style={{ gridTemplateColumns: 'minmax(255px,1.15fr) minmax(255px,1.15fr) minmax(255px,1.15fr) minmax(235px,1fr) minmax(190px,0.73fr)' }}>
           {POST_PRODUCTION_STAGES.map(stage => {
-            const stageTiles = eligibleBoardTiles.filter(tile => (recordsByTileId[tile.tileId]?.stage || 'school_events') === stage.key);
+            const stageTiles = visibleBoardTiles.filter(tile => (recordsByTileId[tile.tileId]?.stage || 'school_events') === stage.key);
+            const isSelling = stage.key === 'selling';
+            const today = todayKey();
+            const sortedStageTiles = isSelling ? stageTiles : sortPostProductionTilesByUrgency(stageTiles, today);
+            const stageGroups = isSelling
+              ? [{ key: 'selling', tiles: sortedStageTiles }]
+              : POST_PRODUCTION_URGENCY_GROUPS.map(group => ({ ...group, tiles: sortedStageTiles.filter(tile => postProductionUrgencyGroup(tile, today) === group.key) })).filter(group => group.tiles.length);
             const isDropTarget = dragOverStage === stage.key;
             return (
               <section
@@ -2873,14 +2938,22 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
                 onDragOver={(e) => { if (canEdit) { e.preventDefault(); setDragOverStage(stage.key); } }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverStage(''); }}
                 onDrop={(e) => { e.preventDefault(); onDropStage(stage.key, e.dataTransfer.getData('text/plain')); }}
-                className={`min-h-[560px] rounded-[1.75rem] border p-2.5 transition sm:p-3 ${isDropTarget ? 'border-zinc-500 bg-zinc-200/65 shadow-soft' : 'border-zinc-200 bg-zinc-100/75'}`}
+                className={`flex min-h-[560px] flex-col rounded-[1.75rem] border p-2.5 transition sm:p-3 lg:h-[78vh] lg:max-h-[960px] ${isDropTarget ? 'border-zinc-500 bg-zinc-200/65 shadow-soft' : 'border-zinc-200 bg-zinc-100/75'}`}
               >
-                <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl bg-white/90 px-3 py-2 shadow-sm">
+                <div className="mb-2 flex shrink-0 items-center justify-between gap-2 rounded-2xl bg-white/90 px-3 py-2 shadow-sm">
                   <h3 className="text-sm font-black text-zinc-900">{stage.label}</h3>
                   <Pill className="border-zinc-200 bg-zinc-50 text-zinc-600">{stageTiles.length}</Pill>
                 </div>
-                <div className="space-y-1.5">
-                  {stageTiles.map(tile => {
+                <div className="min-h-0 flex-1 space-y-2 lg:overflow-y-auto lg:overscroll-contain lg:pr-1" aria-label={`${stage.label} work tiles`}>
+                  {stageGroups.map(group => (
+                    <div key={group.key} className="space-y-1.5">
+                      {!isSelling ? (
+                        <div className="flex items-center justify-between gap-2 px-1 pt-1" aria-label={`${group.label}: ${group.tiles.length} tiles`}>
+                          <span className={`text-[10px] font-black uppercase tracking-wide ${group.color}`}>{group.label}</span>
+                          <span className="text-[10px] font-bold text-zinc-500">{group.tiles.length}</span>
+                        </div>
+                      ) : null}
+                      {group.tiles.map(tile => {
                     const event = tile.event;
                     const record = recordsByTileId[tile.tileId] || null;
                     const eventControlId = postProductionAdminControlId(tile.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY);
@@ -2905,10 +2978,10 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
                         onMouseEnter={() => { if (linked) setLinkedEventId(tile.eventId); }}
                         onMouseLeave={() => { if (linkedEventId === tile.eventId) setLinkedEventId(''); }}
                         onClick={() => setSelectedBoardTile(tile)}
-                        className={`cursor-pointer rounded-xl border bg-white p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${canEdit ? 'sm:cursor-grab sm:active:cursor-grabbing' : ''} ${isSaving ? 'opacity-60' : ''} ${isRelationshipMatch ? 'border-zinc-500 ring-2 ring-zinc-300 shadow-md' : 'border-zinc-200'} ${relationshipActive && !isRelationshipMatch ? 'opacity-45' : ''}`}
+                        className={`cursor-pointer rounded-xl border bg-white ${isSelling ? 'p-1.5' : 'p-2'} shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${canEdit ? 'sm:cursor-grab sm:active:cursor-grabbing' : ''} ${isSaving ? 'opacity-60' : ''} ${isRelationshipMatch ? 'border-zinc-500 ring-2 ring-zinc-300 shadow-md' : 'border-zinc-200'} ${relationshipActive && !isRelationshipMatch ? 'opacity-45' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 text-[12px] font-black leading-4 text-zinc-950">{event.title}</div>
+                          <div title={isSelling ? event.title : undefined} className={`min-w-0 font-black text-zinc-950 ${isSelling ? 'line-clamp-3 text-[11px] leading-[14px]' : 'text-[12px] leading-4'}`}>{event.title}</div>
                           {isAdmin ? (
                             <div className="flex shrink-0 gap-1">
                               <button
@@ -2939,6 +3012,12 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
                           ) : null}
                         </div>
 
+                        {isSelling ? (
+                          <div className="mt-0.5 flex items-center justify-between gap-1 text-[9px] font-bold leading-3 text-zinc-500">
+                            <span className="min-w-0 truncate text-zinc-700">{tile.photographerName}</span>
+                            <span className="shrink-0 text-emerald-700">Completed</span>
+                          </div>
+                        ) : <>
                         <div className="mt-1 flex min-w-0 items-center gap-1 text-[9px] font-bold leading-3 text-zinc-500">
                           <span className="shrink-0">{postProductionCompactDateLabel(event)}</span>
                           <span className="shrink-0 text-zinc-300">·</span>
@@ -2949,11 +3028,14 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
                         <div className="mt-1 text-[10px] font-black leading-3 text-zinc-600">{postProductionDeadlineLabel(tile, record?.stage || 'school_events')}</div>
 
                         {partners.length ? <div className="mt-1 border-t border-zinc-100 pt-1 text-[9px] font-semibold leading-3 text-zinc-500">{postProductionLinkedSummary(partners, recordsByTileId)}</div> : null}
+                        </>}
 
                         {isSaving ? <div className="mt-1 text-[9px] font-bold uppercase tracking-wide text-zinc-400">Saving…</div> : null}
                       </article>
                     );
-                  })}
+                      })}
+                    </div>
+                  ))}
                   {!stageTiles.length ? <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/45 px-3 py-8 text-center text-xs font-semibold text-zinc-400">No events</div> : null}
                 </div>
               </section>
