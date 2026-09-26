@@ -7009,6 +7009,45 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
     setMessage(`${acquisition.schoolName} removed from Acquisitions. The canonical School List was not changed.`);
   };
 
+  const exportAcquisitionsCsv = () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const rows = [...(acquisitions || [])].sort((a, b) => `${a.district}\n${a.schoolName}`.localeCompare(`${b.district}\n${b.schoolName}`));
+    if (!rows.length) {
+      setMessage('There are no School Acquisitions to export yet.');
+      return;
+    }
+
+    const csvCell = (value = '') => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const header = ['School Name', 'District', 'Mailing Address', 'Other Contact', 'Who Reached Out', 'Notes'];
+    const lines = [
+      header.map(csvCell).join(','),
+      ...rows.map(item => [
+        item.schoolName,
+        item.district,
+        item.mailingAddress,
+        item.otherContact,
+        (item.reachedOutBy || []).join('; '),
+        item.notes
+      ].map(csvCell).join(','))
+    ];
+
+    const now = new Date();
+    const dateStamp = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0')
+    ].join('-');
+    const blob = new Blob([`\uFEFF${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `School_Acquisitions_${dateStamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const q = query.trim().toLowerCase();
   const filtered = useMemo(() => {
     const rows = [...(acquisitions || [])].sort((a, b) => `${a.district}\n${a.schoolName}`.localeCompare(`${b.district}\n${b.schoolName}`));
@@ -7026,9 +7065,12 @@ function SchoolAcquisitionsSection({ photographers = [], authEmail = '', canEdit
           </div>
           <p className="mt-1 max-w-3xl text-sm text-zinc-600">Prospective schools only. This shared list is stored separately and never becomes part of the canonical School List or Carrie View automatically.</p>
         </div>
-        {canEdit ? (
-          <button type="button" onClick={() => setAdding(true)} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-zinc-800"><Plus size={16} /> Add Acquisition</button>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <button type="button" onClick={exportAcquisitionsCsv} disabled={loading || !acquisitions.length} className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-black text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40">Export CSV</button>
+          {canEdit ? (
+            <button type="button" onClick={() => setAdding(true)} className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-zinc-800"><Plus size={16} /> Add Acquisition</button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
