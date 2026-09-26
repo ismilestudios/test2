@@ -2687,6 +2687,36 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     : eligibleBoardTiles.filter(tile => tile.photographerKey === boardPhotographerFilter),
   [eligibleBoardTiles, boardPhotographerFilter]);
 
+  const hiddenBoardEvents = useMemo(() => {
+    const hiddenByEventId = new Map();
+
+    allBoardTiles.forEach(tile => {
+      const control = adminControlsById[postProductionAdminControlId(tile.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY)] || null;
+      if (!control?.hiddenAt) return;
+
+      const existing = hiddenByEventId.get(tile.eventId);
+      if (existing) {
+        existing.tiles.push(tile);
+        return;
+      }
+
+      hiddenByEventId.set(tile.eventId, {
+        eventId: tile.eventId,
+        event: tile.event,
+        hiddenAt: control.hiddenAt,
+        hiddenBy: control.hiddenBy,
+        tiles: [tile]
+      });
+    });
+
+    return Array.from(hiddenByEventId.values())
+      .map(item => ({
+        ...item,
+        tiles: [...item.tiles].sort((a, b) => a.index - b.index)
+      }))
+      .sort((a, b) => String(b.hiddenAt || '').localeCompare(String(a.hiddenAt || '')) || String(a.event?.title || '').localeCompare(String(b.event?.title || '')));
+  }, [allBoardTiles, adminControlsById]);
+
   const tilesByEventId = useMemo(() => {
     const map = {};
     allBoardTiles.forEach(tile => {
@@ -2805,6 +2835,14 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       hiddenBy: authEmail || null
     });
     if (saved && selectedBoardTile?.eventId === tile.eventId) setSelectedBoardTile(null);
+  };
+
+  const restoreHiddenBoardEvent = async (hiddenEvent) => {
+    if (!isAdmin || !hiddenEvent?.eventId) return;
+    await savePostProductionAdminControl(hiddenEvent.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY, {
+      hiddenAt: null,
+      hiddenBy: null
+    });
   };
 
   const completeBoardTile = async (tile) => {
@@ -3064,6 +3102,72 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
           })}
         </div>
       </div>
+
+      {isAdmin ? (
+        <section className="rounded-[1.75rem] border border-zinc-200 bg-white/75 p-4 shadow-sm" aria-label="Hidden Board events">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-base font-black text-zinc-950">Hidden</h3>
+              <p className="mt-0.5 text-xs font-semibold text-zinc-500">Admin recovery area. Restoring removes only the Hide flag; each photographer tile keeps its saved Board stage, notes, deadline, and history.</p>
+            </div>
+            <Pill className="border-zinc-200 bg-zinc-50 text-zinc-600">{hiddenBoardEvents.length} hidden</Pill>
+          </div>
+
+          {hiddenBoardEvents.length ? (
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {hiddenBoardEvents.map(hiddenEvent => {
+                const controlId = postProductionAdminControlId(hiddenEvent.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY);
+                const isSaving = savingAdminControlId === controlId;
+                const stageCounts = new Map();
+                hiddenEvent.tiles.forEach(tile => {
+                  const stage = recordsByTileId[tile.tileId]?.stage || 'school_events';
+                  stageCounts.set(stage, (stageCounts.get(stage) || 0) + 1);
+                });
+                const stageSummary = POST_PRODUCTION_STAGES
+                  .filter(stage => stageCounts.has(stage.key))
+                  .map(stage => {
+                    const count = stageCounts.get(stage.key) || 0;
+                    return count > 1 ? `${count} ${stage.label}` : stage.label;
+                  })
+                  .join(' · ');
+                const photographerNames = hiddenEvent.tiles.map(tile => tile.photographerName).filter(Boolean).join(', ');
+                const hiddenByName = displayNameFromEmail(hiddenEvent.hiddenBy || '') || hiddenEvent.hiddenBy || 'Admin';
+                const hiddenDate = formatShortAttributionDate(hiddenEvent.hiddenAt);
+                const hiddenTime = formatAttributionTime(hiddenEvent.hiddenAt);
+
+                return (
+                  <article key={hiddenEvent.eventId} className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-black text-zinc-950">{hiddenEvent.event?.title || 'Untitled event'}</div>
+                        <div className="mt-1 text-[11px] font-semibold text-zinc-600">
+                          {postProductionCompactDateLabel(hiddenEvent.event)}
+                          {photographerNames ? ` · ${photographerNames}` : ''}
+                        </div>
+                        {stageSummary ? <div className="mt-1 text-[11px] font-bold text-zinc-500">{stageSummary}</div> : null}
+                        <div className="mt-1 text-[10px] font-semibold text-zinc-400">
+                          Hidden by {hiddenByName}{hiddenDate ? ` · ${hiddenDate}` : ''}{hiddenTime ? ` ${hiddenTime}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isSaving || !adminControlsReady}
+                        onClick={() => restoreHiddenBoardEvent(hiddenEvent)}
+                        className="shrink-0 rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-zinc-700 transition hover:bg-[#DDE8D2] disabled:opacity-40"
+                        title="Restore this event to its saved Board stages"
+                      >
+                        {isSaving ? 'Restoring…' : 'Restore'}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-2xl border border-dashed border-zinc-300 bg-zinc-50/60 px-4 py-5 text-center text-xs font-semibold text-zinc-400">No hidden Board events.</div>
+          )}
+        </section>
+      ) : null}
 
       <PostProductionBoardDetailsModal
         tile={selectedBoardTile}
