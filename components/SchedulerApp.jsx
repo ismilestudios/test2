@@ -2541,6 +2541,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
   const [notesByEventId, setNotesByEventId] = useState({});
   const [adminControlsById, setAdminControlsById] = useState({});
   const [adminControlsReady, setAdminControlsReady] = useState(false);
+  const [boardSnapshotReady, setBoardSnapshotReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [selectedBoardTile, setSelectedBoardTile] = useState(null);
@@ -2560,6 +2561,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       setNotesByEventId({});
       setAdminControlsById({});
       setAdminControlsReady(false);
+      setBoardSnapshotReady(false);
       setLoading(false);
       setMessage('Supabase is not connected, so The Board cannot be shared yet.');
       return;
@@ -2578,18 +2580,18 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     ]);
 
     if (boardResult.error) {
-      setRecordsByTileId({});
-      setNotesByEventId({});
-      setAdminControlsById({});
-      setMessage(`Could not load The Board: ${boardResult.error.message}. Run supabase/v2_04_board_photographer_tiles.sql before deploying v2.04.`);
+      setMessage(`Could not refresh The Board: ${boardResult.error.message}. The last complete Board snapshot is still being shown.`);
       setLoading(false);
       return;
     }
     if (notesResult.error) {
-      setRecordsByTileId({});
-      setNotesByEventId({});
-      setAdminControlsById({});
-      setMessage(`Could not load Post-Production Notes: ${notesResult.error.message}. Run supabase/v2_03c_post_production_note_history.sql if the note history has not been installed yet.`);
+      setMessage(`Could not refresh Post-Production Notes: ${notesResult.error.message}. The last complete Board snapshot is still being shown.`);
+      setLoading(false);
+      return;
+    }
+    if (adminControlsResult.error) {
+      setAdminControlsReady(false);
+      setMessage(`Could not refresh Board Admin controls: ${adminControlsResult.error.message}. The last complete Board snapshot is still being shown; Hide/Done/Restore controls are paused until a successful reload.`);
       setLoading(false);
       return;
     }
@@ -2612,18 +2614,17 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     });
 
     const nextAdminControls = {};
-    if (!adminControlsResult.error) {
-      (adminControlsResult.data || []).forEach(row => {
-        const control = supabaseRowToPostProductionAdminControl(row);
-        if (control.eventId && control.controlId) nextAdminControls[control.controlId] = control;
-      });
-    }
+    (adminControlsResult.data || []).forEach(row => {
+      const control = supabaseRowToPostProductionAdminControl(row);
+      if (control.eventId && control.controlId) nextAdminControls[control.controlId] = control;
+    });
 
     setRecordsByTileId(nextRecords);
     setNotesByEventId(nextNotes);
     setAdminControlsById(nextAdminControls);
-    setAdminControlsReady(!adminControlsResult.error);
-    setMessage(adminControlsResult.error ? `The Board loaded, but Admin Hide/Done controls are unavailable: ${adminControlsResult.error.message}. Run supabase/v2_06_board_admin_controls.sql before using those controls.` : '');
+    setAdminControlsReady(true);
+    setBoardSnapshotReady(true);
+    setMessage('');
     setLoading(false);
   };
 
@@ -2948,6 +2949,27 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     if (!tile) return;
     await moveTile(tile, stage);
   };
+
+  if (!boardSnapshotReady) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 rounded-[1.75rem] border border-zinc-200 bg-white/75 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-black text-zinc-950">The Board</h2>
+            <p className="mt-1 max-w-3xl text-sm text-zinc-600">Loading the complete post-production Board before showing tiles, so partial stages never look like the finished Board.</p>
+          </div>
+          <button type="button" onClick={loadBoardRecords} disabled={loading} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-50">{loading ? 'Loading…' : 'Retry Board Load'}</button>
+        </div>
+        <div className="flex min-h-[280px] items-center justify-center rounded-[1.75rem] border border-zinc-200 bg-white/70 p-8 text-center shadow-sm">
+          <div>
+            {loading ? <div className="mx-auto h-7 w-7 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" /> : null}
+            <div className="mt-3 text-sm font-black text-zinc-900">{loading ? 'Loading complete Board…' : 'The Board could not finish loading.'}</div>
+            <div className="mt-1 max-w-xl text-xs font-semibold text-zinc-500">{message || 'Existing Board stages, notes, Hide/Done controls, and event data are not being changed while this loads.'}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -9529,6 +9551,7 @@ export default function SchedulerApp() {
   const [staffMembers, setStaffMembers] = useState(builtInStaffMembers());
   const [supabaseEvents, setSupabaseEvents] = useState([]);
   const [supabaseEventsLoaded, setSupabaseEventsLoaded] = useState(false);
+  const [eventsRefreshing, setEventsRefreshing] = useState(false);
   const [localManualEvents, setLocalManualEvents] = useState([]);
   const [eventsMessage, setEventsMessage] = useState('Loading events from Supabase...');
   const [addingEvent, setAddingEvent] = useState(false);
@@ -9541,6 +9564,18 @@ export default function SchedulerApp() {
   const [currentUserRole, setCurrentUserRole] = useState('assistant');
   const [initialLoading, setInitialLoading] = useState(true);
   const [rolloutCapacityOverrides, setRolloutCapacityOverrides] = useState({});
+  const supabaseEventsRef = useRef([]);
+  const supabaseEventsLoadedRef = useRef(false);
+  const eventsLoadPromiseRef = useRef(null);
+  const eventsPartialRetryCountRef = useRef(0);
+
+  useEffect(() => {
+    supabaseEventsRef.current = supabaseEvents;
+  }, [supabaseEvents]);
+
+  useEffect(() => {
+    supabaseEventsLoadedRef.current = supabaseEventsLoaded;
+  }, [supabaseEventsLoaded]);
 
   useEffect(() => {
     setLocalManualEvents(loadLocalManualEvents());
@@ -9604,99 +9639,208 @@ export default function SchedulerApp() {
   };
 
   const loadEventsFromSupabase = async () => {
-    if (!hasSupabaseEnv()) {
-      setEventsMessage('Supabase is not connected yet. New events will not be shared.');
-      return;
-    }
+    // Loading reliability rule: never let overlapping/auth-hydration reads replace
+    // a complete in-memory schedule with a transient partial snapshot. Concurrent
+    // callers share one request; successful snapshots are assembled off-screen and
+    // committed once, atomically, only after the read is considered complete.
+    if (eventsLoadPromiseRef.current) return eventsLoadPromiseRef.current;
 
-    const supabase = createClient();
-    if (!supabase) {
-      setEventsMessage('Supabase client was not available. New events will not be shared.');
-      return;
-    }
+    const runLoad = async () => {
+      if (!hasSupabaseEnv()) {
+        setEventsMessage('Supabase is not connected yet. New events will not be shared.');
+        return false;
+      }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData?.session) {
-      const localBackup = loadLocalManualEvents();
-      setLocalManualEvents(localBackup);
-      setEventsMessage(`Waiting for login before loading Supabase events${localBackup.length ? ` (${localBackup.length} browser safety backup event${localBackup.length === 1 ? '' : 's'} retained locally; not used as the current schedule)` : ''}.`);
-      return;
-    }
+      const supabase = createClient();
+      if (!supabase) {
+        setEventsMessage('Supabase client was not available. New events will not be shared.');
+        return false;
+      }
 
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .order('date', { ascending: true });
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        const localBackup = loadLocalManualEvents();
+        setLocalManualEvents(localBackup);
+        setEventsMessage(`Waiting for login before loading Supabase events${localBackup.length ? ` (${localBackup.length} browser safety backup event${localBackup.length === 1 ? '' : 's'} retained locally; not used as the current schedule)` : ''}.`);
+        return false;
+      }
 
-    if (error) {
-      console.warn('Could not load events from Supabase', error);
-      setEventsMessage(`Could not load Supabase events: ${error.message}. Run supabase/events_migration.sql and refresh.`);
-      return;
-    }
+      setEventsRefreshing(true);
 
-    // ICS VISIBILITY FIX: explicitly read Google Calendar imported rows too.
-    // Some earlier builds only confirmed manual rows in the UI even when the
-    // imported rows were present in Supabase. Keeping this as a separate read
-    // makes the imported calendar rows impossible to lose during merging.
-    const { data: googleImportedRows, error: googleImportedError } = await supabase
-      .from('events')
-      .select('*')
-      .eq('source', 'google_calendar_import')
-      .order('date', { ascending: true });
+      const fetchSnapshot = async () => {
+        // Supabase/PostgREST installations commonly cap a single SELECT at 1000
+        // rows. Scheduler keeps multiple seasons of event history, so always page
+        // the authoritative table instead of assuming one response is complete.
+        const data = [];
+        const pageSize = 1000;
+        let pageStart = 0;
+        let pageGuard = 0;
+        while (pageGuard < 50) {
+          const { data: pageRows, error: pageError } = await supabase
+            .from('events')
+            .select('*')
+            .order('date', { ascending: true })
+            .order('id', { ascending: true })
+            .range(pageStart, pageStart + pageSize - 1);
+          if (pageError) return { error: pageError };
+          const rows = pageRows || [];
+          data.push(...rows);
+          if (rows.length < pageSize) break;
+          pageStart += pageSize;
+          pageGuard += 1;
+        }
+        if (pageGuard >= 50) return { error: new Error('Event load exceeded the safety pagination limit.') };
 
-    if (googleImportedError) {
-      console.warn('Could not explicitly load Google Calendar imported events', googleImportedError);
-    }
+        // Keep the explicit imported/manual reads as compatibility insurance, but
+        // assemble everything in memory before publishing anything to the UI.
+        const [googleImportedResult, manualRows] = await Promise.all([
+          supabase
+            .from('events')
+            .select('*')
+            .eq('source', 'google_calendar_import')
+            .order('date', { ascending: true }),
+          loadManualEventsFromSupabase(supabase)
+        ]);
 
-    const combinedInitialRowsById = new Map();
-    [...(data || []), ...(googleImportedRows || [])].forEach(row => {
-      if (row?.id) combinedInitialRowsById.set(row.id, row);
-    });
-    const initialRows = Array.from(combinedInitialRowsById.values());
+        if (googleImportedResult.error) {
+          console.warn('Could not explicitly load Google Calendar imported events', googleImportedResult.error);
+        }
 
-    const importResult = await importHistoricalEventsToSupabase(supabase, initialRows || []);
+        const combinedInitialRowsById = new Map();
+        [...(data || []), ...(googleImportedResult.data || [])].forEach(row => {
+          if (row?.id) combinedInitialRowsById.set(row.id, row);
+        });
+        const initialRows = Array.from(combinedInitialRowsById.values());
 
-    if (importResult.error) {
-      setSupabaseEvents((data || []).map(supabaseRowToEvent));
+        const importResult = await importHistoricalEventsToSupabase(supabase, initialRows || []);
+        if (importResult.error) return { error: importResult.error };
+
+        const combinedRowsBySupabaseId = new Map();
+        [
+          ...(initialRows || []),
+          ...(importResult.importedCount ? (importResult.data || []) : []),
+          ...(manualRows || [])
+        ].forEach(row => {
+          if (row?.id) combinedRowsBySupabaseId.set(row.id, row);
+        });
+
+        const combinedRows = Array.from(combinedRowsBySupabaseId.values());
+        const finalRows = dedupeSupabaseEventRowsByStableIdentity(combinedRows);
+        const duplicateStableIdentityCount = Math.max(0, combinedRows.length - finalRows.length);
+        const loadedEvents = finalRows.map(row => ({ ...supabaseRowToEvent(row), localBackupOnly: false }));
+        const identityFingerprint = finalRows
+          .map(row => supabaseEventRowStableKey(row))
+          .filter(Boolean)
+          .sort()
+          .join('\n');
+
+        return {
+          finalRows,
+          loadedEvents,
+          duplicateStableIdentityCount,
+          identityFingerprint,
+          importedCount: importResult.importedCount || 0
+        };
+      };
+
+      const pause = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
+      let snapshot = await fetchSnapshot();
+      if (snapshot.error) {
+        console.warn('Could not load events from Supabase', snapshot.error);
+        setEventsMessage(`Could not refresh Supabase events: ${snapshot.error.message}. The last complete schedule is still being shown.`);
+        setEventsRefreshing(false);
+        return false;
+      }
+
+      // Cold-start verification: do not expose the first auth-hydration read as a
+      // finished schedule. A second read shortly afterward must agree; if it does
+      // not, take one tie-breaker read and publish the most complete stable result.
+      if (!supabaseEventsLoadedRef.current) {
+        await pause(700);
+        const second = await fetchSnapshot();
+        if (second.error) {
+          console.warn('Could not verify initial Supabase event snapshot', second.error);
+          setEventsMessage(`Could not verify the initial schedule load: ${second.error.message}. Scheduler is keeping the Calendar/Board in a loading state rather than showing a partial schedule.`);
+          setEventsRefreshing(false);
+          return false;
+        }
+
+        if (second.identityFingerprint === snapshot.identityFingerprint) {
+          snapshot = second;
+        } else {
+          await pause(350);
+          const third = await fetchSnapshot();
+          if (!third.error) {
+            if (third.identityFingerprint === second.identityFingerprint) snapshot = third;
+            else if (third.identityFingerprint === snapshot.identityFingerprint) snapshot = third;
+            else snapshot = [snapshot, second, third].sort((a, b) => b.finalRows.length - a.finalRows.length)[0];
+          } else {
+            snapshot = [snapshot, second].sort((a, b) => b.finalRows.length - a.finalRows.length)[0];
+          }
+        }
+      }
+
+      // Refresh protection: event removal is soft-delete in normal Scheduler use,
+      // so a large sudden row-count collapse is almost always a transient/session
+      // read problem. Keep the last complete snapshot instead of flashing a mostly
+      // empty Calendar/Board. Small legitimate changes still pass normally.
+      const previousCount = supabaseEventsRef.current.length;
+      const nextCount = snapshot.loadedEvents.length;
+      const suspiciousShrink = supabaseEventsLoadedRef.current
+        && previousCount >= 20
+        && nextCount <= Math.floor(previousCount * 0.82)
+        && (previousCount - nextCount) >= 10;
+
+      if (suspiciousShrink) {
+        console.warn(`Rejected a suspicious partial schedule refresh (${nextCount} rows vs ${previousCount} already loaded).`);
+        setEventsMessage(`Scheduler received an incomplete-looking refresh (${nextCount} of ${previousCount} known event rows), so it kept the last complete schedule instead of briefly hiding events. Retrying automatically…`);
+        setEventsRefreshing(false);
+        if (eventsPartialRetryCountRef.current < 2) {
+          eventsPartialRetryCountRef.current += 1;
+          window.setTimeout(() => loadEventsFromSupabase(), 1200);
+        }
+        return false;
+      }
+
+      eventsPartialRetryCountRef.current = 0;
+      if (snapshot.duplicateStableIdentityCount) {
+        console.warn(`Ignored ${snapshot.duplicateStableIdentityCount} duplicate Supabase event row${snapshot.duplicateStableIdentityCount === 1 ? '' : 's'} with the same client_event_id while building the current schedule.`);
+      }
+
+      // Atomic publish: one state replacement after the whole authoritative
+      // snapshot has finished loading and validation has completed.
+      supabaseEventsRef.current = snapshot.loadedEvents;
+      supabaseEventsLoadedRef.current = true;
+      setSupabaseEvents(snapshot.loadedEvents);
       setSupabaseEventsLoaded(true);
-      setEventsMessage(`Supabase events loaded, but historical import failed: ${importResult.error.message}. Run supabase/events_historical_import_migration.sql and refresh.`);
-      return;
-    }
 
-    const manualRows = await loadManualEventsFromSupabase(supabase);
+      const localBackup = loadLocalManualEvents();
+      const localOnlyBackup = localBackup.filter(localEvent => !snapshot.loadedEvents.some(loaded => loaded.id === localEvent.id || loaded.supabaseId === localEvent.supabaseId));
+      setLocalManualEvents(localOnlyBackup);
 
-    const combinedRowsBySupabaseId = new Map();
-    [
-      ...(initialRows || []),
-      ...(importResult.importedCount ? (importResult.data || []) : []),
-      ...manualRows
-    ].forEach(row => {
-      if (row?.id) combinedRowsBySupabaseId.set(row.id, row);
-    });
+      const manualCount = snapshot.finalRows.filter(row => row.source === 'manual_app' || row.source === 'app' || row.client_event_id?.startsWith('custom-')).length;
+      const googleImportCount = snapshot.finalRows.filter(row => row.source === 'google_calendar_import').length;
+      const localOnlyCount = localOnlyBackup.length;
+      setEventsMessage(snapshot.importedCount
+        ? `Imported ${snapshot.importedCount} historical events into Supabase.`
+        : `Loaded ${snapshot.finalRows.length} authoritative Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${snapshot.duplicateStableIdentityCount ? `; ignored ${snapshot.duplicateStableIdentityCount} duplicate row${snapshot.duplicateStableIdentityCount === 1 ? '' : 's'} with the same stable event ID` : ''}${localOnlyCount ? `; ${localOnlyCount} browser safety backup${localOnlyCount === 1 ? '' : 's'} retained locally but excluded from the current schedule` : ''}.`);
+      setEventsRefreshing(false);
+      return true;
+    };
 
-    // The Supabase events table is the authoritative current schedule. Collapse
-    // only exact stable event identities (client_event_id) in the read path so
-    // duplicate DB rows for the same saved event cannot present competing crews.
-    // No rows are updated, deleted, normalized, or backfilled here.
-    const combinedRows = Array.from(combinedRowsBySupabaseId.values());
-    const finalRows = dedupeSupabaseEventRowsByStableIdentity(combinedRows);
-    const duplicateStableIdentityCount = Math.max(0, combinedRows.length - finalRows.length);
-    if (duplicateStableIdentityCount) {
-      console.warn(`Ignored ${duplicateStableIdentityCount} duplicate Supabase event row${duplicateStableIdentityCount === 1 ? '' : 's'} with the same client_event_id while building the current schedule.`);
-    }
+    const promise = runLoad()
+      .catch(error => {
+        console.error('Unexpected Supabase event refresh failure', error);
+        setEventsMessage(`Could not refresh Supabase events: ${error?.message || 'Unexpected error'}. The last complete schedule is still being shown.`);
+        setEventsRefreshing(false);
+        return false;
+      })
+      .finally(() => {
+        if (eventsLoadPromiseRef.current === promise) eventsLoadPromiseRef.current = null;
+      });
 
-    const loadedEvents = finalRows.map(row => ({ ...supabaseRowToEvent(row), localBackupOnly: false }));
-    setSupabaseEvents(loadedEvents);
-    setSupabaseEventsLoaded(true);
-
-    const localBackup = loadLocalManualEvents();
-    const localOnlyBackup = localBackup.filter(localEvent => !loadedEvents.some(loaded => loaded.id === localEvent.id || loaded.supabaseId === localEvent.supabaseId));
-    setLocalManualEvents(localOnlyBackup);
-
-    const manualCount = finalRows.filter(row => row.source === 'manual_app' || row.source === 'app' || row.client_event_id?.startsWith('custom-')).length;
-    const googleImportCount = finalRows.filter(row => row.source === 'google_calendar_import').length;
-    const localOnlyCount = localOnlyBackup.length;
-    setEventsMessage(importResult.importedCount ? `Imported ${importResult.importedCount} historical events into Supabase.` : `Loaded ${finalRows.length} authoritative Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${duplicateStableIdentityCount ? `; ignored ${duplicateStableIdentityCount} duplicate row${duplicateStableIdentityCount === 1 ? '' : 's'} with the same stable event ID` : ''}${localOnlyCount ? `; ${localOnlyCount} browser safety backup${localOnlyCount === 1 ? '' : 's'} retained locally but excluded from the current schedule` : ''}.`);
+    eventsLoadPromiseRef.current = promise;
+    return promise;
   };
 
   const loadSchoolsFromSupabase = async () => {
@@ -9887,11 +10031,6 @@ export default function SchedulerApp() {
         loadRolloutCapacityOverrides()
       ]);
       if (!cancelled) setInitialLoading(false);
-
-      // One short follow-up read catches Supabase session hydration/readback timing races.
-      window.setTimeout(() => {
-        loadEventsFromSupabase();
-      }, 750);
     };
 
     loadAfterAuth();
@@ -9933,6 +10072,7 @@ export default function SchedulerApp() {
     if (hasSupabaseEnv() && authReady && !authEmail) return [];
     return supabaseEvents.filter(event => event.active === false);
   }, [supabaseEvents, authReady, authEmail]);
+  const scheduleSnapshotPending = hasSupabaseEnv() && (initialLoading || !authReady || (Boolean(authEmail) && !supabaseEventsLoaded));
   const handleScheduleEvent = async (event, previousEventOverride = null) => {
     if (!canEditScheduler) {
       setEventsMessage('Your account has view-only access. Ask an Admin or Photographer to make scheduling changes.');
@@ -10276,16 +10416,32 @@ export default function SchedulerApp() {
             </div>
           </>}
           {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} onAddEvent={openAddEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
-          {activeTab === 'Calendar View' && <>
+          {activeTab === 'Calendar View' && (scheduleSnapshotPending ? (
+            <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-zinc-200 bg-white/75 p-8 text-center shadow-sm">
+              <div>
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" />
+                <div className="mt-3 text-base font-black text-zinc-950">Loading the complete schedule…</div>
+                <div className="mt-1 text-sm font-semibold text-zinc-500">Calendar will appear once the authoritative Supabase snapshot has been verified, rather than briefly showing a partial calendar.</div>
+              </div>
+            </div>
+          ) : <>
             <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />
             <div className="mt-4 flex flex-col gap-2 rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/40 p-3 text-sm text-zinc-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-              <div>{eventsMessage || 'Refresh the shared calendar data from Supabase when needed.'}</div>
-              <button type="button" onClick={loadEventsFromSupabase} className="rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-white">Reload Supabase Events</button>
+              <div>{eventsRefreshing ? 'Refreshing in the background — the last complete schedule stays visible until the new snapshot is ready.' : (eventsMessage || 'Refresh the shared calendar data from Supabase when needed.')}</div>
+              <button type="button" onClick={loadEventsFromSupabase} disabled={eventsRefreshing} className="rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-white disabled:opacity-50">{eventsRefreshing ? 'Refreshing…' : 'Reload Supabase Events'}</button>
             </div>
-          </>}
+          </>)}
           {activeTab === 'Mobile View' && <MobileView events={queryFilteredEvents} photographers={photographers} assistants={assistants} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} />}
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
-          {activeTab === 'The Board' && <PostProductionBoard events={allEvents} authEmail={authEmail} canEdit={canEditScheduler} isAdmin={isAdminUser} onViewEvent={setSelected} />}
+          {activeTab === 'The Board' && (scheduleSnapshotPending ? (
+            <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-zinc-200 bg-white/75 p-8 text-center shadow-sm">
+              <div>
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" />
+                <div className="mt-3 text-base font-black text-zinc-950">Loading the complete schedule for The Board…</div>
+                <div className="mt-1 text-sm font-semibold text-zinc-500">Board tiles will appear only after the current event snapshot is complete.</div>
+              </div>
+            </div>
+          ) : <PostProductionBoard events={allEvents} authEmail={authEmail} canEdit={canEditScheduler} isAdmin={isAdminUser} onViewEvent={setSelected} />)}
           {activeTab === 'School List' && <SchoolPages query={query} onClickEvent={setSelected} events={allEvents} selectedName={selectedSchoolName} setSelectedName={setSelectedSchoolName} schools={schools} setSchools={setSchools} reloadSchools={loadSchoolsFromSupabase} schoolsMessage={schoolsMessage} authEmail={authEmail} photographers={photographers} canEditSchools={canEditScheduler} canMergeSchools={isAdminUser} canEditAcquisitions={canEditScheduler} canRemoveAcquisitions={isAdminUser} />}
           {activeTab === 'Team Members' && authEmail && !isAssistantUser && <TeamMembers photographers={photographers} assistants={assistants} staffMembers={staffMembers} setPhotographers={setPhotographers} setAssistants={setAssistants} reloadTeamMembers={loadTeamMembersFromSupabase} teamMembersMessage={teamMembersMessage} />}
           {activeTab === 'Admin' && isAdminUser && <AdminPage events={allEvents} schools={schools} photographers={photographers} assistants={assistants} staffMembers={staffMembers} eventsMessage={eventsMessage} schoolsMessage={schoolsMessage} reloadEvents={loadEventsFromSupabase} reloadSchools={loadSchoolsFromSupabase} reloadTeamMembers={loadTeamMembersFromSupabase} authEmail={authEmail} rolloutCapacityOverrides={rolloutCapacityOverrides} setRolloutCapacityOverrides={setRolloutCapacityOverrides} />}

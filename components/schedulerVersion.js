@@ -1,2 +1,2 @@
-export const SCHEDULER_VERSION = '2.10';
-export const SCHEDULER_LAST_UPDATED = 'September 26, 2026';
+export const SCHEDULER_VERSION = '2.11';
+export const SCHEDULER_LAST_UPDATED = 'October 14, 2026';
