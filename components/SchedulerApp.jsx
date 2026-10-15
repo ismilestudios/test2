@@ -9614,35 +9614,14 @@ export default function SchedulerApp() {
     return () => { cancelled = true; };
   }, [authEmail]);
 
-  const importHistoricalEventsToSupabase = async () => {
-    // Safety fix: do not auto-insert bundled/code-baseline events on app load.
-    // iSmile Scheduler now uses Supabase/ICS/manual events as the source of truth.
-    // The old automatic seed path could make pre-existing calendar dates look duplicated.
-    return { importedCount: 0, skipped: true };
-  };
-
-  const loadManualEventsFromSupabase = async (supabase) => {
-    if (!supabase) return [];
-
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .or('source.eq.manual_app,source.eq.app,client_event_id.like.custom-%')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.warn('Could not explicitly load manual events from Supabase', error);
-      return [];
-    }
-
-    return data || [];
-  };
-
   const loadEventsFromSupabase = async () => {
-    // Loading reliability rule: never let overlapping/auth-hydration reads replace
-    // a complete in-memory schedule with a transient partial snapshot. Concurrent
-    // callers share one request; successful snapshots are assembled off-screen and
-    // committed once, atomically, only after the read is considered complete.
+    // Loading reliability rule: never publish an in-progress event read. Concurrent
+    // callers share one request, the authoritative events table is fetched in pages,
+    // and the completed snapshot is committed once at the end. The previous v2.11
+    // cold-start verification loop intentionally re-read the entire table two or
+    // three times; that protected against partial-looking data but made startup far
+    // too slow as Scheduler history grew. A successful paginated read is already
+    // complete: if any page fails, nothing is published.
     if (eventsLoadPromiseRef.current) return eventsLoadPromiseRef.current;
 
     const runLoad = async () => {
@@ -9668,13 +9647,14 @@ export default function SchedulerApp() {
       setEventsRefreshing(true);
 
       const fetchSnapshot = async () => {
-        // Supabase/PostgREST installations commonly cap a single SELECT at 1000
-        // rows. Scheduler keeps multiple seasons of event history, so always page
-        // the authoritative table instead of assuming one response is complete.
-        const data = [];
+        // Supabase/PostgREST commonly caps one SELECT response. Fetch every page
+        // sequentially, but do it only once per refresh. If any page errors, return
+        // the error and leave the currently displayed complete snapshot untouched.
+        const rows = [];
         const pageSize = 1000;
         let pageStart = 0;
         let pageGuard = 0;
+
         while (pageGuard < 50) {
           const { data: pageRows, error: pageError } = await supabase
             .from('events')
@@ -9682,69 +9662,34 @@ export default function SchedulerApp() {
             .order('date', { ascending: true })
             .order('id', { ascending: true })
             .range(pageStart, pageStart + pageSize - 1);
+
           if (pageError) return { error: pageError };
-          const rows = pageRows || [];
-          data.push(...rows);
-          if (rows.length < pageSize) break;
+
+          const page = pageRows || [];
+          rows.push(...page);
+          if (page.length < pageSize) break;
           pageStart += pageSize;
           pageGuard += 1;
         }
+
         if (pageGuard >= 50) return { error: new Error('Event load exceeded the safety pagination limit.') };
 
-        // Keep the explicit imported/manual reads as compatibility insurance, but
-        // assemble everything in memory before publishing anything to the UI.
-        const [googleImportedResult, manualRows] = await Promise.all([
-          supabase
-            .from('events')
-            .select('*')
-            .eq('source', 'google_calendar_import')
-            .order('date', { ascending: true }),
-          loadManualEventsFromSupabase(supabase)
-        ]);
-
-        if (googleImportedResult.error) {
-          console.warn('Could not explicitly load Google Calendar imported events', googleImportedResult.error);
-        }
-
-        const combinedInitialRowsById = new Map();
-        [...(data || []), ...(googleImportedResult.data || [])].forEach(row => {
-          if (row?.id) combinedInitialRowsById.set(row.id, row);
-        });
-        const initialRows = Array.from(combinedInitialRowsById.values());
-
-        const importResult = await importHistoricalEventsToSupabase(supabase, initialRows || []);
-        if (importResult.error) return { error: importResult.error };
-
-        const combinedRowsBySupabaseId = new Map();
-        [
-          ...(initialRows || []),
-          ...(importResult.importedCount ? (importResult.data || []) : []),
-          ...(manualRows || [])
-        ].forEach(row => {
-          if (row?.id) combinedRowsBySupabaseId.set(row.id, row);
-        });
-
-        const combinedRows = Array.from(combinedRowsBySupabaseId.values());
-        const finalRows = dedupeSupabaseEventRowsByStableIdentity(combinedRows);
-        const duplicateStableIdentityCount = Math.max(0, combinedRows.length - finalRows.length);
+        // Every event source lives in the authoritative events table. The old v2.11
+        // compatibility reads for manual and Google-import rows queried the same table
+        // again and then de-duped the results. They are intentionally unnecessary here.
+        const finalRows = dedupeSupabaseEventRowsByStableIdentity(rows);
+        const duplicateStableIdentityCount = Math.max(0, rows.length - finalRows.length);
         const loadedEvents = finalRows.map(row => ({ ...supabaseRowToEvent(row), localBackupOnly: false }));
-        const identityFingerprint = finalRows
-          .map(row => supabaseEventRowStableKey(row))
-          .filter(Boolean)
-          .sort()
-          .join('\n');
 
         return {
           finalRows,
           loadedEvents,
           duplicateStableIdentityCount,
-          identityFingerprint,
-          importedCount: importResult.importedCount || 0
+          importedCount: 0
         };
       };
 
-      const pause = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
-      let snapshot = await fetchSnapshot();
+      const snapshot = await fetchSnapshot();
       if (snapshot.error) {
         console.warn('Could not load events from Supabase', snapshot.error);
         setEventsMessage(`Could not refresh Supabase events: ${snapshot.error.message}. The last complete schedule is still being shown.`);
@@ -9752,38 +9697,11 @@ export default function SchedulerApp() {
         return false;
       }
 
-      // Cold-start verification: do not expose the first auth-hydration read as a
-      // finished schedule. A second read shortly afterward must agree; if it does
-      // not, take one tie-breaker read and publish the most complete stable result.
-      if (!supabaseEventsLoadedRef.current) {
-        await pause(700);
-        const second = await fetchSnapshot();
-        if (second.error) {
-          console.warn('Could not verify initial Supabase event snapshot', second.error);
-          setEventsMessage(`Could not verify the initial schedule load: ${second.error.message}. Scheduler is keeping the Calendar/Board in a loading state rather than showing a partial schedule.`);
-          setEventsRefreshing(false);
-          return false;
-        }
-
-        if (second.identityFingerprint === snapshot.identityFingerprint) {
-          snapshot = second;
-        } else {
-          await pause(350);
-          const third = await fetchSnapshot();
-          if (!third.error) {
-            if (third.identityFingerprint === second.identityFingerprint) snapshot = third;
-            else if (third.identityFingerprint === snapshot.identityFingerprint) snapshot = third;
-            else snapshot = [snapshot, second, third].sort((a, b) => b.finalRows.length - a.finalRows.length)[0];
-          } else {
-            snapshot = [snapshot, second].sort((a, b) => b.finalRows.length - a.finalRows.length)[0];
-          }
-        }
-      }
-
       // Refresh protection: event removal is soft-delete in normal Scheduler use,
       // so a large sudden row-count collapse is almost always a transient/session
       // read problem. Keep the last complete snapshot instead of flashing a mostly
-      // empty Calendar/Board. Small legitimate changes still pass normally.
+      // empty Calendar/Board. This applies only after a complete snapshot is already
+      // on screen; the initial load publishes the first successful paginated read.
       const previousCount = supabaseEventsRef.current.length;
       const nextCount = snapshot.loadedEvents.length;
       const suspiciousShrink = supabaseEventsLoadedRef.current
@@ -9807,8 +9725,7 @@ export default function SchedulerApp() {
         console.warn(`Ignored ${snapshot.duplicateStableIdentityCount} duplicate Supabase event row${snapshot.duplicateStableIdentityCount === 1 ? '' : 's'} with the same client_event_id while building the current schedule.`);
       }
 
-      // Atomic publish: one state replacement after the whole authoritative
-      // snapshot has finished loading and validation has completed.
+      // Atomic publish: one state replacement only after every event page has loaded.
       supabaseEventsRef.current = snapshot.loadedEvents;
       supabaseEventsLoadedRef.current = true;
       setSupabaseEvents(snapshot.loadedEvents);
@@ -9821,9 +9738,7 @@ export default function SchedulerApp() {
       const manualCount = snapshot.finalRows.filter(row => row.source === 'manual_app' || row.source === 'app' || row.client_event_id?.startsWith('custom-')).length;
       const googleImportCount = snapshot.finalRows.filter(row => row.source === 'google_calendar_import').length;
       const localOnlyCount = localOnlyBackup.length;
-      setEventsMessage(snapshot.importedCount
-        ? `Imported ${snapshot.importedCount} historical events into Supabase.`
-        : `Loaded ${snapshot.finalRows.length} authoritative Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${snapshot.duplicateStableIdentityCount ? `; ignored ${snapshot.duplicateStableIdentityCount} duplicate row${snapshot.duplicateStableIdentityCount === 1 ? '' : 's'} with the same stable event ID` : ''}${localOnlyCount ? `; ${localOnlyCount} browser safety backup${localOnlyCount === 1 ? '' : 's'} retained locally but excluded from the current schedule` : ''}.`);
+      setEventsMessage(`Loaded ${snapshot.finalRows.length} authoritative Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${snapshot.duplicateStableIdentityCount ? `; ignored ${snapshot.duplicateStableIdentityCount} duplicate row${snapshot.duplicateStableIdentityCount === 1 ? '' : 's'} with the same stable event ID` : ''}${localOnlyCount ? `; ${localOnlyCount} browser safety backup${localOnlyCount === 1 ? '' : 's'} retained locally but excluded from the current schedule` : ''}.`);
       setEventsRefreshing(false);
       return true;
     };
@@ -10072,7 +9987,7 @@ export default function SchedulerApp() {
     if (hasSupabaseEnv() && authReady && !authEmail) return [];
     return supabaseEvents.filter(event => event.active === false);
   }, [supabaseEvents, authReady, authEmail]);
-  const scheduleSnapshotPending = hasSupabaseEnv() && (initialLoading || !authReady || (Boolean(authEmail) && !supabaseEventsLoaded));
+  const scheduleSnapshotPending = hasSupabaseEnv() && (!authReady || (Boolean(authEmail) && !supabaseEventsLoaded));
   const handleScheduleEvent = async (event, previousEventOverride = null) => {
     if (!canEditScheduler) {
       setEventsMessage('Your account has view-only access. Ask an Admin or Photographer to make scheduling changes.');
@@ -10421,7 +10336,7 @@ export default function SchedulerApp() {
               <div>
                 <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" />
                 <div className="mt-3 text-base font-black text-zinc-950">Loading the complete schedule…</div>
-                <div className="mt-1 text-sm font-semibold text-zinc-500">Calendar will appear once the authoritative Supabase snapshot has been verified, rather than briefly showing a partial calendar.</div>
+                <div className="mt-1 text-sm font-semibold text-zinc-500">Calendar will appear as soon as the complete paginated Supabase event snapshot is ready, rather than briefly showing a partial calendar.</div>
               </div>
             </div>
           ) : <>
