@@ -9552,6 +9552,7 @@ export default function SchedulerApp() {
   const [supabaseEvents, setSupabaseEvents] = useState([]);
   const [supabaseEventsLoaded, setSupabaseEventsLoaded] = useState(false);
   const [eventsRefreshing, setEventsRefreshing] = useState(false);
+  const [eventsLoadError, setEventsLoadError] = useState('');
   const [localManualEvents, setLocalManualEvents] = useState([]);
   const [eventsMessage, setEventsMessage] = useState('Loading events from Supabase...');
   const [addingEvent, setAddingEvent] = useState(false);
@@ -9567,7 +9568,6 @@ export default function SchedulerApp() {
   const supabaseEventsRef = useRef([]);
   const supabaseEventsLoadedRef = useRef(false);
   const eventsLoadPromiseRef = useRef(null);
-  const eventsPartialRetryCountRef = useRef(0);
 
   useEffect(() => {
     supabaseEventsRef.current = supabaseEvents;
@@ -9615,13 +9615,11 @@ export default function SchedulerApp() {
   }, [authEmail]);
 
   const loadEventsFromSupabase = async () => {
-    // Loading reliability rule: never publish an in-progress event read. Concurrent
-    // callers share one request, the authoritative events table is fetched in pages,
-    // and the completed snapshot is committed once at the end. The previous v2.11
-    // cold-start verification loop intentionally re-read the entire table two or
-    // three times; that protected against partial-looking data but made startup far
-    // too slow as Scheduler history grew. A successful paginated read is already
-    // complete: if any page fails, nothing is published.
+    // v2.11b loading rule: keep the known-fast v2.10 event read pattern, but make
+    // the publication atomic and coalesce concurrent auth/startup refreshes. This
+    // prevents competing loads from temporarily replacing the Calendar/Board with
+    // different snapshots, without forcing a full-table pagination crawl before
+    // Scheduler can open.
     if (eventsLoadPromiseRef.current) return eventsLoadPromiseRef.current;
 
     const runLoad = async () => {
@@ -9645,111 +9643,111 @@ export default function SchedulerApp() {
       }
 
       setEventsRefreshing(true);
+      setEventsLoadError('');
 
-      const fetchSnapshot = async () => {
-        // Supabase/PostgREST commonly caps one SELECT response. Fetch every page
-        // sequentially, but do it only once per refresh. If any page errors, return
-        // the error and leave the currently displayed complete snapshot untouched.
-        const rows = [];
-        const pageSize = 1000;
-        let pageStart = 0;
-        let pageGuard = 0;
-
-        while (pageGuard < 50) {
-          const { data: pageRows, error: pageError } = await supabase
-            .from('events')
-            .select('*')
-            .order('date', { ascending: true })
-            .order('id', { ascending: true })
-            .range(pageStart, pageStart + pageSize - 1);
-
-          if (pageError) return { error: pageError };
-
-          const page = pageRows || [];
-          rows.push(...page);
-          if (page.length < pageSize) break;
-          pageStart += pageSize;
-          pageGuard += 1;
+      const withTimeout = async (promise, label, timeoutMs = 20000) => {
+        let timeoutId;
+        try {
+          return await Promise.race([
+            Promise.resolve(promise),
+            new Promise((_, reject) => {
+              timeoutId = window.setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)} seconds.`)), timeoutMs);
+            })
+          ]);
+        } finally {
+          if (timeoutId) window.clearTimeout(timeoutId);
         }
-
-        if (pageGuard >= 50) return { error: new Error('Event load exceeded the safety pagination limit.') };
-
-        // Every event source lives in the authoritative events table. The old v2.11
-        // compatibility reads for manual and Google-import rows queried the same table
-        // again and then de-duped the results. They are intentionally unnecessary here.
-        const finalRows = dedupeSupabaseEventRowsByStableIdentity(rows);
-        const duplicateStableIdentityCount = Math.max(0, rows.length - finalRows.length);
-        const loadedEvents = finalRows.map(row => ({ ...supabaseRowToEvent(row), localBackupOnly: false }));
-
-        return {
-          finalRows,
-          loadedEvents,
-          duplicateStableIdentityCount,
-          importedCount: 0
-        };
       };
 
-      const snapshot = await fetchSnapshot();
-      if (snapshot.error) {
-        console.warn('Could not load events from Supabase', snapshot.error);
-        setEventsMessage(`Could not refresh Supabase events: ${snapshot.error.message}. The last complete schedule is still being shown.`);
-        setEventsRefreshing(false);
-        return false;
-      }
+      try {
+        // These are the same event sources v2.10 used successfully in production.
+        // Run them together instead of serially, then merge/dedupe off-screen and
+        // publish exactly once when all reads have completed.
+        const [baseResult, googleResult, manualResult] = await Promise.all([
+          withTimeout(
+            supabase.from('events').select('*').order('date', { ascending: true }),
+            'Main schedule read'
+          ),
+          withTimeout(
+            supabase.from('events').select('*').eq('source', 'google_calendar_import').order('date', { ascending: true }),
+            'Google-import schedule read'
+          ),
+          withTimeout(
+            supabase.from('events').select('*').or('source.eq.manual_app,source.eq.app,client_event_id.like.custom-%').order('created_at', { ascending: false }),
+            'Manual-event schedule read'
+          )
+        ]);
 
-      // Refresh protection: event removal is soft-delete in normal Scheduler use,
-      // so a large sudden row-count collapse is almost always a transient/session
-      // read problem. Keep the last complete snapshot instead of flashing a mostly
-      // empty Calendar/Board. This applies only after a complete snapshot is already
-      // on screen; the initial load publishes the first successful paginated read.
-      const previousCount = supabaseEventsRef.current.length;
-      const nextCount = snapshot.loadedEvents.length;
-      const suspiciousShrink = supabaseEventsLoadedRef.current
-        && previousCount >= 20
-        && nextCount <= Math.floor(previousCount * 0.82)
-        && (previousCount - nextCount) >= 10;
+        if (baseResult.error) throw baseResult.error;
+        if (googleResult.error) console.warn('Could not explicitly load Google Calendar imported events', googleResult.error);
+        if (manualResult.error) console.warn('Could not explicitly load manual events from Supabase', manualResult.error);
 
-      if (suspiciousShrink) {
-        console.warn(`Rejected a suspicious partial schedule refresh (${nextCount} rows vs ${previousCount} already loaded).`);
-        setEventsMessage(`Scheduler received an incomplete-looking refresh (${nextCount} of ${previousCount} known event rows), so it kept the last complete schedule instead of briefly hiding events. Retrying automatically…`);
-        setEventsRefreshing(false);
-        if (eventsPartialRetryCountRef.current < 2) {
-          eventsPartialRetryCountRef.current += 1;
-          window.setTimeout(() => loadEventsFromSupabase(), 1200);
+        const rowsBySupabaseId = new Map();
+        [
+          ...(baseResult.data || []),
+          ...(googleResult.error ? [] : (googleResult.data || [])),
+          ...(manualResult.error ? [] : (manualResult.data || []))
+        ].forEach(row => {
+          if (row?.id) rowsBySupabaseId.set(row.id, row);
+        });
+
+        const combinedRows = Array.from(rowsBySupabaseId.values());
+        const finalRows = dedupeSupabaseEventRowsByStableIdentity(combinedRows);
+        const duplicateStableIdentityCount = Math.max(0, combinedRows.length - finalRows.length);
+        const loadedEvents = finalRows.map(row => ({ ...supabaseRowToEvent(row), localBackupOnly: false }));
+
+        // Once a complete snapshot is already visible, never replace it with a
+        // dramatically smaller refresh. A transient auth/RLS/read problem should
+        // leave the last known-good schedule on screen rather than making schools
+        // appear to disappear.
+        const previousCount = supabaseEventsRef.current.length;
+        const nextCount = loadedEvents.length;
+        const suspiciousShrink = supabaseEventsLoadedRef.current
+          && previousCount >= 20
+          && nextCount <= Math.floor(previousCount * 0.82)
+          && (previousCount - nextCount) >= 10;
+
+        if (suspiciousShrink) {
+          const msg = `Scheduler received an incomplete-looking refresh (${nextCount} of ${previousCount} known event rows), so it kept the last complete schedule.`;
+          console.warn(msg);
+          setEventsMessage(`${msg} Use Reload Supabase Events to try again.`);
+          setEventsRefreshing(false);
+          return false;
         }
+
+        if (duplicateStableIdentityCount) {
+          console.warn(`Ignored ${duplicateStableIdentityCount} duplicate Supabase event row${duplicateStableIdentityCount === 1 ? '' : 's'} with the same client_event_id while building the current schedule.`);
+        }
+
+        // Atomic publish: this is the only point where the visible shared schedule
+        // is replaced by the newly loaded snapshot.
+        supabaseEventsRef.current = loadedEvents;
+        supabaseEventsLoadedRef.current = true;
+        setSupabaseEvents(loadedEvents);
+        setSupabaseEventsLoaded(true);
+        setEventsLoadError('');
+
+        const localBackup = loadLocalManualEvents();
+        const localOnlyBackup = localBackup.filter(localEvent => !loadedEvents.some(loaded => loaded.id === localEvent.id || loaded.supabaseId === localEvent.supabaseId));
+        setLocalManualEvents(localOnlyBackup);
+
+        const manualCount = finalRows.filter(row => row.source === 'manual_app' || row.source === 'app' || row.client_event_id?.startsWith('custom-')).length;
+        const googleImportCount = finalRows.filter(row => row.source === 'google_calendar_import').length;
+        const localOnlyCount = localOnlyBackup.length;
+        setEventsMessage(`Loaded ${finalRows.length} authoritative Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${duplicateStableIdentityCount ? `; ignored ${duplicateStableIdentityCount} duplicate row${duplicateStableIdentityCount === 1 ? '' : 's'} with the same stable event ID` : ''}${localOnlyCount ? `; ${localOnlyCount} browser safety backup${localOnlyCount === 1 ? '' : 's'} retained locally but excluded from the current schedule` : ''}.`);
+        setEventsRefreshing(false);
+        return true;
+      } catch (error) {
+        console.error('Could not load the complete Supabase schedule', error);
+        const msg = error?.message || 'Unexpected schedule loading error.';
+        setEventsLoadError(msg);
+        setEventsMessage(`Could not load the complete Supabase schedule: ${msg} ${supabaseEventsLoadedRef.current ? 'The last complete schedule is still being shown.' : 'No partial schedule was displayed.'}`);
+        setEventsRefreshing(false);
         return false;
       }
-
-      eventsPartialRetryCountRef.current = 0;
-      if (snapshot.duplicateStableIdentityCount) {
-        console.warn(`Ignored ${snapshot.duplicateStableIdentityCount} duplicate Supabase event row${snapshot.duplicateStableIdentityCount === 1 ? '' : 's'} with the same client_event_id while building the current schedule.`);
-      }
-
-      // Atomic publish: one state replacement only after every event page has loaded.
-      supabaseEventsRef.current = snapshot.loadedEvents;
-      supabaseEventsLoadedRef.current = true;
-      setSupabaseEvents(snapshot.loadedEvents);
-      setSupabaseEventsLoaded(true);
-
-      const localBackup = loadLocalManualEvents();
-      const localOnlyBackup = localBackup.filter(localEvent => !snapshot.loadedEvents.some(loaded => loaded.id === localEvent.id || loaded.supabaseId === localEvent.supabaseId));
-      setLocalManualEvents(localOnlyBackup);
-
-      const manualCount = snapshot.finalRows.filter(row => row.source === 'manual_app' || row.source === 'app' || row.client_event_id?.startsWith('custom-')).length;
-      const googleImportCount = snapshot.finalRows.filter(row => row.source === 'google_calendar_import').length;
-      const localOnlyCount = localOnlyBackup.length;
-      setEventsMessage(`Loaded ${snapshot.finalRows.length} authoritative Supabase events, including ${manualCount} manual event${manualCount === 1 ? '' : 's'} and ${googleImportCount} Google Calendar import event${googleImportCount === 1 ? '' : 's'}${snapshot.duplicateStableIdentityCount ? `; ignored ${snapshot.duplicateStableIdentityCount} duplicate row${snapshot.duplicateStableIdentityCount === 1 ? '' : 's'} with the same stable event ID` : ''}${localOnlyCount ? `; ${localOnlyCount} browser safety backup${localOnlyCount === 1 ? '' : 's'} retained locally but excluded from the current schedule` : ''}.`);
-      setEventsRefreshing(false);
-      return true;
     };
 
     const promise = runLoad()
-      .catch(error => {
-        console.error('Unexpected Supabase event refresh failure', error);
-        setEventsMessage(`Could not refresh Supabase events: ${error?.message || 'Unexpected error'}. The last complete schedule is still being shown.`);
-        setEventsRefreshing(false);
-        return false;
-      })
       .finally(() => {
         if (eventsLoadPromiseRef.current === promise) eventsLoadPromiseRef.current = null;
       });
@@ -9988,6 +9986,7 @@ export default function SchedulerApp() {
     return supabaseEvents.filter(event => event.active === false);
   }, [supabaseEvents, authReady, authEmail]);
   const scheduleSnapshotPending = hasSupabaseEnv() && (!authReady || (Boolean(authEmail) && !supabaseEventsLoaded));
+  const scheduleSnapshotFailed = hasSupabaseEnv() && authReady && Boolean(authEmail) && !supabaseEventsLoaded && Boolean(eventsLoadError);
   const handleScheduleEvent = async (event, previousEventOverride = null) => {
     if (!canEditScheduler) {
       setEventsMessage('Your account has view-only access. Ask an Admin or Photographer to make scheduling changes.');
@@ -10333,10 +10332,11 @@ export default function SchedulerApp() {
           {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} onAddEvent={openAddEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
           {activeTab === 'Calendar View' && (scheduleSnapshotPending ? (
             <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-zinc-200 bg-white/75 p-8 text-center shadow-sm">
-              <div>
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" />
-                <div className="mt-3 text-base font-black text-zinc-950">Loading the complete schedule…</div>
-                <div className="mt-1 text-sm font-semibold text-zinc-500">Calendar will appear as soon as the complete paginated Supabase event snapshot is ready, rather than briefly showing a partial calendar.</div>
+              <div className="max-w-xl">
+                {!scheduleSnapshotFailed ? <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" /> : null}
+                <div className="mt-3 text-base font-black text-zinc-950">{scheduleSnapshotFailed ? 'The schedule did not finish loading.' : 'Loading the complete schedule…'}</div>
+                <div className="mt-1 text-sm font-semibold text-zinc-500">{scheduleSnapshotFailed ? eventsLoadError : 'Scheduler is loading the shared event snapshot without displaying a partial calendar.'}</div>
+                {scheduleSnapshotFailed ? <button type="button" onClick={loadEventsFromSupabase} disabled={eventsRefreshing} className="mt-4 rounded-2xl border border-zinc-300 bg-white px-4 py-2 text-sm font-black text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-50">{eventsRefreshing ? 'Retrying…' : 'Retry Schedule Load'}</button> : null}
               </div>
             </div>
           ) : <>
@@ -10350,10 +10350,11 @@ export default function SchedulerApp() {
           {activeTab === 'Carrie View' && <CarrieView query={query} onClickEvent={setSelected} photographers={photographers} assistants={assistants} events={allEvents} onSchedule={handleScheduleEvent} schoolsList={schools} setSchools={setSchools} onSchoolAdded={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
           {activeTab === 'The Board' && (scheduleSnapshotPending ? (
             <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-zinc-200 bg-white/75 p-8 text-center shadow-sm">
-              <div>
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" />
-                <div className="mt-3 text-base font-black text-zinc-950">Loading the complete schedule for The Board…</div>
-                <div className="mt-1 text-sm font-semibold text-zinc-500">Board tiles will appear only after the current event snapshot is complete.</div>
+              <div className="max-w-xl">
+                {!scheduleSnapshotFailed ? <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" /> : null}
+                <div className="mt-3 text-base font-black text-zinc-950">{scheduleSnapshotFailed ? 'The schedule did not finish loading.' : 'Loading the complete schedule for The Board…'}</div>
+                <div className="mt-1 text-sm font-semibold text-zinc-500">{scheduleSnapshotFailed ? eventsLoadError : 'Board tiles will appear only after the current shared event snapshot is ready.'}</div>
+                {scheduleSnapshotFailed ? <button type="button" onClick={loadEventsFromSupabase} disabled={eventsRefreshing} className="mt-4 rounded-2xl border border-zinc-300 bg-white px-4 py-2 text-sm font-black text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-50">{eventsRefreshing ? 'Retrying…' : 'Retry Schedule Load'}</button> : null}
               </div>
             </div>
           ) : <PostProductionBoard events={allEvents} authEmail={authEmail} canEdit={canEditScheduler} isAdmin={isAdminUser} onViewEvent={setSelected} />)}
