@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2 } from 'lucide-react';
+import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2, AlertTriangle } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
@@ -7926,28 +7926,34 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
       </div>
 
       <div className="px-1.5 sm:px-0">
-        <div className={`flex flex-col gap-2 rounded-2xl border px-3 py-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between ${isCalendarFiltered ? 'border-amber-300 bg-amber-50/90' : 'border-zinc-200 bg-white/80'}`}>
-          <div className="flex min-w-0 items-center gap-2">
+        <div className={`mx-auto rounded-2xl border shadow-sm transition-all ${isCalendarFiltered ? 'max-w-3xl border-amber-400 bg-amber-50 ring-2 ring-amber-200/70' : 'max-w-xl border-zinc-200 bg-white/85'}`}>
+          <div className="flex flex-col items-center justify-center gap-2 px-3 py-2.5 sm:flex-row sm:px-4">
             <label htmlFor="calendar-event-filter" className="shrink-0 text-xs font-black uppercase tracking-wide text-zinc-500">Show:</label>
             <select
               id="calendar-event-filter"
               value={calendarFilter}
               onChange={(event) => setCalendarFilter(event.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-black text-zinc-900 shadow-sm outline-none ring-[#AEBB9E]/30 focus:ring-4 sm:min-w-[280px] sm:flex-none"
+              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-black text-zinc-900 shadow-sm outline-none ring-[#AEBB9E]/30 focus:ring-4 sm:w-auto sm:min-w-[320px]"
               aria-label="Filter Calendar by event type"
             >
               {CALENDAR_FILTER_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
+            {!isCalendarFiltered ? <span className="text-[11px] font-semibold text-zinc-500 sm:text-xs">All calendar events are visible.</span> : null}
           </div>
+
           {isCalendarFiltered ? (
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <span className="rounded-full border border-amber-400 bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-950 sm:text-xs">FILTERED: {selectedFilter.shortLabel} only</span>
-              <span className="text-[10px] font-semibold text-amber-900 sm:text-xs">Calendar display only · rollout totals stay complete.</span>
-              <button type="button" onClick={() => setCalendarFilter('all')} className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-black text-zinc-900 shadow-sm transition hover:bg-zinc-50">Show All</button>
+            <div className="mx-2 mb-2 flex flex-col gap-2 rounded-xl border border-amber-400 bg-amber-100 px-3 py-2.5 text-amber-950 sm:mx-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <AlertTriangle size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <div className="min-w-0">
+                  <div className="text-xs font-black uppercase tracking-[0.12em]">Filter Mode On</div>
+                  <div className="mt-0.5 text-xs font-bold sm:text-sm">Only {selectedFilter.shortLabel} are shown. Other calendar events are intentionally hidden.</div>
+                  <div className="mt-0.5 text-[10px] font-semibold text-amber-900 sm:text-[11px]">Calendar display only · rollout totals still use the complete schedule.</div>
+                </div>
+              </div>
+              <button type="button" onClick={() => setCalendarFilter('all')} className="shrink-0 rounded-xl border border-amber-500 bg-white px-3.5 py-2 text-xs font-black text-zinc-950 shadow-sm transition hover:bg-amber-50">Show All Events</button>
             </div>
-          ) : (
-            <div className="text-[11px] font-semibold text-zinc-500 sm:text-xs">All Calendar events are visible.</div>
-          )}
+          ) : null}
         </div>
       </div>
 
