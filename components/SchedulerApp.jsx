@@ -4267,7 +4267,7 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
   );
 }
 
-function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
+function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent, emptyMessage = '' }) {
   const cells = getCalendarMonthCells(month);
   const weeks = [];
   for (let i = 0; i < cells.length; i += 7) {
@@ -4339,7 +4339,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
           })}
         </div>
       </div>
-        {events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">No events scheduled for {monthLabel(month)} yet.</div> : null}
+        {events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">{emptyMessage || `No events scheduled for ${monthLabel(month)} yet.`}</div> : null}
       </div>
     </>
   );
@@ -4625,14 +4625,14 @@ function PhotographerAssignmentPicker({ photographers, selectedPhotographers, se
   );
 }
 
-function WeekView({ events, selectedDate, onClick, rolloutCapacityOverrides = {} }) {
+function WeekView({ events, rolloutEvents = events, selectedDate, onClick, rolloutCapacityOverrides = {} }) {
   const { start, end } = weekBounds(selectedDate);
   const { start: rolloutStart, end: rolloutEnd } = rolloutWeekBounds(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const weekEvents = events.filter(event => event && event.date && event.date <= end && (event.endDate || event.date) >= start);
-  const weeklyRollouts = getRolloutCountForDateRange(events, rolloutStart, rolloutEnd);
+  const weeklyRollouts = getRolloutCountForDateRange(rolloutEvents, rolloutStart, rolloutEnd);
   const weeklyCapacity = getWeeklyRolloutCapacity(rolloutStart, rolloutCapacityOverrides);
-  const photographerSummary = getPhotographerRolloutSummaryForDateRange(events, rolloutStart, rolloutEnd);
+  const photographerSummary = getPhotographerRolloutSummaryForDateRange(rolloutEvents, rolloutStart, rolloutEnd);
   const capacity = getCapacityTone(weeklyRollouts, weeklyCapacity);
   const pct = Math.min(100, Math.round((weeklyRollouts / weeklyCapacity) * 100));
   const segments = buildMonthWeekSegments(events, days, null);
@@ -4704,7 +4704,7 @@ function WeekView({ events, selectedDate, onClick, rolloutCapacityOverrides = {}
   );
 }
 
-function DayView({ events, onClick, selectedDate }) {
+function DayView({ events, onClick, selectedDate, emptyMessage = '' }) {
   const dayEvents = events.filter(event => isDateInEventRange(event, selectedDate));
   if (!dayEvents.length) return (
     <div className="rounded-3xl border border-zinc-200 bg-white/60 p-8 text-center text-sm text-zinc-500 shadow-sm">
@@ -4712,7 +4712,7 @@ function DayView({ events, onClick, selectedDate }) {
         <span className="shrink-0">{formatDate(selectedDate)}</span>
         <HolidayText date={selectedDate} className="text-xs" />
       </div>
-      <div>No events scheduled yet.</div>
+      <div>{emptyMessage || 'No events scheduled yet.'}</div>
     </div>
   );
   return (
@@ -7870,7 +7870,36 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
   );
 }
 
+const CALENDAR_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Events', shortLabel: 'All Events', types: null },
+  { value: 'picture-days', label: 'Picture Days (Fall + Spring)', shortLabel: 'Picture Days', types: ['Fall Picture Day', 'Spring Picture Day'] },
+  { value: 'fall-picture-days', label: 'Fall Picture Days', shortLabel: 'Fall Picture Days', types: ['Fall Picture Day'] },
+  { value: 'spring-picture-days', label: 'Spring Picture Days', shortLabel: 'Spring Picture Days', types: ['Spring Picture Day'] },
+  { value: 'makeups', label: 'Makeup Days', shortLabel: 'Makeup Days', types: ['Makeup Day'] },
+  { value: 'sports', label: 'Sports', shortLabel: 'Sports', types: ['Sports'] },
+  { value: 'seniors', label: 'Seniors', shortLabel: 'Seniors', types: ['Seniors'] },
+  { value: 'sas', label: 'Studio Assigned Schools (SAS)', shortLabel: 'SAS', types: ['Studio Assigned Schools (SAS)'] },
+  { value: 'special-events', label: 'Special Events / Headshots / Family Photos', shortLabel: 'Special Events / Headshots / Family Photos', types: ['Special Event', 'Headshots', 'Family Photos'] },
+  { value: 'rain-dates', label: 'Rain Dates', shortLabel: 'Rain Dates', types: ['Rain Date'] },
+  { value: 'school-holidays', label: 'School Holidays', shortLabel: 'School Holidays', types: ['School Holiday Calendar'] },
+  { value: 'time-off-personal', label: 'Time Off / Personal Appointments', shortLabel: 'Time Off / Personal', types: ['Time Off', 'Personal Appointment'] },
+  { value: 'calls-meetings', label: 'Calls / Meetings', shortLabel: 'Calls / Meetings', types: ['Call or Meeting'] },
+  { value: 'edit-days', label: 'Edit Days', shortLabel: 'Edit Days', types: ['Edit Day'] },
+  { value: 'photo-booths', label: 'Photo Booths', shortLabel: 'Photo Booths', types: ['Photo Booth'] }
+];
+
+function eventMatchesCalendarFilter(event = {}, filterValue = 'all') {
+  const option = CALENDAR_FILTER_OPTIONS.find(item => item.value === filterValue) || CALENDAR_FILTER_OPTIONS[0];
+  if (!option.types) return true;
+  return option.types.includes(String(event?.type || '').trim());
+}
+
 function CalendarView({ viewMode, setViewMode, events, month, setMonth, selectedDate, setSelectedDate, onClick, onAddEvent, canEdit = true, rolloutCapacityOverrides = {} }) {
+  const [calendarFilter, setCalendarFilter] = useState('all');
+  const selectedFilter = CALENDAR_FILTER_OPTIONS.find(item => item.value === calendarFilter) || CALENDAR_FILTER_OPTIONS[0];
+  const filteredEvents = useMemo(() => (events || []).filter(event => eventMatchesCalendarFilter(event, calendarFilter)), [events, calendarFilter]);
+  const isCalendarFiltered = calendarFilter !== 'all';
+  const filteredEmptyMessage = isCalendarFiltered ? `No ${selectedFilter.shortLabel} events match this view.` : '';
   const viewSwitcher = (
     <div className="grid w-full grid-cols-3 rounded-2xl border border-zinc-200 bg-white/80 p-1 shadow-sm sm:w-auto">
       {['Month', 'Week', 'Day'].map(mode => (
@@ -7896,10 +7925,36 @@ function CalendarView({ viewMode, setViewMode, events, month, setMonth, selected
         <div className="justify-self-end">{viewSwitcher}</div>
       </div>
 
+      <div className="px-1.5 sm:px-0">
+        <div className={`flex flex-col gap-2 rounded-2xl border px-3 py-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between ${isCalendarFiltered ? 'border-amber-300 bg-amber-50/90' : 'border-zinc-200 bg-white/80'}`}>
+          <div className="flex min-w-0 items-center gap-2">
+            <label htmlFor="calendar-event-filter" className="shrink-0 text-xs font-black uppercase tracking-wide text-zinc-500">Show:</label>
+            <select
+              id="calendar-event-filter"
+              value={calendarFilter}
+              onChange={(event) => setCalendarFilter(event.target.value)}
+              className="min-w-0 flex-1 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-black text-zinc-900 shadow-sm outline-none ring-[#AEBB9E]/30 focus:ring-4 sm:min-w-[280px] sm:flex-none"
+              aria-label="Filter Calendar by event type"
+            >
+              {CALENDAR_FILTER_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </div>
+          {isCalendarFiltered ? (
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <span className="rounded-full border border-amber-400 bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-950 sm:text-xs">FILTERED: {selectedFilter.shortLabel} only</span>
+              <span className="text-[10px] font-semibold text-amber-900 sm:text-xs">Calendar display only · rollout totals stay complete.</span>
+              <button type="button" onClick={() => setCalendarFilter('all')} className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-black text-zinc-900 shadow-sm transition hover:bg-zinc-50">Show All</button>
+            </div>
+          ) : (
+            <div className="text-[11px] font-semibold text-zinc-500 sm:text-xs">All Calendar events are visible.</div>
+          )}
+        </div>
+      </div>
+
       <div className="px-1.5 sm:px-0"><CalendarColorKey /></div>
-      {viewMode === 'Month' && <MonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={canEdit ? onAddEvent : null} />}
-      {viewMode === 'Week' && <WeekView events={events} selectedDate={selectedDate} onClick={onClick} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
-      {viewMode === 'Day' && <DayView events={events} selectedDate={selectedDate} onClick={onClick} />}
+      {viewMode === 'Month' && <MonthView events={filteredEvents} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={canEdit ? onAddEvent : null} emptyMessage={filteredEmptyMessage} />}
+      {viewMode === 'Week' && <WeekView events={filteredEvents} rolloutEvents={events} selectedDate={selectedDate} onClick={onClick} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
+      {viewMode === 'Day' && <DayView events={filteredEvents} selectedDate={selectedDate} onClick={onClick} emptyMessage={filteredEmptyMessage} />}
     </div>
   );
 }
