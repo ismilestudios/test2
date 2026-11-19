@@ -681,15 +681,29 @@ function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.', canEdit =
     <div className="space-y-4">
       {entries.map(entry => {
         const isEditing = editingId === entry.id;
+        const authorLabel = entry.name || displayNameFromEmail(entry.email || '') || 'Unknown Author';
+        const savedAt = entry.savedAt || entry.date || '';
+        const savedLabel = [formatAttributionTime(savedAt), formatShortAttributionDate(savedAt)].filter(Boolean).join(' ');
         const editedLabel = entry.editedAt ? `Edited by ${entry.editedName || displayNameFromEmail(entry.editedEmail || '')} • ${formatAttributionTime(entry.editedAt)} ${formatShortAttributionDate(entry.editedAt)}` : '';
         return (
-          <div key={entry.id} className={isEditing ? 'rounded-2xl border border-[#AEBB9E] bg-white/80 p-3' : ''}>
+          <div key={entry.id} className={isEditing ? 'rounded-2xl border-2 border-[#AEBB9E] bg-[#F8FAF7] p-3 shadow-sm' : ''}>
             {isEditing ? (
-              <div className="space-y-2">
-                <textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} rows={4} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
+              <div className="space-y-3">
+                <div className="rounded-xl border border-[#AEBB9E]/70 bg-[#DDE8D2]/55 px-3 py-2">
+                  <div className="text-[11px] font-black uppercase tracking-[0.14em] text-zinc-700">Editing this Picture Day Note</div>
+                  <div className="mt-1 text-[11px] font-semibold text-zinc-500">Originally saved by {authorLabel}{savedLabel ? ` • ${savedLabel}` : ''}</div>
+                </div>
+                <div className="rounded-xl border border-zinc-200 bg-white/75 px-3 py-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Original note</div>
+                  <div className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-zinc-600">{entry.text}</div>
+                </div>
+                <label className="block">
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">Updated note</div>
+                  <textarea autoFocus value={draftText} onChange={(event) => setDraftText(event.target.value)} rows={4} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
+                </label>
                 <div className="flex justify-end gap-2">
                   <button type="button" onClick={() => { setEditingId(null); setDraftText(''); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button>
-                  <button type="button" onClick={() => { onEditNote(entry.id, draftText); setEditingId(null); setDraftText(''); }} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white">Save Note Edit</button>
+                  <button type="button" disabled={!String(draftText || '').trim()} onClick={async () => { const saved = await onEditNote(entry.id, draftText); if (saved !== false) { setEditingId(null); setDraftText(''); } }} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Save Changes to This Note</button>
                 </div>
               </div>
             ) : (
@@ -701,7 +715,7 @@ function NoteHistoryList({ entries = [], emptyLabel = 'No notes yet.', canEdit =
                     {editedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{editedLabel}</div> : null}
                   </div>
                   {canEdit && onEditNote ? (
-                    <button type="button" onClick={() => { setEditingId(entry.id); setDraftText(entry.text); }} className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-600 transition hover:bg-zinc-50">Edit</button>
+                    <button type="button" onClick={() => { setEditingId(entry.id); setDraftText(entry.text); }} className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-600 transition hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/40">Edit This Note</button>
                   ) : null}
                 </div>
               </>
@@ -2253,8 +2267,26 @@ function supabaseRowToPostProductionAdminControl(row = {}) {
     hiddenBy: row.hidden_by || '',
     completedAt: row.completed_at || '',
     completedBy: row.completed_by || '',
+    deletedAt: row.deleted_at || '',
+    deletedBy: row.deleted_by || '',
     createdAt: row.created_at || '',
     updatedAt: row.updated_at || ''
+  };
+}
+
+function supabaseRowToPostProductionActivity(row = {}) {
+  return {
+    id: row.id || '',
+    eventId: row.event_id || '',
+    eventTitle: row.event_title || '',
+    photographerKey: row.photographer_key || '',
+    photographerName: row.photographer_name || '',
+    actionType: row.action_type || '',
+    actionText: row.action_text || '',
+    fromStage: row.from_stage || '',
+    toStage: row.to_stage || '',
+    actorEmail: row.actor_email || '',
+    createdAt: row.created_at || ''
   };
 }
 
@@ -2541,6 +2573,8 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
   const [notesByEventId, setNotesByEventId] = useState({});
   const [adminControlsById, setAdminControlsById] = useState({});
   const [adminControlsReady, setAdminControlsReady] = useState(false);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [activityAvailable, setActivityAvailable] = useState(true);
   const [boardSnapshotReady, setBoardSnapshotReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -2561,6 +2595,8 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       setNotesByEventId({});
       setAdminControlsById({});
       setAdminControlsReady(false);
+      setRecentActivity([]);
+      setActivityAvailable(false);
       setBoardSnapshotReady(false);
       setLoading(false);
       setMessage('Supabase is not connected, so The Board cannot be shared yet.');
@@ -2573,6 +2609,14 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       return;
     }
     setLoading(true);
+    // Board activity is helpful context, but it must never delay the operational Board.
+    // Start it alongside the core reads and publish stages/notes/Admin controls as soon
+    // as those three authoritative Board sources are complete.
+    const activityPromise = supabase
+      .from('post_production_activity')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(12);
     const [boardResult, notesResult, adminControlsResult] = await Promise.all([
       supabase.from('post_production_board_photographers').select('*').order('updated_at', { ascending: false }),
       supabase.from('post_production_notes').select('*').order('created_at', { ascending: false }),
@@ -2626,6 +2670,16 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     setBoardSnapshotReady(true);
     setMessage('');
     setLoading(false);
+
+    const activityResult = await activityPromise;
+    if (activityResult.error) {
+      setRecentActivity([]);
+      setActivityAvailable(false);
+      setMessage('Recent Board Activity is unavailable until the v2.13 SQL migration is installed. Board stages and notes are still fully available.');
+      return;
+    }
+    setRecentActivity((activityResult.data || []).map(supabaseRowToPostProductionActivity));
+    setActivityAvailable(true);
   };
 
   useEffect(() => {
@@ -2670,7 +2724,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     .filter(tile => {
       const eventControl = adminControlsById[postProductionAdminControlId(tile.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY)] || null;
       const tileControl = adminControlsById[postProductionAdminControlId(tile.eventId, tile.photographerKey)] || null;
-      if (eventControl?.hiddenAt || tileControl?.completedAt) return false;
+      if (eventControl?.hiddenAt || eventControl?.deletedAt || tileControl?.completedAt) return false;
       return !isPostProductionRecordHidden(recordsByTileId[tile.tileId], nowTick);
     }), [allBoardTiles, recordsByTileId, adminControlsById, nowTick]);
 
@@ -2693,7 +2747,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
 
     allBoardTiles.forEach(tile => {
       const control = adminControlsById[postProductionAdminControlId(tile.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY)] || null;
-      if (!control?.hiddenAt) return;
+      if (!control?.hiddenAt || control?.deletedAt) return;
 
       const existing = hiddenByEventId.get(tile.eventId);
       if (existing) {
@@ -2727,6 +2781,38 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     Object.values(map).forEach(list => list.sort((a, b) => a.index - b.index));
     return map;
   }, [allBoardTiles]);
+
+  const logBoardActivity = async ({ eventId = '', eventTitle = '', photographerKey = '', photographerName = '', actionType = '', actionText = '', fromStage = '', toStage = '' } = {}) => {
+    if (!eventId || !actionType || !actionText || !hasSupabaseEnv()) return false;
+    const supabase = createClient();
+    if (!supabase) return false;
+    const { data, error } = await supabase
+      .from('post_production_activity')
+      .insert({
+        event_id: eventId,
+        event_title: eventTitle || null,
+        photographer_key: photographerKey || null,
+        photographer_name: photographerName || null,
+        action_type: actionType,
+        action_text: actionText,
+        from_stage: fromStage || null,
+        to_stage: toStage || null,
+        actor_email: authEmail || null
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.warn('Board activity log was not saved', error);
+      setActivityAvailable(false);
+      return false;
+    }
+
+    const saved = supabaseRowToPostProductionActivity(data);
+    setRecentActivity(current => [saved, ...(current || []).filter(item => item.id !== saved.id)].slice(0, 12));
+    setActivityAvailable(true);
+    return saved;
+  };
 
   const saveBoardRecord = async (tile, patch = {}) => {
     const event = tile?.event;
@@ -2773,6 +2859,18 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
     const saved = supabaseRowToPostProductionRecord(data);
     setRecordsByTileId(current => ({ ...current, [saved.tileId]: saved }));
     setMessage('');
+    if (stageChanged) {
+      await logBoardActivity({
+        eventId: event.supabaseId,
+        eventTitle: event.title || '',
+        photographerKey: tile.photographerKey,
+        photographerName: tile.photographerName,
+        actionType: 'stage_moved',
+        actionText: `${tile.photographerName}: ${event.title || 'Untitled event'} — ${postProductionStageLabel(previousStage)} → ${postProductionStageLabel(nextStage)}`,
+        fromStage: previousStage,
+        toStage: nextStage
+      });
+    }
     return saved;
   };
 
@@ -2803,6 +2901,8 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       hidden_by: patch.hiddenBy !== undefined ? patch.hiddenBy : (previous?.hiddenBy || null),
       completed_at: patch.completedAt !== undefined ? patch.completedAt : (previous?.completedAt || null),
       completed_by: patch.completedBy !== undefined ? patch.completedBy : (previous?.completedBy || null),
+      deleted_at: patch.deletedAt !== undefined ? patch.deletedAt : (previous?.deletedAt || null),
+      deleted_by: patch.deletedBy !== undefined ? patch.deletedBy : (previous?.deletedBy || null),
       updated_at: nowIso
     };
 
@@ -2816,7 +2916,7 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
 
     if (error || !data) {
       setAdminControlsReady(false);
-      setMessage(`Board Admin control was not saved: ${error?.message || 'Supabase did not return the saved control.'}. Run supabase/v2_06_board_admin_controls.sql if needed.`);
+      setMessage(`Board Admin control was not saved: ${error?.message || 'Supabase did not return the saved control.'}. Confirm the Board Admin controls migrations through v2.13 have been installed.`);
       return false;
     }
 
@@ -2835,15 +2935,58 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       hiddenAt: new Date().toISOString(),
       hiddenBy: authEmail || null
     });
-    if (saved && selectedBoardTile?.eventId === tile.eventId) setSelectedBoardTile(null);
+    if (saved) {
+      await logBoardActivity({
+        eventId: tile.eventId,
+        eventTitle,
+        actionType: 'event_hidden',
+        actionText: `hid ${eventTitle} from The Board`
+      });
+      if (selectedBoardTile?.eventId === tile.eventId) setSelectedBoardTile(null);
+    }
   };
 
   const restoreHiddenBoardEvent = async (hiddenEvent) => {
     if (!isAdmin || !hiddenEvent?.eventId) return;
-    await savePostProductionAdminControl(hiddenEvent.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY, {
+    const eventTitle = hiddenEvent.event?.title || 'this event';
+    const saved = await savePostProductionAdminControl(hiddenEvent.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY, {
       hiddenAt: null,
       hiddenBy: null
     });
+    if (saved) {
+      await logBoardActivity({
+        eventId: hiddenEvent.eventId,
+        eventTitle,
+        actionType: 'event_restored',
+        actionText: `restored ${eventTitle} to The Board`
+      });
+    }
+  };
+
+  const permanentlyDeleteHiddenBoardEvent = async (hiddenEvent) => {
+    if (!isAdmin || !hiddenEvent?.eventId) return;
+    const eventTitle = hiddenEvent.event?.title || 'this event';
+    if (typeof window !== 'undefined') {
+      const firstConfirm = window.confirm(`Permanently remove ${eventTitle} from The Board?\n\nThis does NOT delete the Scheduler event. It removes the event from both the active Board and the Hidden recovery section. Existing Board stage/note records are retained in Supabase for safety, but Scheduler will no longer show this event on The Board.`);
+      if (!firstConfirm) return;
+      const finalConfirm = window.confirm(`Final confirmation:\n\nPermanently remove ${eventTitle} from The Board?\n\nThis cannot be undone from the Hidden section.`);
+      if (!finalConfirm) return;
+    }
+    const saved = await savePostProductionAdminControl(hiddenEvent.eventId, POST_PRODUCTION_EVENT_CONTROL_KEY, {
+      hiddenAt: null,
+      hiddenBy: null,
+      deletedAt: new Date().toISOString(),
+      deletedBy: authEmail || null
+    });
+    if (saved) {
+      await logBoardActivity({
+        eventId: hiddenEvent.eventId,
+        eventTitle,
+        actionType: 'event_deleted_from_board',
+        actionText: `permanently removed ${eventTitle} from The Board`
+      });
+      if (selectedBoardTile?.eventId === hiddenEvent.eventId) setSelectedBoardTile(null);
+    }
   };
 
   const completeBoardTile = async (tile) => {
@@ -2855,7 +2998,17 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       completedAt: new Date().toISOString(),
       completedBy: authEmail || null
     });
-    if (saved && selectedBoardTile?.tileId === tile.tileId) setSelectedBoardTile(null);
+    if (saved) {
+      await logBoardActivity({
+        eventId: tile.eventId,
+        eventTitle: tile.event?.title || '',
+        photographerKey: tile.photographerKey,
+        photographerName: tile.photographerName,
+        actionType: 'tile_done',
+        actionText: `marked ${tile.photographerName} done for ${tile.event?.title || 'this event'}`
+      });
+      if (selectedBoardTile?.tileId === tile.tileId) setSelectedBoardTile(null);
+    }
   };
 
   const addPostProductionNote = async (event, text) => {
@@ -2894,6 +3047,12 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       [event.supabaseId]: sortPostProductionNotesNewestFirst([saved, ...(current[event.supabaseId] || [])])
     }));
     setMessage('');
+    await logBoardActivity({
+      eventId: event.supabaseId,
+      eventTitle: event.title || '',
+      actionType: 'note_added',
+      actionText: `added a Post-Production Note to ${event.title || 'this event'}`
+    });
     return saved;
   };
 
@@ -2937,6 +3096,12 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       [event.supabaseId]: sortPostProductionNotesNewestFirst((current[event.supabaseId] || []).map(note => note.id === saved.id ? saved : note))
     }));
     setMessage('');
+    await logBoardActivity({
+      eventId: event.supabaseId,
+      eventTitle: event.title || '',
+      actionType: 'note_edited',
+      actionText: `edited a Post-Production Note on ${event.title || 'this event'}`
+    });
     return saved;
   };
 
@@ -2986,6 +3151,34 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
       </div>
 
       {message ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{message}</div> : null}
+
+      <section className="rounded-2xl border border-zinc-200 bg-white/85 px-3 py-3 shadow-sm" aria-label="Recent Board activity">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-zinc-600"><History size={14} />Recent Board Activity</div>
+            <div className="mt-0.5 text-[11px] font-semibold text-zinc-400">Latest shared Board changes across staff.</div>
+          </div>
+          <Pill className="border-zinc-200 bg-zinc-50 text-zinc-500">{recentActivity.length ? `${Math.min(recentActivity.length, 6)} shown` : 'No activity yet'}</Pill>
+        </div>
+        {recentActivity.length ? (
+          <div className="mt-2 grid gap-1.5 lg:grid-cols-2">
+            {recentActivity.slice(0, 6).map(item => {
+              const actor = displayNameFromEmail(item.actorEmail || '') || item.actorEmail || 'Staff';
+              const when = [formatShortAttributionDate(item.createdAt), formatAttributionTime(item.createdAt)].filter(Boolean).join(' ');
+              return (
+                <div key={item.id} className="rounded-xl border border-zinc-100 bg-zinc-50/75 px-3 py-2 text-xs leading-5 text-zinc-700">
+                  <span className="font-black text-zinc-900">{actor}</span> <span>{item.actionText}</span>
+                  {when ? <span className="ml-1 whitespace-nowrap font-semibold text-zinc-400">• {when}</span> : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-2 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-3 py-3 text-center text-xs font-semibold text-zinc-400">
+            {activityAvailable ? 'Board activity will appear here as staff make changes.' : 'Run the v2.13 SQL migration to enable shared Board activity history.'}
+          </div>
+        )}
+      </section>
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-2xl border border-zinc-200 bg-white/85 px-3 py-2 shadow-sm" aria-label="Filter The Board by photographer">
         <span className="mr-1 shrink-0 text-xs font-black text-zinc-600">Photographer:</span>
@@ -3171,15 +3364,26 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
                           Hidden by {hiddenByName}{hiddenDate ? ` · ${hiddenDate}` : ''}{hiddenTime ? ` ${hiddenTime}` : ''}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        disabled={isSaving || !adminControlsReady}
-                        onClick={() => restoreHiddenBoardEvent(hiddenEvent)}
-                        className="shrink-0 rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-zinc-700 transition hover:bg-[#DDE8D2] disabled:opacity-40"
-                        title="Restore this event to its saved Board stages"
-                      >
-                        {isSaving ? 'Restoring…' : 'Restore'}
-                      </button>
+                      <div className="flex shrink-0 flex-col gap-1.5">
+                        <button
+                          type="button"
+                          disabled={isSaving || !adminControlsReady}
+                          onClick={() => restoreHiddenBoardEvent(hiddenEvent)}
+                          className="rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-zinc-700 transition hover:bg-[#DDE8D2] disabled:opacity-40"
+                          title="Restore this event to its saved Board stages"
+                        >
+                          {isSaving ? 'Saving…' : 'Restore'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSaving || !adminControlsReady}
+                          onClick={() => permanentlyDeleteHiddenBoardEvent(hiddenEvent)}
+                          className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-wide text-rose-700 transition hover:bg-rose-100 disabled:opacity-40"
+                          title="Permanently remove this event from The Board without deleting the Scheduler event"
+                        >
+                          Permanent Delete
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );
@@ -5437,6 +5641,10 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
       return { ...prev, [day]: { ...current, [key]: nextList } };
     });
   };
+  const enableAssistantSlot = () => {
+    setNoAssistant(false);
+    setRequiredAssistants(current => Math.max(1, Number(current) || 0));
+  };
   const save = async () => {
     if (saving) return;
     setSaving(true);
@@ -5640,7 +5848,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                               })}
                             </div>
                             {noAssistant || (Number(requiredAssistants) || 0) <= 0 ? (
-                              <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm font-semibold text-zinc-500">No assistant needed for this event. Change Assistants Needed above if that changes.</div>
+                              <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-sm font-semibold text-zinc-600">No assistant is currently required.</div><div className="mt-0.5 text-xs font-medium text-zinc-400">Need to assign one? Scheduler can open the first assistant slot for you.</div></div><button type="button" onClick={enableAssistantSlot} className="shrink-0 rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-2 text-xs font-black text-zinc-800 transition hover:bg-[#DDE8D2]">+ Add an Assistant</button></div>
                             ) : (
                               <>
                                 <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Assistants</div>
@@ -5660,7 +5868,7 @@ function AddEventModal({ photographers, assistants, events = [], schools = [], o
                     <section className="rounded-3xl border border-zinc-200 bg-white/70 p-4">
                       <h3 className="text-sm font-semibold text-zinc-900">Assistants</h3>
                       {noAssistant || (Number(requiredAssistants) || 0) <= 0 ? (
-                        <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm font-semibold text-zinc-500">No assistant needed for this event. Change Assistants Needed above if that changes.</div>
+                        <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-sm font-semibold text-zinc-600">No assistant is currently required.</div><div className="mt-0.5 text-xs font-medium text-zinc-400">Need to assign one? Scheduler can open the first assistant slot for you.</div></div><button type="button" onClick={enableAssistantSlot} className="shrink-0 rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-2 text-xs font-black text-zinc-800 transition hover:bg-[#DDE8D2]">+ Add an Assistant</button></div>
                       ) : (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {assistants.map(name => <button key={name} type="button" onClick={() => { setNoAssistant(false); toggleName(name, setSelectedAssistants); }} className={`rounded-full border px-3 py-2 text-sm transition ${!noAssistant && selectedAssistants.includes(name) ? 'border-[#AEBB9E] bg-[#DDE8D2] text-zinc-900' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'}`}>{name}</button>)}
@@ -7634,7 +7842,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
     ...uniqueCanonicalPhotographers(photographers || []),
     ...(assistants || []).filter(Boolean)
   ])).filter(Boolean).sort((a, b) => a.localeCompare(b));
-  const [selectedStaff, setSelectedStaff] = useState('Stephanie');
+  const [selectedStaff, setSelectedStaff] = useState('');
   const [viewMode, setViewMode] = useState('Day');
   const [staffScheduleCopied, setStaffScheduleCopied] = useState(false);
   const [plainViewMode, setPlainViewMode] = useState('Week');
@@ -7688,6 +7896,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
       : formatDate(selectedDate);
 
   const copyStaffSchedule = async () => {
+    if (!String(selectedStaff || '').trim()) return;
     const header = `${selectedStaff} — ${staffScheduleLabel}`;
     const lines = visibleEvents.length
       ? visibleEvents.map(event => {
@@ -7779,9 +7988,10 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
       <section className="rounded-[1.5rem] border border-zinc-200 bg-white/80 p-3 shadow-sm sm:rounded-[2rem] sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Staff Schedule</div>
-          <button type="button" onClick={copyStaffSchedule} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-black text-zinc-600 transition hover:bg-zinc-50">{staffScheduleCopied ? 'Copied' : 'Copy Schedule'}</button>
+          <button type="button" onClick={copyStaffSchedule} disabled={!selectedStaff} className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-black text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40">{staffScheduleCopied ? 'Copied' : 'Copy Schedule'}</button>
         </div>
         <select value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-900 outline-none sm:py-3 sm:text-base">
+          <option value="">Select staff member…</option>
           {staffOptions.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
         <div className="mt-3 grid grid-cols-3 rounded-2xl border border-zinc-200 bg-cream/80 p-1">
@@ -7809,7 +8019,7 @@ function MobileView({ events, photographers, assistants = [], selectedDate, setS
                 </div>
               </button>
             );
-          }) : <div className="rounded-xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-center text-sm text-zinc-500">No {viewMode.toLowerCase()} events for {selectedStaff}.</div>}
+          }) : <div className="rounded-xl border border-dashed border-zinc-200 bg-cream/70 p-3 text-center text-sm text-zinc-500">{selectedStaff ? `No ${viewMode.toLowerCase()} events for ${selectedStaff}.` : 'Select a staff member above to view their schedule.'}</div>}
         </div>
       </section>
 
@@ -8388,9 +8598,10 @@ function RemovedEventsModule({ events, onRestore, onPermanentDelete, canRestore 
   );
 }
 
-function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, onSavePictureDayNotes, canRemove = true, canEdit = true, canEditNotes = false }) {
+function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, onRemoveEvent, onSavePictureDayNotes, authEmail = '', canRemove = true, canEdit = true, canEditNotes = false }) {
   const [editingNotesOnly, setEditingNotesOnly] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
+  const [newNoteDraft, setNewNoteDraft] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [eventChangeLog, setEventChangeLog] = useState([]);
   const [eventChangeLogLoading, setEventChangeLogLoading] = useState(false);
@@ -8400,6 +8611,7 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   useEffect(() => {
     setEditingNotesOnly(false);
     setNotesDraft(String(event?.notes || ''));
+    setNewNoteDraft('');
     setSavingNotes(false);
     setShowEventChangeHistory(false);
   }, [event?.id, event?.supabaseId]);
@@ -8452,15 +8664,75 @@ function Drawer({ event, onClose, onViewSchool, onEditEvent, onDuplicateEvent, o
   const saveNotesOnly = async () => {
     if (!onSavePictureDayNotes || savingNotes) return;
     setSavingNotes(true);
-    const saved = await onSavePictureDayNotes(event, notesDraft);
+    const saved = await onSavePictureDayNotes(event, { notes: notesDraft });
     setSavingNotes(false);
     if (saved) setEditingNotesOnly(false);
   };
 
-  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}{lastChangeLabel ? <div><span className="font-semibold text-zinc-700">Last Change:</span> {lastChangeLabel}</div> : (event.supabaseId && !eventChangeLogLoading && !eventChangeLogError ? <div><span className="font-semibold text-zinc-700">Change History:</span> Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div> : null)}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:gap-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex min-h-[58px] w-full flex-col items-center justify-center rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-4 py-2.5 text-center text-zinc-900 transition hover:-translate-y-0.5 hover:bg-[#DDE8D2] hover:shadow-soft sm:min-h-[64px] sm:px-5 sm:py-3">
-  <span className="max-w-full break-words text-sm font-bold leading-snug">View {event.canonicalSchool}</span>
-  <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-600 sm:text-xs">in School List <ChevronRight size={14} aria-hidden="true" /></span>
-</button> : null}<div className={isSchoolHoliday ? "grid grid-cols-1 gap-2 sm:gap-3" : "grid grid-cols-2 gap-2 sm:gap-3"}><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} />{!isSchoolHoliday ? <Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /> : null}</div>{!isSchoolHoliday ? <div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div> : null}<div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />{isSchoolHoliday ? 'School Holiday Notes' : 'Picture Day Notes'} ({noteCount})</div>{canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-[#AEBB9E] bg-[#DDE8D2]/70 px-2.5 py-1 text-[10px] font-semibold text-zinc-800 transition hover:bg-[#DDE8D2] sm:px-3 sm:text-[11px]">{isSchoolHoliday ? 'Edit School Holiday Notes' : 'Edit Picture Day Notes'}</button> : null}</div>{editingNotesOnly ? <div className="mt-3 space-y-2"><textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" /><div className="flex justify-end gap-2"><button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button><button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Notes'}</button></div></div> : <><div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} /></div>{event.notes ? <div className="mt-3"><LinkifiedText text={event.notes} className="text-sm leading-6 text-zinc-800" />{plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}</div> : null}</>}</div>{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
+  const addPictureDayNoteFromDrawer = async () => {
+    const cleanText = String(newNoteDraft || '').trim();
+    if (!onSavePictureDayNotes || savingNotes || !cleanText) return;
+    setSavingNotes(true);
+    const saved = await onSavePictureDayNotes(event, { newNote: cleanText });
+    setSavingNotes(false);
+    if (saved) setNewNoteDraft('');
+  };
+
+  const editPictureDayNoteFromDrawer = async (noteId, text) => {
+    const cleanText = String(text || '').trim();
+    if (!onSavePictureDayNotes || savingNotes || !cleanText) return false;
+    setSavingNotes(true);
+    const nextAttribution = editNoteHistory(event.noteAttribution, noteId, authEmail, cleanText);
+    const saved = await onSavePictureDayNotes(event, { noteAttribution: nextAttribution });
+    setSavingNotes(false);
+    return Boolean(saved);
+  };
+
+  return <AnimatePresence>{event && <motion.aside initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-zinc-950/25 p-1.5 backdrop-blur-sm sm:p-4" onClick={onClose}><motion.div initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }} transition={{ type: 'spring', damping: 28, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto flex h-full max-w-xl flex-col overflow-hidden rounded-[1.35rem] bg-cream shadow-2xl sm:rounded-[2rem]"><div className="border-b border-zinc-200 p-3 sm:p-5"><div className="flex items-start justify-between gap-2 sm:gap-4"><div><div className="flex flex-wrap gap-2"><Pill className={TYPE_COLORS[event.type] || 'bg-zinc-100 text-zinc-800 border-zinc-200'}>{event.type}</Pill>{getEventIrm(event) ? <Pill className="border-amber-200 bg-amber-50 text-amber-900">IRM {getEventIrm(event)}</Pill> : null}{!event.supabaseId ? <Pill className="border-zinc-200 bg-white text-zinc-500">Historical Event</Pill> : null}</div><h2 className="mt-2 text-lg font-semibold leading-tight text-zinc-950 sm:mt-3 sm:text-2xl">{event.title}</h2><p className="mt-1 text-xs text-zinc-500 sm:text-sm">{getEventDateLabel(event)} · {getEventTimeLabel(event)}</p><div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-zinc-500 sm:mt-3 sm:gap-1 sm:text-xs sm:leading-5"><div><span className="font-semibold text-zinc-700">Created By:</span> {createdByLabel}</div>{editedLabel ? <div><span className="font-semibold text-zinc-700">Last Edited By:</span> {editedLabel}</div> : null}{lastChangeLabel ? <div><span className="font-semibold text-zinc-700">Last Change:</span> {lastChangeLabel}</div> : (event.supabaseId && !eventChangeLogLoading && !eventChangeLogError ? <div><span className="font-semibold text-zinc-700">Change History:</span> Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div> : null)}</div></div><button onClick={onClose} className="rounded-full bg-white p-2 text-zinc-500 hover:text-zinc-900"><X size={18} /></button></div></div><div className="space-y-2.5 overflow-auto p-3 sm:space-y-4 sm:p-5"><div className="grid grid-cols-2 gap-2 sm:gap-3">{event.supabaseId && canEdit ? <button type="button" onClick={() => onEditEvent(event)} className="flex items-center justify-center rounded-2xl bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 sm:px-4 sm:py-3">Edit Event</button> : null}{event.supabaseId && canEdit ? <button type="button" onClick={() => onDuplicateEvent(event)} className="flex items-center justify-center rounded-2xl border border-[#AEBB9E] bg-white/80 px-3 py-2.5 text-center text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#DDE8D2]/70 sm:px-4 sm:py-3">Duplicate Event</button> : null}</div>{event.canonicalSchool ? <button type="button" onClick={() => onViewSchool(event.canonicalSchool, event.schoolId)} className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[#AEBB9E] bg-[#DDE8D2]/55 px-3 py-2.5 text-left text-zinc-900 transition hover:bg-[#DDE8D2] hover:shadow-sm sm:px-4">
+  <span className="min-w-0 truncate text-sm font-bold">View {event.canonicalSchool} in School List</span>
+  <ChevronRight size={16} className="shrink-0 text-zinc-500" aria-hidden="true" />
+</button> : null}<div className={isSchoolHoliday ? "grid grid-cols-1 gap-2 sm:gap-3" : "grid grid-cols-2 gap-2 sm:gap-3"}><Info icon={CalendarDays} title="Date Range" value={getEventDateLabel(event)} />{!isSchoolHoliday ? <Info icon={Clock} title="Arrival / Start" value={getEventTimeLabel(event)} /> : null}</div>{!isSchoolHoliday ? <div className="grid grid-cols-2 gap-2 sm:gap-3"><Info icon={UserRoundCheck} title="Photographers" value={displayPhotographerAssignment(event)} /><Info icon={Users} title="Assistants" value={displayAssistants(event)} /></div> : null}<div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4">
+  <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><Pencil size={14} />{isSchoolHoliday ? 'School Holiday Notes' : 'Picture Day Notes'} ({noteCount})</div>
+    {canEditNotes && canEdit && !editingNotesOnly ? <button type="button" onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(true); }} className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-zinc-600 transition hover:border-[#AEBB9E] hover:bg-[#DDE8D2]/40 sm:px-3 sm:text-[11px]">{isSchoolHoliday ? 'Edit Existing Holiday Info' : 'Edit Existing Picture Day Info'}</button> : null}
+  </div>
+
+  {!isSchoolHoliday && canEdit ? (
+    <div className="mt-3 rounded-2xl border border-[#AEBB9E]/70 bg-[#DDE8D2]/30 p-3">
+      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-zinc-600">Add a new Picture Day Note</div>
+      <textarea value={newNoteDraft} onChange={(event) => setNewNoteDraft(event.target.value)} rows={3} placeholder="Add a new note without opening Edit Event…" className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="text-[10px] font-semibold text-zinc-500">Saved as a new attributed note. Existing notes stay unchanged.</div>
+        <button type="button" disabled={savingNotes || !String(newNoteDraft || '').trim()} onClick={addPictureDayNoteFromDrawer} className="shrink-0 rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Add Note'}</button>
+      </div>
+    </div>
+  ) : null}
+
+  {editingNotesOnly ? (
+    <div className="mt-3 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/60 p-3">
+      <div>
+        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-800">{isSchoolHoliday ? 'Editing Existing School Holiday Info' : 'Editing Existing Picture Day Info'}</div>
+        <div className="mt-1 text-[10px] font-semibold text-amber-700">This edits the existing imported/plain-text info below. Individual attributed notes are edited separately on the exact note.</div>
+      </div>
+      <textarea autoFocus value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={6} className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-800 outline-none focus:border-[#AEBB9E]" />
+      <div className="flex justify-end gap-2">
+        <button type="button" disabled={savingNotes} onClick={() => { setNotesDraft(String(event.notes || '')); setEditingNotesOnly(false); }} className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600">Cancel</button>
+        <button type="button" disabled={savingNotes} onClick={saveNotesOnly} className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{savingNotes ? 'Saving…' : 'Save Existing Info'}</button>
+      </div>
+    </div>
+  ) : (
+    <>
+      <div className="mt-3"><NoteHistoryList entries={getNoteHistory(event.noteAttribution)} canEdit={canEditNotes && canEdit} onEditNote={editPictureDayNoteFromDrawer} /></div>
+      {event.notes ? (
+        <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/75 p-3">
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-400">{isSchoolHoliday ? 'Existing School Holiday Info' : 'Existing Picture Day Info'}</div>
+          <LinkifiedText text={event.notes} className="text-sm leading-6 text-zinc-800" />
+          {plainNoteEditedLabel ? <div className="mt-1 text-[11px] font-semibold text-zinc-500">{plainNoteEditedLabel}</div> : null}
+        </div>
+      ) : null}
+    </>
+  )}
+</div>{event.supabaseId ? <div className="rounded-3xl border border-zinc-200 bg-white/70 p-3 sm:p-4"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-xs"><History size={14} />Event Change History</div><div className="mt-1 text-[11px] text-zinc-500">Tracking began {EVENT_CHANGE_TRACKING_START_LABEL}</div></div><button type="button" onClick={() => setShowEventChangeHistory(value => !value)} className="shrink-0 rounded-full border border-zinc-200 bg-white px-3 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:text-[11px]">{showEventChangeHistory ? 'Hide History' : `View History${eventChangeLog.length ? ` (${eventChangeLog.length})` : ''}`}</button></div>{eventChangeLogError ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{eventChangeLogError}</div> : null}{showEventChangeHistory ? <div className="mt-3 space-y-2">{eventChangeLogLoading ? <div className="text-xs text-zinc-500">Loading change history…</div> : null}{!eventChangeLogLoading && !eventChangeLog.length && !eventChangeLogError ? <div className="text-xs text-zinc-500">No event changes have been recorded since tracking began.</div> : null}{eventChangeLog.map(entry => <div key={entry.id} className="rounded-2xl border border-zinc-100 bg-cream/70 p-3"><div className="text-xs font-semibold text-zinc-800">{entry.changedByName || displayNameFromEmail(entry.changedByEmail || '')} <span className="font-normal text-zinc-500">• {formatEventMetaDateTime(entry.changedAt)}</span></div><div className="mt-1 text-xs font-semibold text-zinc-700">{entry.changeSummary}</div>{entry.changes.length > 1 ? <div className="mt-2 space-y-1 border-t border-zinc-100 pt-2">{entry.changes.map((change, index) => <div key={`${entry.id}-${change.field || index}-${index}`} className="text-[11px] leading-4 text-zinc-600">{change.summary || `${change.label}: ${change.before} → ${change.after}`}</div>)}</div> : null}</div>)}<div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-3 py-2 text-[11px] text-zinc-500">Change History tracking began • {EVENT_CHANGE_TRACKING_START_LABEL}. Earlier field-by-field changes were not recorded and are not reconstructed.</div></div> : null}</div> : null}{event.supabaseId && canRemove ? <button type="button" onClick={() => { const ok = window.confirm(`Remove event: ${event.title}?\n\nThis will move it to Removed Events so it can be restored later.`); if (ok) onRemoveEvent(event); }} className="inline-flex w-auto items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs font-semibold text-rose-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-100">Remove Event</button> : null}</div></motion.div></motion.aside>}</AnimatePresence>;
 }
 
 function Info({ icon: Icon, title, value, large = false }) {
@@ -8917,6 +9189,25 @@ function RolloutController({ rolloutCapacityOverrides = {}, setRolloutCapacityOv
   );
 }
 
+function AdminDisclosure({ label, summary = '', defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white/65 p-2 shadow-sm">
+      <button type="button" onClick={() => setOpen(value => !value)} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-white/80" aria-expanded={open}>
+        <div className="min-w-0">
+          <div className="text-sm font-black text-zinc-900">{label}</div>
+          {summary ? <div className="mt-0.5 text-xs font-medium text-zinc-500">{summary}</div> : null}
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-zinc-500">
+          {open ? 'Collapse' : 'Expand'}
+          <ChevronRight size={15} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
+        </span>
+      </button>
+      {open ? <div className="mt-2">{children}</div> : null}
+    </section>
+  );
+}
+
 function AdminPage({ events, schools, photographers, assistants, staffMembers = [], eventsMessage, schoolsMessage, reloadEvents, reloadSchools, reloadTeamMembers, authEmail, rolloutCapacityOverrides = {}, setRolloutCapacityOverrides }) {
   const activeEvents = (events || []).filter(event => event.active !== false);
   const removedEvents = (events || []).filter(event => event.active === false);
@@ -8942,6 +9233,21 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
     if (typeof window === 'undefined') return [];
     try { return JSON.parse(window.localStorage.getItem('schedulerSkippedUnlinkedEventIds') || '[]'); } catch { return []; }
   });
+  const [irmSearch, setIrmSearch] = useState('');
+  const [irmDrafts, setIrmDrafts] = useState({});
+  const [irmSavingId, setIrmSavingId] = useState('');
+  const [irmMessage, setIrmMessage] = useState('');
+
+  useEffect(() => {
+    setIrmDrafts(current => {
+      const next = { ...current };
+      (schools || []).forEach(school => {
+        if (!school?.id) return;
+        if (!(school.id in next)) next[school.id] = school.irm === null || school.irm === undefined ? '' : String(school.irm);
+      });
+      return next;
+    });
+  }, [schools]);
 
   const skipUnlinkedEvent = (event) => {
     const id = event?.supabaseId || event?.id;
@@ -8963,6 +9269,56 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
   const activeStaffMembers = useMemo(() => groupStaffMembers(staffMembers?.length ? staffMembers : builtInStaffMembers()), [staffMembers]);
 
   const activeVisibleSchools = useMemo(() => (schools || []).filter(school => school && school.active !== false && !school.mergedInto), [schools]);
+
+  const irmSchools = useMemo(() => {
+    const search = irmSearch.trim().toLowerCase();
+    return (schools || [])
+      .filter(school => school?.id && (!search || [school.name, school.district, school.city, school.irm].filter(value => value !== null && value !== undefined).join(' ').toLowerCase().includes(search)))
+      .slice()
+      .sort((a, b) => {
+        const aInactive = a.active === false || Boolean(a.mergedInto);
+        const bInactive = b.active === false || Boolean(b.mergedInto);
+        if (aInactive !== bInactive) return aInactive ? 1 : -1;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+  }, [schools, irmSearch]);
+
+  const saveSchoolIrm = async (school) => {
+    if (!school?.id) {
+      setIrmMessage('This school does not have a canonical Supabase row id, so its IRM was not changed.');
+      return;
+    }
+    const raw = String(irmDrafts[school.id] ?? '').trim();
+    const nextIrm = raw === '' ? null : Number(raw);
+    if (raw !== '' && (!Number.isFinite(nextIrm) || nextIrm < 0)) {
+      setIrmMessage(`Enter a valid IRM number for ${school.name}.`);
+      return;
+    }
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setIrmMessage('Supabase is not connected, so the IRM was not saved.');
+      return;
+    }
+
+    setIrmSavingId(school.id);
+    setIrmMessage(`Saving IRM for ${school.name}…`);
+    const { data, error } = await supabase
+      .from('schools')
+      .update({ irm: nextIrm, updated_at: new Date().toISOString() })
+      .eq('id', school.id)
+      .select('id, name, irm')
+      .single();
+    setIrmSavingId('');
+
+    if (error || !data?.id) {
+      setIrmMessage(`Could not update ${school.name}: ${error?.message || 'Supabase did not confirm the canonical school row.'}`);
+      return;
+    }
+
+    setIrmDrafts(current => ({ ...current, [school.id]: data.irm === null || data.irm === undefined ? '' : String(data.irm) }));
+    await reloadSchools?.();
+    setIrmMessage(`${school.name} IRM saved as ${data.irm ?? 'blank'}. Only the IRM field was updated.`);
+  };
 
   const unlinkedEventCandidates = useMemo(() => {
     const search = unlinkedSearch.trim().toLowerCase();
@@ -9196,11 +9552,11 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
     }
     const { data, error } = await supabase
       .from('app_users')
-      .select('id, name, email, role, active, created_at, updated_at')
+      .select('id, name, email, role, active, last_sign_in_at, created_at, updated_at')
       .order('active', { ascending: false })
       .order('name', { ascending: true });
     if (error) {
-      setAdminUsersMessage(`Users table is not ready yet: ${error.message}. Run supabase/admin_auth_users_sync_migration.sql once, then reload.`);
+      setAdminUsersMessage(`Users table is not ready yet: ${error.message}. Run supabase/v2_13_admin_board_workflow.sql, then reload.`);
       return;
     }
     setAdminUsers(data || []);
@@ -9421,8 +9777,51 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
         ))}
       </div>
 
-      <RolloutController rolloutCapacityOverrides={rolloutCapacityOverrides} setRolloutCapacityOverrides={setRolloutCapacityOverrides} authEmail={authEmail} />
+      <AdminDisclosure label="Rollout Controller" summary="Weekly rollout capacity and saved exception weeks.">
+        <RolloutController rolloutCapacityOverrides={rolloutCapacityOverrides} setRolloutCapacityOverrides={setRolloutCapacityOverrides} authEmail={authEmail} />
+      </AdminDisclosure>
 
+      <AdminDisclosure label="School IRM Manager" summary="Update only the IRM field on exact canonical School List rows.">
+        <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h3 className="font-semibold text-zinc-950">School IRM Manager</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">Quick Admin editor for IRM values across the School List. Each Save updates only that school's <strong>IRM</strong> field by its exact canonical Supabase row ID—names, contacts, notes, merge state, and other school data are not touched.</p>
+            </div>
+            <input value={irmSearch} onChange={event => setIrmSearch(event.target.value)} placeholder="Search schools…" className="w-full rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#AEBB9E] md:w-72" />
+          </div>
+          {irmMessage ? <div className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 px-3 py-2 text-sm font-semibold text-zinc-700">{irmMessage}</div> : null}
+          <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white/85">
+            <div className="max-h-[560px] overflow-auto">
+              <table className="w-full min-w-[700px] text-left">
+                <thead className="sticky top-0 z-10 bg-zinc-50 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                  <tr><th className="px-3 py-2">School</th><th className="px-3 py-2">Status</th><th className="w-[160px] px-3 py-2">IRM</th><th className="w-[110px] px-3 py-2 text-right">Action</th></tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {irmSchools.map(school => {
+                    const currentValue = school.irm === null || school.irm === undefined ? '' : String(school.irm);
+                    const draftValue = String(irmDrafts[school.id] ?? '');
+                    const changed = draftValue.trim() !== currentValue.trim();
+                    const inactive = school.active === false || Boolean(school.mergedInto);
+                    return (
+                      <tr key={school.id} className={inactive ? 'bg-zinc-50/80 text-zinc-500' : 'text-zinc-900'}>
+                        <td className="px-3 py-2"><div className="text-sm font-bold">{school.name}</div>{school.district ? <div className="mt-0.5 text-xs text-zinc-400">{school.district}</div> : null}</td>
+                        <td className="px-3 py-2 text-xs font-semibold">{school.mergedInto ? 'Merged' : school.active === false ? 'Inactive' : 'Active'}</td>
+                        <td className="px-3 py-2"><input type="number" min="0" step="any" value={draftValue} onChange={event => setIrmDrafts(current => ({ ...current, [school.id]: event.target.value }))} className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-bold text-zinc-900 outline-none focus:border-[#AEBB9E]" placeholder="Blank" /></td>
+                        <td className="px-3 py-2 text-right"><button type="button" disabled={!changed || irmSavingId === school.id} onClick={() => saveSchoolIrm(school)} className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-35">{irmSavingId === school.id ? 'Saving…' : 'Save IRM'}</button></td>
+                      </tr>
+                    );
+                  })}
+                  {!irmSchools.length ? <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-zinc-500">No schools match this search.</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="mt-2 text-xs font-medium text-zinc-500">{irmSchools.length} school{irmSchools.length === 1 ? '' : 's'} shown. Merged/inactive rows are labeled so they are not mistaken for active canonical accounts.</div>
+        </div>
+      </AdminDisclosure>
+
+      <AdminDisclosure label="Unlinked Events" summary="Repair events that do not yet have a canonical School List link.">
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
@@ -9463,6 +9862,9 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
         <p className="mt-2 text-xs text-zinc-500">Showing up to 75 unique unlinked event/date combinations. This tool does not delete, rename, or bulk-link duplicate rows.</p>
       </div>
 
+      </AdminDisclosure>
+
+      <AdminDisclosure label="Staff Directory Manager" summary="Team Member contact information and photographer/assistant directory roles.">
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -9525,11 +9927,14 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
         </div>
       </div>
 
+      </AdminDisclosure>
+
+      <AdminDisclosure label="Users & Permissions" summary="Account roles, access status, and last Scheduler login.">
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h3 className="font-semibold text-zinc-950">Users & Permissions</h3>
-            <p className="mt-1 text-sm leading-6 text-zinc-600">Synced access list for everyone who has created a Supabase account. Detailed permission enforcement can be tightened later.</p>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">Synced access list for everyone who has created a Supabase account, including their latest Supabase Auth sign-in time.</p>
             {authEmail ? <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Signed in as {authEmail}</p> : null}
           </div>
           <button type="button" onClick={loadAdminUsers} disabled={adminUsersSaving} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Reload Users</button>
@@ -9557,17 +9962,19 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
         {adminUsersMessage ? <p className="mt-3 rounded-2xl border border-zinc-200 bg-cream/70 p-3 text-sm text-zinc-700">{adminUsersMessage}</p> : null}
 
         <div className="mt-4 overflow-hidden rounded-3xl border border-zinc-200">
-          <div className="grid grid-cols-[1.2fr_1.4fr_220px_140px] gap-3 bg-zinc-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-500 max-md:hidden">
-            <div>Name</div><div>Email</div><div>Role</div><div>Status</div>
+          <div className="grid grid-cols-[1.1fr_1.3fr_190px_220px_120px] gap-3 bg-zinc-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-500 max-md:hidden">
+            <div>Name</div><div>Email</div><div>Last Login</div><div>Role</div><div>Status</div>
           </div>
           <div className="divide-y divide-zinc-200 bg-white/80">
             {adminUsers.map(user => (
-              <div key={user.id || user.email} className={`grid gap-3 px-4 py-3 md:grid-cols-[1.2fr_1.4fr_220px_140px] md:items-center ${user.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
+              <div key={user.id || user.email} className={`grid gap-3 px-4 py-3 md:grid-cols-[1.1fr_1.3fr_190px_220px_120px] md:items-center ${user.active === false ? 'bg-zinc-50 text-zinc-400' : 'text-zinc-900'}`}>
                 <div>
                   <div className="font-semibold">{user.name || user.email}</div>
                   <div className="text-xs text-zinc-500 md:hidden">{user.email}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold text-zinc-400 md:hidden">Last login: {user.last_sign_in_at ? formatEventMetaDateTime(user.last_sign_in_at) : 'Never / not recorded'}</div>
                 </div>
                 <div className="text-sm text-zinc-600 max-md:hidden">{user.email}</div>
+                <div className="text-xs font-semibold text-zinc-600 max-md:hidden">{user.last_sign_in_at ? formatEventMetaDateTime(user.last_sign_in_at) : <span className="text-zinc-400">Never / not recorded</span>}</div>
                 <select value={normalizePermissionRole(user.role || 'photographer')} disabled={adminUsersSaving} onChange={event => updateAdminUser(user.id, { role: event.target.value })} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60">
                   {USER_PERMISSION_ROLES.map(label => <option key={label} value={USER_PERMISSION_ROLE_VALUES[label]}>{label}</option>)}
                 </select>
@@ -9583,6 +9990,9 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
         </div>
       </div>
 
+      </AdminDisclosure>
+
+      <AdminDisclosure label="Current Load Status" summary="Live event/school loading messages and recovery status.">
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
         <h3 className="font-semibold text-zinc-950">Current load status</h3>
         <div className="mt-3 space-y-2 text-sm leading-6 text-zinc-600">
@@ -9590,7 +10000,8 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
           <p><strong>Schools:</strong> {schoolsMessage || 'No school load message yet.'}</p>
           <p><strong>Safety note:</strong> Removed events are soft-deleted, meaning they are hidden from the main calendar but still visible in recovery/export data.</p>
         </div>
-      </div>
+      </div>      </AdminDisclosure>
+
     </div>
   );
 }
@@ -10432,7 +10843,7 @@ export default function SchedulerApp() {
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} canAdmin={isAdminUser} />
       {canEditScheduler && addingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setAddingEvent(false)} onSave={handleScheduleEvent} defaultDate={addingEventDefaultDate} sourceLabel={activeTab} authEmail={authEmail} canEditNotes={isAdminUser} />}
       {canEditScheduler && quickAssignment && <QuickAssignmentModal event={quickAssignment.event} mode={quickAssignment.mode} photographers={photographers} assistants={assistants} onClose={() => setQuickAssignment(null)} onSave={handleQuickAssignmentSave} />}
-      <Drawer event={selectedEventForDisplay} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} onSavePictureDayNotes={async (event, notes) => { const saved = await handleScheduleEvent({ ...event, notes }); if (saved) setSelected(saved); return saved; }} canRemove={isAdminUser} canEdit={canEditScheduler} canEditNotes={isAdminUser} onViewSchool={openLinkedSchoolFromEvent} />
+      <Drawer event={selectedEventForDisplay} onClose={() => setSelected(null)} onEditEvent={(event) => { if (!canEditScheduler) return; setEditingEvent(event); setSelected(null); }} onDuplicateEvent={openDuplicateEvent} onRemoveEvent={handleRemoveEvent} onSavePictureDayNotes={async (event, patch = {}) => { const saved = await handleScheduleEvent({ ...event, ...patch }, event); if (saved) setSelected(saved); return saved; }} authEmail={authEmail} canRemove={isAdminUser} canEdit={canEditScheduler} canEditNotes={isAdminUser} onViewSchool={openLinkedSchoolFromEvent} />
       {canEditScheduler && editingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setEditingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setSelected(saved); return saved; }} defaultDate={editingEvent.date || selectedDate} sourceLabel="Edit Event" initialEvent={editingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
       {canEditScheduler && duplicatingEvent && <AddEventModal photographers={photographers} assistants={assistants} events={allEvents} schools={schools} onClose={() => setDuplicatingEvent(null)} onSave={async (event) => { const saved = await handleScheduleEvent(event); if (saved) setDuplicatingEvent(null); return saved; }} defaultDate={duplicatingEvent.date || selectedDate} sourceLabel="Duplicate Event" initialEvent={duplicatingEvent} authEmail={authEmail} canEditNotes={isAdminUser} />}
     </main>
