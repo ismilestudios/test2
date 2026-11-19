@@ -2290,6 +2290,38 @@ function supabaseRowToPostProductionActivity(row = {}) {
   };
 }
 
+function postProductionActivityDetail(item = {}) {
+  const photographerName = String(item.photographerName || '').trim();
+  const actorName = displayNameFromEmail(item.actorEmail || '') || '';
+  const tileOwner = photographerName && photographerName.toLowerCase() !== actorName.toLowerCase() ? photographerName : '';
+  switch (item.actionType) {
+    case 'stage_moved': {
+      const movement = `${postProductionStageLabel(item.fromStage)} → ${postProductionStageLabel(item.toStage)}`;
+      return [tileOwner, movement].filter(Boolean).join(' · ');
+    }
+    case 'tile_done':
+      return [tileOwner, 'Marked Done'].filter(Boolean).join(' · ');
+    case 'event_hidden':
+      return 'Hidden from The Board';
+    case 'event_restored':
+      return 'Restored to The Board';
+    case 'event_deleted_from_board':
+      return 'Permanently removed from The Board';
+    case 'note_added':
+      return 'Added Post-Production Note';
+    case 'note_edited':
+      return 'Edited Post-Production Note';
+    default: {
+      let text = String(item.actionText || 'Board activity').trim();
+      const actor = displayNameFromEmail(item.actorEmail || '') || '';
+      if (actor && text.toLowerCase().startsWith(`${actor.toLowerCase()}:`)) {
+        text = text.slice(actor.length + 1).trim();
+      }
+      return text;
+    }
+  }
+}
+
 function supabaseRowToPostProductionNote(row = {}) {
   return {
     id: row.id || '',
@@ -3152,29 +3184,32 @@ function PostProductionBoard({ events = [], authEmail = '', canEdit = false, isA
 
       {message ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{message}</div> : null}
 
-      <section className="rounded-2xl border border-zinc-200 bg-white/85 px-3 py-3 shadow-sm" aria-label="Recent Board activity">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-zinc-600"><History size={14} />Recent Board Activity</div>
-            <div className="mt-0.5 text-[11px] font-semibold text-zinc-400">Latest shared Board changes across staff.</div>
-          </div>
-          <Pill className="border-zinc-200 bg-zinc-50 text-zinc-500">{recentActivity.length ? `${Math.min(recentActivity.length, 6)} shown` : 'No activity yet'}</Pill>
+      <section className="rounded-2xl border border-zinc-200 bg-white/85 px-3 py-2.5 shadow-sm" aria-label="Recent Board activity">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-zinc-600"><History size={14} />Recent Board Activity</div>
+          <div className="mt-0.5 text-[11px] font-semibold text-zinc-400">Latest shared changes across staff.</div>
         </div>
         {recentActivity.length ? (
-          <div className="mt-2 grid gap-1.5 lg:grid-cols-2">
-            {recentActivity.slice(0, 6).map(item => {
+          <div className="mt-2 overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50/60 divide-y divide-zinc-100">
+            {recentActivity.slice(0, 5).map(item => {
               const actor = displayNameFromEmail(item.actorEmail || '') || item.actorEmail || 'Staff';
               const when = [formatShortAttributionDate(item.createdAt), formatAttributionTime(item.createdAt)].filter(Boolean).join(' ');
+              const eventTitle = item.eventTitle || 'Board event';
+              const detail = postProductionActivityDetail(item);
               return (
-                <div key={item.id} className="rounded-xl border border-zinc-100 bg-zinc-50/75 px-3 py-2 text-xs leading-5 text-zinc-700">
-                  <span className="font-black text-zinc-900">{actor}</span> <span>{item.actionText}</span>
-                  {when ? <span className="ml-1 whitespace-nowrap font-semibold text-zinc-400">• {when}</span> : null}
+                <div key={item.id} className="grid gap-0.5 px-3 py-1.5 text-xs md:grid-cols-[5.5rem_minmax(0,1fr)_auto] md:items-center md:gap-3">
+                  <div className="font-black text-zinc-900">{actor}</div>
+                  <div className="min-w-0 text-zinc-600">
+                    <span className="font-bold text-zinc-800">{eventTitle}</span>
+                    {detail ? <span className="text-zinc-500"> · {detail}</span> : null}
+                  </div>
+                  {when ? <div className="whitespace-nowrap text-[11px] font-semibold text-zinc-400">{when}</div> : null}
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="mt-2 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-3 py-3 text-center text-xs font-semibold text-zinc-400">
+          <div className="mt-2 rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
             {activityAvailable ? 'Board activity will appear here as staff make changes.' : 'Run the v2.13 SQL migration to enable shared Board activity history.'}
           </div>
         )}
@@ -9552,11 +9587,11 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
     }
     const { data, error } = await supabase
       .from('app_users')
-      .select('id, name, email, role, active, last_sign_in_at, created_at, updated_at')
+      .select('id, name, email, role, active, last_active_at, created_at, updated_at')
       .order('active', { ascending: false })
       .order('name', { ascending: true });
     if (error) {
-      setAdminUsersMessage(`Users table is not ready yet: ${error.message}. Run supabase/v2_13_admin_board_workflow.sql, then reload.`);
+      setAdminUsersMessage(`Users table is not ready yet: ${error.message}. Run Supabase migrations through v2_13a_last_active.sql, then reload.`);
       return;
     }
     setAdminUsers(data || []);
@@ -9929,12 +9964,12 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
 
       </AdminDisclosure>
 
-      <AdminDisclosure label="Users & Permissions" summary="Account roles, access status, and last Scheduler login.">
+      <AdminDisclosure label="Users & Permissions" summary="Account roles, access status, and recent Scheduler activity.">
       <div className="rounded-[2rem] border border-zinc-200 bg-white/70 p-5 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h3 className="font-semibold text-zinc-950">Users & Permissions</h3>
-            <p className="mt-1 text-sm leading-6 text-zinc-600">Synced access list for everyone who has created a Supabase account, including their latest Supabase Auth sign-in time.</p>
+            <p className="mt-1 text-sm leading-6 text-zinc-600">Synced access list for everyone who has created a Supabase account, including their most recent recorded Scheduler activity.</p>
             {authEmail ? <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Signed in as {authEmail}</p> : null}
           </div>
           <button type="button" onClick={loadAdminUsers} disabled={adminUsersSaving} className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">Reload Users</button>
@@ -9963,7 +9998,7 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
 
         <div className="mt-4 overflow-hidden rounded-3xl border border-zinc-200">
           <div className="grid grid-cols-[1.1fr_1.3fr_190px_220px_120px] gap-3 bg-zinc-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-500 max-md:hidden">
-            <div>Name</div><div>Email</div><div>Last Login</div><div>Role</div><div>Status</div>
+            <div>Name</div><div>Email</div><div>Last Active</div><div>Role</div><div>Status</div>
           </div>
           <div className="divide-y divide-zinc-200 bg-white/80">
             {adminUsers.map(user => (
@@ -9971,10 +10006,10 @@ function AdminPage({ events, schools, photographers, assistants, staffMembers = 
                 <div>
                   <div className="font-semibold">{user.name || user.email}</div>
                   <div className="text-xs text-zinc-500 md:hidden">{user.email}</div>
-                  <div className="mt-0.5 text-[11px] font-semibold text-zinc-400 md:hidden">Last login: {user.last_sign_in_at ? formatEventMetaDateTime(user.last_sign_in_at) : 'Never / not recorded'}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold text-zinc-400 md:hidden">Last active: {user.last_active_at ? formatEventMetaDateTime(user.last_active_at) : 'Not recorded yet'}</div>
                 </div>
                 <div className="text-sm text-zinc-600 max-md:hidden">{user.email}</div>
-                <div className="text-xs font-semibold text-zinc-600 max-md:hidden">{user.last_sign_in_at ? formatEventMetaDateTime(user.last_sign_in_at) : <span className="text-zinc-400">Never / not recorded</span>}</div>
+                <div className="text-xs font-semibold text-zinc-600 max-md:hidden">{user.last_active_at ? formatEventMetaDateTime(user.last_active_at) : <span className="text-zinc-400">Not recorded yet</span>}</div>
                 <select value={normalizePermissionRole(user.role || 'photographer')} disabled={adminUsersSaving} onChange={event => updateAdminUser(user.id, { role: event.target.value })} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#AEBB9E] disabled:opacity-60">
                   {USER_PERMISSION_ROLES.map(label => <option key={label} value={USER_PERMISSION_ROLE_VALUES[label]}>{label}</option>)}
                 </select>
@@ -10084,6 +10119,51 @@ export default function SchedulerApp() {
     }
     loadCurrentUserRole();
     return () => { cancelled = true; };
+  }, [authEmail]);
+
+  useEffect(() => {
+    if (!authEmail || !hasSupabaseEnv()) return undefined;
+    const supabase = createClient();
+    if (!supabase) return undefined;
+
+    const HEARTBEAT_MS = 10 * 60 * 1000;
+    let disposed = false;
+    let inFlight = false;
+    let lastSentAt = 0;
+
+    const touchLastActive = async (force = false) => {
+      const now = Date.now();
+      if (disposed || inFlight || (!force && now - lastSentAt < HEARTBEAT_MS)) return;
+      inFlight = true;
+      try {
+        const { error } = await supabase.rpc('touch_scheduler_last_active');
+        if (!error) lastSentAt = now;
+        else console.warn('Could not update Scheduler Last Active', error);
+      } catch (error) {
+        console.warn('Could not update Scheduler Last Active', error);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const recordInteraction = () => { touchLastActive(false); };
+    const recordVisibility = () => {
+      if (document.visibilityState === 'visible') touchLastActive(false);
+    };
+
+    touchLastActive(true);
+    window.addEventListener('pointerdown', recordInteraction, { passive: true });
+    window.addEventListener('keydown', recordInteraction);
+    window.addEventListener('touchstart', recordInteraction, { passive: true });
+    document.addEventListener('visibilitychange', recordVisibility);
+
+    return () => {
+      disposed = true;
+      window.removeEventListener('pointerdown', recordInteraction);
+      window.removeEventListener('keydown', recordInteraction);
+      window.removeEventListener('touchstart', recordInteraction);
+      document.removeEventListener('visibilitychange', recordVisibility);
+    };
   }, [authEmail]);
 
   const loadEventsFromSupabase = async () => {
