@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2, AlertTriangle, Copy, School } from 'lucide-react';
+import { CalendarDays, Search, Users, ClipboardList, Clock, X, History, UserRoundCheck, CloudRain, Pencil, ChevronLeft, ChevronRight, Plus, Trash2, Image as ImageIcon, BarChart3, Wand2, AlertTriangle, Copy, School, GripVertical, Maximize2, Tag } from 'lucide-react';
 import { EVENTS, STATUSES, TYPE_COLORS, PHOTOGRAPHERS, ASSISTANTS, ADMINS, SCHOOLS } from '../lib/scheduleData';
 import AuthStatus from './AuthStatus';
 import { createClient, hasSupabaseEnv } from '../lib/supabase/client';
@@ -5345,6 +5345,22 @@ const SCHOOL_IMAGE_BUCKET = 'school-reference-images';
 const SCHOOL_IMAGE_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const SCHOOL_IMAGE_COMPRESS_THRESHOLD_BYTES = 2.5 * 1024 * 1024;
 const SCHOOL_IMAGE_MAX_DIMENSION = 1800;
+const SCHOOL_IMAGE_CATEGORIES = [
+  { value: 'parking', label: 'Parking' },
+  { value: 'entrance', label: 'Entrance' },
+  { value: 'setup', label: 'Setup' },
+  { value: 'other', label: 'Other' }
+];
+
+function normalizeSchoolImageCategory(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return SCHOOL_IMAGE_CATEGORIES.some(category => category.value === normalized) ? normalized : 'other';
+}
+
+function schoolImageCategoryLabel(value) {
+  const normalized = normalizeSchoolImageCategory(value);
+  return SCHOOL_IMAGE_CATEGORIES.find(category => category.value === normalized)?.label || 'Other';
+}
 
 function sanitizeSchoolImageFilename(name = 'image') {
   const cleaned = String(name || 'image')
@@ -5409,8 +5425,11 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
-  const [editingCaptionId, setEditingCaptionId] = useState(null);
+  const [editingMetaId, setEditingMetaId] = useState(null);
   const [captionDraft, setCaptionDraft] = useState('');
+  const [categoryDraft, setCategoryDraft] = useState('other');
+  const [draggedImageId, setDraggedImageId] = useState(null);
+  const [viewerIndex, setViewerIndex] = useState(null);
   const fileInputRef = useRef(null);
 
   const schoolIds = useMemo(() => Array.from(new Set([
@@ -5419,6 +5438,22 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
   ].filter(Boolean))), [school?.id, JSON.stringify(school?.imageSchoolIds || [])]);
 
   const legacyImages = Array.isArray(school?.referenceImages) ? school.referenceImages.filter(image => image?.src) : [];
+  const viewerImages = useMemo(() => [
+    ...images.filter(image => image?.signedUrl).map(image => ({
+      key: `stored-${image.id}`,
+      src: image.signedUrl,
+      caption: image.caption || 'School reference image',
+      category: schoolImageCategoryLabel(image.image_type),
+      legacy: false
+    })),
+    ...legacyImages.map((image, index) => ({
+      key: `legacy-${image.id || index}`,
+      src: image.src,
+      caption: image.caption || 'School reference image',
+      category: 'Legacy',
+      legacy: true
+    }))
+  ], [images, legacyImages]);
 
   const loadImages = async () => {
     if (!schoolIds.length || !hasSupabaseEnv()) {
@@ -5458,6 +5493,7 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
     }
     setImages(rows.map((row, index) => ({
       ...row,
+      image_type: normalizeSchoolImageCategory(row.image_type),
       signedUrl: signedUrls[index]?.signedUrl || signedUrls[index]?.signedURL || ''
     })));
     setLoading(false);
@@ -5473,6 +5509,23 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
     return () => { cancelled = true; };
   }, [schoolIds.join('|')]);
 
+  useEffect(() => {
+    if (viewerIndex === null) return;
+    if (!viewerImages.length) setViewerIndex(null);
+    else if (viewerIndex >= viewerImages.length) setViewerIndex(viewerImages.length - 1);
+  }, [viewerImages.length, viewerIndex]);
+
+  useEffect(() => {
+    if (viewerIndex === null || typeof window === 'undefined') return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setViewerIndex(null);
+      if (event.key === 'ArrowLeft' && viewerImages.length > 1) setViewerIndex(current => (current - 1 + viewerImages.length) % viewerImages.length);
+      if (event.key === 'ArrowRight' && viewerImages.length > 1) setViewerIndex(current => (current + 1) % viewerImages.length);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewerIndex, viewerImages.length]);
+
   const handleUpload = async (event) => {
     const files = Array.from(event.target.files || []).slice(0, 8);
     event.target.value = '';
@@ -5485,7 +5538,9 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
     setUploading(true);
     setMessage('');
     try {
-      for (const originalFile of files) {
+      const currentMaxSort = images.reduce((max, image) => Math.max(max, Number(image.sort_order) || 0), 0);
+      for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
+        const originalFile = files[fileIndex];
         const preparedFile = await prepareSchoolImageUpload(originalFile);
         const randomId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const storagePath = `${school.id}/${randomId}-${sanitizeSchoolImageFilename(preparedFile.name)}`;
@@ -5500,8 +5555,8 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
           school_id: school.id,
           storage_path: storagePath,
           caption: schoolImageCaptionFromFilename(originalFile.name),
-          image_type: 'reference',
-          sort_order: 0
+          image_type: 'other',
+          sort_order: currentMaxSort + ((fileIndex + 1) * 10)
         });
         if (insertResult.error) {
           await supabase.storage.from(SCHOOL_IMAGE_BUCKET).remove([storagePath]);
@@ -5518,26 +5573,71 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
     }
   };
 
-  const beginCaptionEdit = (image) => {
-    setEditingCaptionId(image.id);
+  const beginMetaEdit = (image) => {
+    setEditingMetaId(image.id);
     setCaptionDraft(image.caption || '');
+    setCategoryDraft(normalizeSchoolImageCategory(image.image_type));
   };
 
-  const saveCaption = async (image) => {
+  const saveMetadata = async (image) => {
     const supabase = createClient();
     if (!supabase || !image?.id) return;
     const cleanCaption = String(captionDraft || '').trim();
+    const cleanCategory = normalizeSchoolImageCategory(categoryDraft);
     const { error } = await supabase.from('school_images').update({
       caption: cleanCaption || null,
+      image_type: cleanCategory,
       updated_at: new Date().toISOString()
     }).eq('id', image.id);
     if (error) {
-      setMessage(`Could not update image caption: ${error.message}`);
+      setMessage(`Could not update image details: ${error.message}`);
       return;
     }
-    setImages(current => current.map(item => item.id === image.id ? { ...item, caption: cleanCaption } : item));
-    setEditingCaptionId(null);
+    setImages(current => current.map(item => item.id === image.id ? { ...item, caption: cleanCaption, image_type: cleanCategory } : item));
+    setEditingMetaId(null);
     setCaptionDraft('');
+    setCategoryDraft('other');
+  };
+
+  const persistImageOrder = async (nextImages) => {
+    if (!canEdit || nextImages.length < 2) return;
+    const previousImages = images;
+    const normalized = nextImages.map((image, index) => ({ ...image, sort_order: (index + 1) * 10 }));
+    setImages(normalized);
+    const supabase = createClient();
+    if (!supabase) return;
+    const updatedAt = new Date().toISOString();
+    const results = await Promise.all(normalized.map(image => supabase.from('school_images').update({
+      sort_order: image.sort_order,
+      updated_at: updatedAt
+    }).eq('id', image.id)));
+    const failed = results.find(result => result.error);
+    if (failed?.error) {
+      setImages(previousImages);
+      setMessage(`Could not save image order: ${failed.error.message}`);
+      return;
+    }
+    setMessage('Image order saved.');
+  };
+
+  const reorderImage = (draggedId, targetId) => {
+    if (!draggedId || !targetId || draggedId === targetId) return;
+    const fromIndex = images.findIndex(image => image.id === draggedId);
+    const toIndex = images.findIndex(image => image.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const next = [...images];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    persistImageOrder(next);
+  };
+
+  const moveImage = (imageId, direction) => {
+    const currentIndex = images.findIndex(image => image.id === imageId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= images.length) return;
+    const next = [...images];
+    [next[currentIndex], next[nextIndex]] = [next[nextIndex], next[currentIndex]];
+    persistImageOrder(next);
   };
 
   const removeImage = async (image) => {
@@ -5556,13 +5656,32 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
     setMessage('Image removed.');
   };
 
+  const openStoredImage = (imageId) => {
+    const index = viewerImages.findIndex(item => item.key === `stored-${imageId}`);
+    if (index >= 0) setViewerIndex(index);
+  };
+
+  const openLegacyImage = (image, index) => {
+    const key = `legacy-${image.id || index}`;
+    const viewerItemIndex = viewerImages.findIndex(item => item.key === key);
+    if (viewerItemIndex >= 0) setViewerIndex(viewerItemIndex);
+  };
+
+  const shiftViewer = (direction) => {
+    if (!viewerImages.length || viewerIndex === null) return;
+    setViewerIndex((viewerIndex + direction + viewerImages.length) % viewerImages.length);
+  };
+
   const hasImages = images.length > 0 || legacyImages.length > 0;
+  const currentViewerImage = viewerIndex !== null ? viewerImages[viewerIndex] : null;
+
   return (
     <div className={`${compact ? '' : 'max-w-4xl'} rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800"><ImageIcon size={16} /> School Reference Images ({images.length + legacyImages.length})</div>
           <div className="mt-0.5 text-[11px] leading-4 text-zinc-500">Parking, entrances, setup references, and other school-specific visuals.</div>
+          {canEdit && images.length > 1 ? <div className="mt-1 text-[10px] font-semibold text-zinc-400">Drag images to reorder on desktop. Use the arrow controls on touch devices.</div> : null}
         </div>
         {canEdit ? (
           <>
@@ -5576,30 +5695,102 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
       {!loading && !hasImages ? <div className="mt-3 rounded-xl border border-dashed border-zinc-200 bg-cream/60 p-3 text-xs font-semibold text-zinc-400">No school reference images yet.</div> : null}
       {hasImages ? (
         <div className={`mt-3 grid gap-3 ${compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-          {images.map(image => (
-            <div key={image.id} className="overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70">
-              {image.signedUrl ? <a href={image.signedUrl} target="_blank" rel="noreferrer" className="block bg-zinc-100"><img src={image.signedUrl} alt={image.caption || 'School reference'} loading="lazy" className="h-32 w-full object-cover" /></a> : <div className="flex h-32 items-center justify-center bg-zinc-100 text-xs font-semibold text-zinc-400">Image unavailable</div>}
-              <div className="p-2.5">
-                {editingCaptionId === image.id ? (
-                  <div className="space-y-2">
-                    <input autoFocus value={captionDraft} onChange={(event) => setCaptionDraft(event.target.value)} className="w-full rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-700 outline-none focus:border-[#AEBB9E]" placeholder="Image caption" />
-                    <div className="flex justify-end gap-1.5"><button type="button" onClick={() => { setEditingCaptionId(null); setCaptionDraft(''); }} className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600">Cancel</button><button type="button" onClick={() => saveCaption(image)} className="rounded-lg bg-zinc-900 px-2 py-1 text-[10px] font-semibold text-white">Save</button></div>
+          {images.map((image, index) => (
+            <div
+              key={image.id}
+              draggable={canEdit && editingMetaId !== image.id}
+              onDragStart={(event) => {
+                setDraggedImageId(image.id);
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', image.id);
+              }}
+              onDragEnd={() => setDraggedImageId(null)}
+              onDragOver={(event) => { if (canEdit) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const draggedId = draggedImageId || event.dataTransfer.getData('text/plain');
+                setDraggedImageId(null);
+                reorderImage(draggedId, image.id);
+              }}
+              className={`overflow-hidden rounded-2xl border bg-cream/70 transition ${draggedImageId === image.id ? 'border-[#145C39] opacity-55' : 'border-zinc-200'}`}
+            >
+              <div className="relative bg-zinc-100">
+                {image.signedUrl ? (
+                  <button type="button" onClick={() => openStoredImage(image.id)} className="group block w-full text-left" title="Open image viewer">
+                    <img src={image.signedUrl} alt={image.caption || 'School reference'} loading="lazy" className="h-36 w-full object-cover transition group-hover:scale-[1.015]" />
+                    <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-zinc-950/70 px-2 py-1 text-[9px] font-bold text-white opacity-90"><Maximize2 size={10} /> View</span>
+                  </button>
+                ) : <div className="flex h-36 items-center justify-center bg-zinc-100 text-xs font-semibold text-zinc-400">Image unavailable</div>}
+                {canEdit ? <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/90 px-2 py-1 text-[9px] font-bold text-zinc-600 shadow-sm"><GripVertical size={11} /> Drag</div> : null}
+              </div>
+              <div className="p-3">
+                {editingMetaId === image.id ? (
+                  <div className="space-y-2.5">
+                    <div>
+                      <div className="mb-1 text-[9px] font-black uppercase tracking-wide text-zinc-400">Title / Caption</div>
+                      <input autoFocus value={captionDraft} onChange={(event) => setCaptionDraft(event.target.value)} className="w-full rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-semibold text-zinc-700 outline-none focus:border-[#AEBB9E]" placeholder="e.g. Staff parking lot" />
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[9px] font-black uppercase tracking-wide text-zinc-400">Category</div>
+                      <select value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} className="w-full rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-semibold text-zinc-700 outline-none focus:border-[#AEBB9E]">
+                        {SCHOOL_IMAGE_CATEGORIES.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex justify-end gap-1.5"><button type="button" onClick={() => { setEditingMetaId(null); setCaptionDraft(''); setCategoryDraft('other'); }} className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-zinc-600">Cancel</button><button type="button" onClick={() => saveMetadata(image)} className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[10px] font-semibold text-white">Save</button></div>
                   </div>
                 ) : (
                   <>
-                    <div className="min-h-[2rem] text-xs font-semibold leading-4 text-zinc-700">{image.caption || 'School reference image'}</div>
-                    {canEdit ? <div className="mt-2 flex items-center gap-1.5"><button type="button" onClick={() => beginCaptionEdit(image)} className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600">Edit caption</button><button type="button" onClick={() => removeImage(image)} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Remove</button></div> : null}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="min-h-[1.25rem] text-xs font-semibold leading-4 text-zinc-800">{image.caption || 'School reference image'}</div>
+                        <div className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#C8D6BB] bg-[#EEF4E8] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#145C39]"><Tag size={9} />{schoolImageCategoryLabel(image.image_type)}</div>
+                      </div>
+                      {canEdit && images.length > 1 ? (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button type="button" disabled={index === 0} onClick={() => moveImage(image.id, -1)} className="rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 disabled:opacity-25" title="Move image earlier"><ChevronLeft size={13} /></button>
+                          <button type="button" disabled={index === images.length - 1} onClick={() => moveImage(image.id, 1)} className="rounded-lg border border-zinc-200 bg-white p-1 text-zinc-500 disabled:opacity-25" title="Move image later"><ChevronRight size={13} /></button>
+                        </div>
+                      ) : null}
+                    </div>
+                    {canEdit ? <div className="mt-2.5 flex flex-wrap items-center gap-1.5"><button type="button" onClick={() => beginMetaEdit(image)} className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600">Edit details</button><button type="button" onClick={() => removeImage(image)} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Remove</button></div> : null}
                   </>
                 )}
               </div>
             </div>
           ))}
           {legacyImages.map((image, index) => (
-            <a key={image.id || image.src || `legacy-${index}`} href={image.src} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70 transition hover:bg-white hover:shadow-sm">
-              <img src={image.src} alt={image.caption || 'School reference'} loading="lazy" className="h-32 w-full object-cover transition group-hover:scale-[1.02]" />
-              <div className="p-2.5"><div className="text-xs font-semibold leading-4 text-zinc-700">{image.caption || 'School reference image'}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-wide text-zinc-400">Legacy image</div></div>
-            </a>
+            <div key={image.id || image.src || `legacy-${index}`} className="overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70">
+              <button type="button" onClick={() => openLegacyImage(image, index)} className="group relative block w-full bg-zinc-100 text-left">
+                <img src={image.src} alt={image.caption || 'School reference'} loading="lazy" className="h-36 w-full object-cover transition group-hover:scale-[1.015]" />
+                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-zinc-950/70 px-2 py-1 text-[9px] font-bold text-white"><Maximize2 size={10} /> View</span>
+              </button>
+              <div className="p-3"><div className="text-xs font-semibold leading-4 text-zinc-700">{image.caption || 'School reference image'}</div><div className="mt-1.5 text-[9px] font-bold uppercase tracking-wide text-zinc-400">Legacy image</div></div>
+            </div>
           ))}
+        </div>
+      ) : null}
+
+      {currentViewerImage ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-zinc-950/80 p-3 backdrop-blur-sm sm:p-8" onClick={() => setViewerIndex(null)}>
+          <div className="relative flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-[1.5rem] bg-zinc-950 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-white">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-bold">{currentViewerImage.caption}</div>
+                <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-white/55">{currentViewerImage.category}</div>
+              </div>
+              <button type="button" onClick={() => setViewerIndex(null)} className="rounded-full border border-white/15 bg-white/10 p-2 text-white transition hover:bg-white/20"><X size={18} /></button>
+            </div>
+            <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black p-2 sm:p-4">
+              <img src={currentViewerImage.src} alt={currentViewerImage.caption} className="max-h-[78vh] max-w-full object-contain" />
+              {viewerImages.length > 1 ? (
+                <>
+                  <button type="button" onClick={() => shiftViewer(-1)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-white/15 bg-zinc-950/65 p-2.5 text-white shadow-lg transition hover:bg-zinc-900"><ChevronLeft size={22} /></button>
+                  <button type="button" onClick={() => shiftViewer(1)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/15 bg-zinc-950/65 p-2.5 text-white shadow-lg transition hover:bg-zinc-900"><ChevronRight size={22} /></button>
+                </>
+              ) : null}
+            </div>
+            {viewerImages.length > 1 ? <div className="border-t border-white/10 px-4 py-2 text-center text-[10px] font-semibold text-white/50">{viewerIndex + 1} of {viewerImages.length}</div> : null}
+          </div>
         </div>
       ) : null}
     </div>
@@ -11292,7 +11483,18 @@ export default function SchedulerApp() {
       ) : null}
       <div className={`${['Schedule Live!', 'The Board'].includes(activeTab) ? 'mx-auto w-full max-w-[1800px]' : 'mx-auto max-w-7xl'} space-y-3 sm:space-y-6 ${['Calendar View','Mobile View'].includes(activeTab) ? 'px-0 sm:px-6' : ['Schedule Live!', 'The Board'].includes(activeTab) ? 'px-1 sm:px-6' : 'px-2 sm:px-6'} ${activeTab === 'Overview' ? 'pb-36' : 'pb-28'} pt-3 sm:pb-6 sm:pt-6`}>
         <LoginRequiredNotice />
-        <GlobalSearchResults query={query} schools={schools} events={allEvents} onSelectEvent={setSelected} onSelectSchool={(schoolName) => { setSelectedSchoolName(schoolName); setActiveTab('School List'); }} />
+        <GlobalSearchResults
+          query={query}
+          schools={schools}
+          events={allEvents}
+          onSelectEvent={(event) => { setSelected(event); setQuery(''); }}
+          onSelectSchool={(schoolName) => {
+            setSelectedSchoolName(schoolName);
+            setActiveTab('School List');
+            setQuery('');
+            scrollSchedulerPageToTop();
+          }}
+        />
         {activeTab === 'Overview' && !query.trim() ? <OperationalSummary events={allEvents} onClickEvent={setSelected} rolloutCapacityOverrides={rolloutCapacityOverrides} /> : null}
         <section className={activeTab === 'Schedule Live!' ? 'rounded-none border-0 bg-transparent p-0 shadow-none' : `rounded-[2rem] border border-zinc-200/80 bg-white/35 ${['Calendar View','Mobile View'].includes(activeTab) ? 'p-0 sm:p-4' : 'p-2 sm:p-4'} shadow-soft`}>
           {activeTab === 'Overview' && !query.trim() && <>
