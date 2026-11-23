@@ -937,15 +937,20 @@ function getHolidayMapForYear(year) {
   const map = new Map();
   pushHoliday(map, dateKeyFromParts(year, 1, 1), "New Year's Day");
   pushHoliday(map, nthWeekdayOfMonth(year, 1, 1, 3), 'MLK Day');
+  pushHoliday(map, dateKeyFromParts(year, 2, 14), "Valentine's Day");
   pushHoliday(map, nthWeekdayOfMonth(year, 2, 1, 3), 'Presidents Day');
+  pushHoliday(map, dateKeyFromParts(year, 3, 17), "St. Patrick's Day");
   const easter = easterDateKey(year);
   pushHoliday(map, addHolidayDays(easter, -2), 'Good Friday');
   pushHoliday(map, easter, 'Easter');
+  pushHoliday(map, nthWeekdayOfMonth(year, 5, 0, 2), "Mother's Day");
   pushHoliday(map, lastWeekdayOfMonth(year, 5, 1), 'Memorial Day');
+  pushHoliday(map, nthWeekdayOfMonth(year, 6, 0, 3), "Father's Day");
   pushHoliday(map, dateKeyFromParts(year, 6, 19), 'Juneteenth');
   pushHoliday(map, dateKeyFromParts(year, 7, 4), 'Independence Day');
   pushHoliday(map, nthWeekdayOfMonth(year, 9, 1, 1), 'Labor Day');
   pushHoliday(map, nthWeekdayOfMonth(year, 10, 1, 2), 'Columbus Day / Indigenous Peoples Day');
+  pushHoliday(map, dateKeyFromParts(year, 10, 31), 'Halloween');
   pushHoliday(map, dateKeyFromParts(year, 11, 11), 'Veterans Day');
   const thanksgiving = nthWeekdayOfMonth(year, 11, 4, 4);
   pushHoliday(map, thanksgiving, 'Thanksgiving');
@@ -5387,7 +5392,7 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
     if (error) {
       console.warn('Could not load School List images', error);
       setImages([]);
-      setMessage('School Images are unavailable. Run the included v2.15 SQL if it has not been installed yet.');
+      setMessage('School Reference Images are unavailable. Run the included v2.15 SQL if it has not been installed yet.');
       setLoading(false);
       return;
     }
@@ -5509,7 +5514,7 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
     <div className={`${compact ? '' : 'max-w-4xl'} rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800"><ImageIcon size={16} /> School Images ({images.length + legacyImages.length})</div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800"><ImageIcon size={16} /> School Reference Images ({images.length + legacyImages.length})</div>
           <div className="mt-0.5 text-[11px] leading-4 text-zinc-500">Parking, entrances, setup references, and other school-specific visuals.</div>
         </div>
         {canEdit ? (
@@ -5520,8 +5525,8 @@ function SchoolImagesSection({ school, canEdit = false, compact = false }) {
         ) : null}
       </div>
       {message ? <div className="mt-2 rounded-xl border border-zinc-200 bg-cream/70 px-3 py-2 text-[11px] font-semibold text-zinc-600">{message}</div> : null}
-      {loading ? <div className="mt-3 text-xs font-semibold text-zinc-400">Loading school images…</div> : null}
-      {!loading && !hasImages ? <div className="mt-3 rounded-xl border border-dashed border-zinc-200 bg-cream/60 p-3 text-xs font-semibold text-zinc-400">No school images yet.</div> : null}
+      {loading ? <div className="mt-3 text-xs font-semibold text-zinc-400">Loading school reference images…</div> : null}
+      {!loading && !hasImages ? <div className="mt-3 rounded-xl border border-dashed border-zinc-200 bg-cream/60 p-3 text-xs font-semibold text-zinc-400">No school reference images yet.</div> : null}
       {hasImages ? (
         <div className={`mt-3 grid gap-3 ${compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
           {images.map(image => (
