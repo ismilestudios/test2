@@ -4430,8 +4430,18 @@ function getCalendarMonthCells(month) {
 
 function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
   const cells = useMemo(() => getCalendarMonthCells(month), [month]);
-  const weeks = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  const weekLayouts = useMemo(() => {
+    const weeks = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return weeks.map(weekDays => {
+      const dates = weekDays.map(cell => cell.date);
+      const segments = buildMonthWeekSegments(events, dates, null);
+      const visibleRows = Math.max(2, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
+      const eventLayerTop = 22;
+      const rowMinHeight = Math.max(72, eventLayerTop + 3 + (visibleRows * 19));
+      return { weekDays, segments, eventLayerTop, rowMinHeight };
+    });
+  }, [cells, events]);
   const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   return (
@@ -4440,12 +4450,7 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
         {dayNames.map((day, index) => <div key={`${day}-${index}`}>{day}</div>)}
       </div>
       <div className="mt-1 space-y-1">
-        {weeks.map((weekDays, weekIndex) => {
-          const dates = weekDays.map(cell => cell.date);
-          const segments = buildMonthWeekSegments(events, dates, null);
-          const visibleRows = Math.max(2, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
-          const eventLayerTop = 22;
-          const rowMinHeight = Math.max(72, eventLayerTop + 3 + (visibleRows * 19));
+        {weekLayouts.map(({ weekDays, segments, eventLayerTop, rowMinHeight }, weekIndex) => {
           return (
             <div key={`mobile-week-${weekIndex}`} className="relative grid grid-cols-7 overflow-hidden rounded-xl border border-zinc-100" style={{ minHeight: rowMinHeight }}>
               {weekDays.map((cell) => {
@@ -4517,10 +4522,18 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
     if (!firstVisibleDate || !lastVisibleDate) return [];
     return (events || []).filter(event => event?.date && event.date <= lastVisibleDate && (event.endDate || event.date) >= firstVisibleDate);
   }, [events, cells]);
-  const weeks = [];
-  for (let i = 0; i < cells.length; i += 7) {
-    weeks.push(cells.slice(i, i + 7));
-  }
+  const weekLayouts = useMemo(() => {
+    const weeks = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return weeks.map(weekDays => {
+      const dates = weekDays.map(cell => cell.date);
+      const segments = buildMonthWeekSegments(visibleMonthEvents, dates, null);
+      const visibleRows = Math.max(3, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
+      const eventLayerTop = 40;
+      const rowMinHeight = Math.max(132, eventLayerTop + 18 + (visibleRows * 34));
+      return { weekDays, segments, eventLayerTop, rowMinHeight };
+    });
+  }, [cells, visibleMonthEvents]);
 
   return (
     <>
@@ -4531,12 +4544,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
           {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d}>{d}</div>)}
         </div>
         <div className="mt-2 space-y-2">
-          {weeks.map((weekDays, weekIndex) => {
-            const dates = weekDays.map(cell => cell.date);
-            const segments = buildMonthWeekSegments(visibleMonthEvents, dates, null);
-            const visibleRows = Math.max(3, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
-            const eventLayerTop = 40;
-            const rowMinHeight = Math.max(132, eventLayerTop + 18 + (visibleRows * 34));
+          {weekLayouts.map(({ weekDays, segments, eventLayerTop, rowMinHeight }, weekIndex) => {
             return (
               <div key={`week-${weekIndex}`} className="relative grid grid-cols-7 gap-2 overflow-hidden" style={{ minHeight: rowMinHeight }}>
                 {weekDays.map((cell, index) => {
@@ -5281,16 +5289,49 @@ function getSchoolsToScheduleSpring2027FromList(schoolsList = SCHOOLS, events = 
 }
 
 function getCarrie2026To2027Availability(events = EVENTS, photographers = PHOTOGRAPHERS, rolloutCapacityOverrides = {}) {
+  // v2.17 performance rule: build the date/rollout indexes once instead of
+  // rescanning the complete schedule for every one of the ~334 availability days.
+  // Include the full boundary weeks so weekly rollout totals remain identical to
+  // the previous Sunday–Saturday calculation at the Aug/Jun edges.
+  const availabilityStart = '2026-08-01';
+  const availabilityEnd = '2027-06-30';
+  const expandedStart = rolloutWeekBounds(availabilityStart).start;
+  const expandedEnd = rolloutWeekBounds(availabilityEnd).end;
+  const scheduledByDate = new Map();
+  const dayRolloutsByDate = new Map();
+  const weekRolloutsByStart = new Map();
+
+  (events || []).forEach(event => {
+    if (!event?.date) return;
+    const eventEnd = event.endDate || event.date;
+    if (event.date > expandedEnd || eventEnd < expandedStart) return;
+    const rangeStart = event.date > expandedStart ? event.date : expandedStart;
+    const rangeEnd = eventEnd < expandedEnd ? eventEnd : expandedEnd;
+    const rolloutCount = isRolloutEvent(event) ? getRequiredPhotographerCount(event) : 0;
+
+    getEventDateKeysInRange(event, rangeStart, rangeEnd).forEach(dateKey => {
+      if (dateKey >= availabilityStart && dateKey <= availabilityEnd) {
+        const scheduled = scheduledByDate.get(dateKey) || [];
+        scheduled.push(event);
+        scheduledByDate.set(dateKey, scheduled);
+        if (rolloutCount) dayRolloutsByDate.set(dateKey, (dayRolloutsByDate.get(dateKey) || 0) + rolloutCount);
+      }
+      if (rolloutCount) {
+        const weekStart = rolloutWeekBounds(dateKey).start;
+        weekRolloutsByStart.set(weekStart, (weekRolloutsByStart.get(weekStart) || 0) + rolloutCount);
+      }
+    });
+  });
+
   const dates = [];
-  const start = new Date('2026-08-01T12:00:00');
-  const end = new Date('2027-06-30T12:00:00');
+  const start = new Date(`${availabilityStart}T12:00:00`);
+  const end = new Date(`${availabilityEnd}T12:00:00`);
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const key = d.toISOString().slice(0, 10);
     const { start: weekStart, end: weekEnd } = rolloutWeekBounds(key);
-    const scheduled = events.filter(event => isDateInEventRange(event, key));
-    const weekEvents = events.filter(event => event && event.date && event.date <= weekEnd && (event.endDate || event.date) >= weekStart);
-    const dayRollouts = scheduled.reduce((total, event) => total + getRolloutCountForOccurrence(event, key), 0);
-    const weekRollouts = getRolloutCountForDateRange(events, weekStart, weekEnd);
+    const scheduled = scheduledByDate.get(key) || [];
+    const dayRollouts = dayRolloutsByDate.get(key) || 0;
+    const weekRollouts = weekRolloutsByStart.get(weekStart) || 0;
     const weeklyCapacity = getWeeklyRolloutCapacity(weekStart, rolloutCapacityOverrides);
     const remainingWeekRollouts = Math.max(0, weeklyCapacity - weekRollouts);
     const capacity = getCapacityTone(weekRollouts, weeklyCapacity);
@@ -10876,13 +10917,19 @@ export default function SchedulerApp() {
         return;
       }
 
-      await Promise.all([
+      // The Calendar's authoritative event snapshot is the critical startup path.
+      // Team members, schools, and rollout settings are useful secondary resources,
+      // but they should not keep the global "Scheduler is loading" banner up after
+      // the complete schedule itself is ready. Start all four together, then release
+      // the initial UI as soon as the event snapshot finishes safely.
+      const secondaryLoads = Promise.allSettled([
         loadTeamMembersFromSupabase(),
         loadSchoolsFromSupabase(),
-        loadEventsFromSupabase(),
         loadRolloutCapacityOverrides()
       ]);
+      await loadEventsFromSupabase();
       if (!cancelled) setInitialLoading(false);
+      await secondaryLoads;
     };
 
     loadAfterAuth();
@@ -10892,10 +10939,11 @@ export default function SchedulerApp() {
       setAuthReady(true);
       setAuthEmail(session?.user?.email || null);
       // Initial session data is already loaded by loadAfterAuth() above. Supabase
-      // also emits INITIAL_SESSION when this listener attaches; reloading all four
-      // resources here duplicates startup traffic and can make Scheduler feel slower.
-      // Keep the existing SIGNED_IN/TOKEN_REFRESHED refresh behavior unchanged.
-      if (session && ['SIGNED_IN', 'TOKEN_REFRESHED'].includes(event)) {
+      // also emits INITIAL_SESSION when this listener attaches, and TOKEN_REFRESHED
+      // is only an authentication maintenance event. Neither should trigger another
+      // full Scheduler data refresh. A genuine SIGNED_IN event still refreshes the
+      // shared resources so a newly signed-in user gets a current snapshot.
+      if (session && event === 'SIGNED_IN') {
         loadTeamMembersFromSupabase();
         loadSchoolsFromSupabase();
         loadEventsFromSupabase();
@@ -11274,14 +11322,18 @@ export default function SchedulerApp() {
           </>}
           {activeTab === 'Schedule Live!' && !isAssistantUser && <ScheduleLiveView events={allEvents} photographers={photographers} assistants={assistants} onClickEvent={setSelected} onSchedule={handleScheduleEvent} onAddEvent={openAddEvent} authEmail={authEmail} isAdminUser={isAdminUser} canEdit={canEditScheduler} reloadEvents={loadEventsFromSupabase} rolloutCapacityOverrides={rolloutCapacityOverrides} />}
           {activeTab === 'Calendar View' && (scheduleSnapshotPending ? (
-            <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-zinc-200 bg-white/75 p-8 text-center shadow-sm">
-              <div className="max-w-xl">
-                {!scheduleSnapshotFailed ? <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" /> : null}
-                <div className="mt-3 text-base font-black text-zinc-950">{scheduleSnapshotFailed ? 'The schedule did not finish loading.' : 'Loading the complete schedule…'}</div>
-                <div className="mt-1 text-sm font-semibold text-zinc-500">{scheduleSnapshotFailed ? eventsLoadError : 'Scheduler is loading the shared event snapshot without displaying a partial calendar.'}</div>
-                {scheduleSnapshotFailed ? <button type="button" onClick={loadEventsFromSupabase} disabled={eventsRefreshing} className="mt-4 rounded-2xl border border-zinc-300 bg-white px-4 py-2 text-sm font-black text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-50">{eventsRefreshing ? 'Retrying…' : 'Retry Schedule Load'}</button> : null}
+            initialLoading && !scheduleSnapshotFailed ? (
+              <div className="min-h-[420px]" aria-hidden="true" />
+            ) : (
+              <div className="flex min-h-[420px] items-center justify-center rounded-[1.75rem] border border-zinc-200 bg-white/75 p-8 text-center shadow-sm">
+                <div className="max-w-xl">
+                  {!scheduleSnapshotFailed ? <div className="mx-auto h-8 w-8 animate-spin rounded-full border-[3px] border-[#DDE8D2] border-t-zinc-900" /> : null}
+                  <div className="mt-3 text-base font-black text-zinc-950">{scheduleSnapshotFailed ? 'The schedule did not finish loading.' : 'Loading the complete schedule…'}</div>
+                  <div className="mt-1 text-sm font-semibold text-zinc-500">{scheduleSnapshotFailed ? eventsLoadError : 'Scheduler is loading the shared event snapshot without displaying a partial calendar.'}</div>
+                  {scheduleSnapshotFailed ? <button type="button" onClick={loadEventsFromSupabase} disabled={eventsRefreshing} className="mt-4 rounded-2xl border border-zinc-300 bg-white px-4 py-2 text-sm font-black text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:opacity-50">{eventsRefreshing ? 'Retrying…' : 'Retry Schedule Load'}</button> : null}
+                </div>
               </div>
-            </div>
+            )
           ) : <>
             <CalendarView viewMode={calendarMode} setViewMode={setCalendarMode} events={queryFilteredEvents} month={month} setMonth={setMonth} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onClick={setSelected} onAddEvent={openAddEvent} canEdit={canEditScheduler} rolloutCapacityOverrides={rolloutCapacityOverrides} />
             <div className="mt-4 flex flex-col gap-2 rounded-3xl border border-[#AEBB9E] bg-[#DDE8D2]/40 p-3 text-sm text-zinc-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
