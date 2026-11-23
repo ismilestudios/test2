@@ -5288,6 +5288,272 @@ function getCarrie2026To2027Availability(events = EVENTS, photographers = PHOTOG
   return dates;
 }
 
+
+const SCHOOL_IMAGE_BUCKET = 'school-reference-images';
+const SCHOOL_IMAGE_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const SCHOOL_IMAGE_COMPRESS_THRESHOLD_BYTES = 2.5 * 1024 * 1024;
+const SCHOOL_IMAGE_MAX_DIMENSION = 1800;
+
+function sanitizeSchoolImageFilename(name = 'image') {
+  const cleaned = String(name || 'image')
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return cleaned || 'image';
+}
+
+function schoolImageCaptionFromFilename(name = '') {
+  return String(name || 'Reference image').replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ').trim() || 'Reference image';
+}
+
+async function prepareSchoolImageUpload(file) {
+  if (!file?.type?.startsWith('image/')) throw new Error('Please choose an image file.');
+  if (file.size > SCHOOL_IMAGE_MAX_UPLOAD_BYTES) throw new Error(`${file.name} is larger than 10 MB.`);
+  if (file.size <= SCHOOL_IMAGE_COMPRESS_THRESHOLD_BYTES || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return file;
+
+  return await new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const scale = Math.min(1, SCHOOL_IMAGE_MAX_DIMENSION / Math.max(image.naturalWidth || 1, image.naturalHeight || 1));
+        const width = Math.max(1, Math.round((image.naturalWidth || 1) * scale));
+        const height = Math.max(1, Math.round((image.naturalHeight || 1) * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        if (!context) {
+          URL.revokeObjectURL(objectUrl);
+          resolve(file);
+          return;
+        }
+        context.drawImage(image, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (!blob || blob.size >= file.size) {
+            resolve(file);
+            return;
+          }
+          const baseName = sanitizeSchoolImageFilename(file.name.replace(/\.[^/.]+$/, ''));
+          resolve(new File([blob], `${baseName}.jpg`, { type: 'image/jpeg', lastModified: Date.now() }));
+        }, 'image/jpeg', 0.84);
+      } catch (_) {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    image.src = objectUrl;
+  });
+}
+
+function SchoolImagesSection({ school, canEdit = false, compact = false }) {
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [editingCaptionId, setEditingCaptionId] = useState(null);
+  const [captionDraft, setCaptionDraft] = useState('');
+  const fileInputRef = useRef(null);
+
+  const schoolIds = useMemo(() => Array.from(new Set([
+    school?.id,
+    ...(school?.imageSchoolIds || [])
+  ].filter(Boolean))), [school?.id, JSON.stringify(school?.imageSchoolIds || [])]);
+
+  const legacyImages = Array.isArray(school?.referenceImages) ? school.referenceImages.filter(image => image?.src) : [];
+
+  const loadImages = async () => {
+    if (!schoolIds.length || !hasSupabaseEnv()) {
+      setImages([]);
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) return;
+    setLoading(true);
+    setMessage('');
+    const { data, error } = await supabase
+      .from('school_images')
+      .select('id, school_id, storage_path, caption, image_type, sort_order, created_at, updated_at')
+      .in('school_id', schoolIds)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Could not load School List images', error);
+      setImages([]);
+      setMessage('School Images are unavailable. Run the included v2.15 SQL if it has not been installed yet.');
+      setLoading(false);
+      return;
+    }
+
+    const rows = data || [];
+    const paths = rows.map(row => row.storage_path).filter(Boolean);
+    let signedUrls = [];
+    if (paths.length) {
+      const signed = await supabase.storage.from(SCHOOL_IMAGE_BUCKET).createSignedUrls(paths, 60 * 60 * 6);
+      if (signed.error) {
+        console.warn('Could not sign School List image URLs', signed.error);
+        setMessage('Image metadata loaded, but the private image files could not be opened. Check the Storage policies from v2.15.');
+      } else {
+        signedUrls = signed.data || [];
+      }
+    }
+    setImages(rows.map((row, index) => ({
+      ...row,
+      signedUrl: signedUrls[index]?.signedUrl || signedUrls[index]?.signedURL || ''
+    })));
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (cancelled) return;
+      await loadImages();
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [schoolIds.join('|')]);
+
+  const handleUpload = async (event) => {
+    const files = Array.from(event.target.files || []).slice(0, 8);
+    event.target.value = '';
+    if (!files.length || !school?.id || uploading) return;
+    const supabase = createClient();
+    if (!hasSupabaseEnv() || !supabase) {
+      setMessage('Supabase is not connected. Images were not uploaded.');
+      return;
+    }
+    setUploading(true);
+    setMessage('');
+    try {
+      for (const originalFile of files) {
+        const preparedFile = await prepareSchoolImageUpload(originalFile);
+        const randomId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const storagePath = `${school.id}/${randomId}-${sanitizeSchoolImageFilename(preparedFile.name)}`;
+        const uploadResult = await supabase.storage.from(SCHOOL_IMAGE_BUCKET).upload(storagePath, preparedFile, {
+          cacheControl: '3600',
+          contentType: preparedFile.type || originalFile.type || 'image/jpeg',
+          upsert: false
+        });
+        if (uploadResult.error) throw new Error(`Could not upload ${originalFile.name}: ${uploadResult.error.message}`);
+
+        const insertResult = await supabase.from('school_images').insert({
+          school_id: school.id,
+          storage_path: storagePath,
+          caption: schoolImageCaptionFromFilename(originalFile.name),
+          image_type: 'reference',
+          sort_order: 0
+        });
+        if (insertResult.error) {
+          await supabase.storage.from(SCHOOL_IMAGE_BUCKET).remove([storagePath]);
+          throw new Error(`The image file uploaded, but Scheduler could not save its School List record: ${insertResult.error.message}`);
+        }
+      }
+      setMessage(`${files.length} image${files.length === 1 ? '' : 's'} added.`);
+      await loadImages();
+    } catch (error) {
+      console.warn('Could not upload School List image', error);
+      setMessage(error?.message || 'Could not upload the image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const beginCaptionEdit = (image) => {
+    setEditingCaptionId(image.id);
+    setCaptionDraft(image.caption || '');
+  };
+
+  const saveCaption = async (image) => {
+    const supabase = createClient();
+    if (!supabase || !image?.id) return;
+    const cleanCaption = String(captionDraft || '').trim();
+    const { error } = await supabase.from('school_images').update({
+      caption: cleanCaption || null,
+      updated_at: new Date().toISOString()
+    }).eq('id', image.id);
+    if (error) {
+      setMessage(`Could not update image caption: ${error.message}`);
+      return;
+    }
+    setImages(current => current.map(item => item.id === image.id ? { ...item, caption: cleanCaption } : item));
+    setEditingCaptionId(null);
+    setCaptionDraft('');
+  };
+
+  const removeImage = async (image) => {
+    if (!image?.id) return;
+    if (typeof window !== 'undefined' && !window.confirm('Remove this image from the School List?')) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const { error: metadataError } = await supabase.from('school_images').delete().eq('id', image.id);
+    if (metadataError) {
+      setMessage(`Could not remove image: ${metadataError.message}`);
+      return;
+    }
+    const { error: storageError } = await supabase.storage.from(SCHOOL_IMAGE_BUCKET).remove([image.storage_path]);
+    if (storageError) console.warn('School image metadata was removed but the Storage object could not be deleted', storageError);
+    setImages(current => current.filter(item => item.id !== image.id));
+    setMessage('Image removed.');
+  };
+
+  const hasImages = images.length > 0 || legacyImages.length > 0;
+  return (
+    <div className={`${compact ? '' : 'max-w-4xl'} rounded-2xl border border-zinc-200 bg-white/70 p-3 text-xs text-zinc-600`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800"><ImageIcon size={16} /> School Images ({images.length + legacyImages.length})</div>
+          <div className="mt-0.5 text-[11px] leading-4 text-zinc-500">Parking, entrances, setup references, and other school-specific visuals.</div>
+        </div>
+        {canEdit ? (
+          <>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleUpload} />
+            <button type="button" disabled={uploading || !school?.id} onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-xl border border-[#AEBB9E] bg-[#DDE8D2]/70 px-3 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-[#DDE8D2] disabled:cursor-not-allowed disabled:opacity-50"><Plus size={13} />{uploading ? 'Uploading…' : 'Add Images'}</button>
+          </>
+        ) : null}
+      </div>
+      {message ? <div className="mt-2 rounded-xl border border-zinc-200 bg-cream/70 px-3 py-2 text-[11px] font-semibold text-zinc-600">{message}</div> : null}
+      {loading ? <div className="mt-3 text-xs font-semibold text-zinc-400">Loading school images…</div> : null}
+      {!loading && !hasImages ? <div className="mt-3 rounded-xl border border-dashed border-zinc-200 bg-cream/60 p-3 text-xs font-semibold text-zinc-400">No school images yet.</div> : null}
+      {hasImages ? (
+        <div className={`mt-3 grid gap-3 ${compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+          {images.map(image => (
+            <div key={image.id} className="overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70">
+              {image.signedUrl ? <a href={image.signedUrl} target="_blank" rel="noreferrer" className="block bg-zinc-100"><img src={image.signedUrl} alt={image.caption || 'School reference'} loading="lazy" className="h-32 w-full object-cover" /></a> : <div className="flex h-32 items-center justify-center bg-zinc-100 text-xs font-semibold text-zinc-400">Image unavailable</div>}
+              <div className="p-2.5">
+                {editingCaptionId === image.id ? (
+                  <div className="space-y-2">
+                    <input autoFocus value={captionDraft} onChange={(event) => setCaptionDraft(event.target.value)} className="w-full rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-700 outline-none focus:border-[#AEBB9E]" placeholder="Image caption" />
+                    <div className="flex justify-end gap-1.5"><button type="button" onClick={() => { setEditingCaptionId(null); setCaptionDraft(''); }} className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600">Cancel</button><button type="button" onClick={() => saveCaption(image)} className="rounded-lg bg-zinc-900 px-2 py-1 text-[10px] font-semibold text-white">Save</button></div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="min-h-[2rem] text-xs font-semibold leading-4 text-zinc-700">{image.caption || 'School reference image'}</div>
+                    {canEdit ? <div className="mt-2 flex items-center gap-1.5"><button type="button" onClick={() => beginCaptionEdit(image)} className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-600">Edit caption</button><button type="button" onClick={() => removeImage(image)} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Remove</button></div> : null}
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {legacyImages.map((image, index) => (
+            <a key={image.id || image.src || `legacy-${index}`} href={image.src} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70 transition hover:bg-white hover:shadow-sm">
+              <img src={image.src} alt={image.caption || 'School reference'} loading="lazy" className="h-32 w-full object-cover transition group-hover:scale-[1.02]" />
+              <div className="p-2.5"><div className="text-xs font-semibold leading-4 text-zinc-700">{image.caption || 'School reference image'}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-wide text-zinc-400">Legacy image</div></div>
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = false, scrollable = false }) {
   if (!school) {
     return (
@@ -5382,6 +5648,10 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         ) : null}
       </div>
 
+      <div className="mt-3">
+        <SchoolImagesSection school={school} canEdit={Boolean(onEdit)} compact={compact} />
+      </div>
+
       <div className={`${compact ? 'mt-4 grid gap-3 sm:grid-cols-2' : 'mt-5 grid gap-3 md:grid-cols-4'}`}>
         {seasons.map(season => {
           const events = grouped[season] || [];
@@ -5438,19 +5708,6 @@ function SchoolHistoryPanel({ school, onClickEvent, onEdit, onMerge, compact = f
         ) : <div className="mt-2 text-xs text-zinc-400">No picture day info imported yet.</div>}
       </div>
 
-      <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/70 p-3 text-sm text-zinc-600">
-        <div className="flex items-center gap-2 font-semibold text-zinc-800"><ImageIcon size={16} /> Reference Images</div>
-        {school.referenceImages?.length ? (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {school.referenceImages.map((image) => (
-              <a key={image.id || image.src} href={image.src} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-zinc-200 bg-cream/70 transition hover:bg-white hover:shadow-sm">
-                <img src={image.src} alt={image.caption || 'School reference'} className="h-32 w-full object-cover transition group-hover:scale-[1.02]" />
-                <div className="p-2 text-xs font-medium text-zinc-700">{image.caption || 'Reference image'}</div>
-              </a>
-            ))}
-          </div>
-        ) : <div className="mt-2 text-xs text-zinc-400">No reference images added yet.</div>}
-      </div>
     </section>
   );
 }
@@ -6413,34 +6670,6 @@ function EditSchoolModal({ school, onClose, onSave }) {
 
   if (!school) return null;
 
-  const handleImageUpload = (event) => {
-    const files = Array.from(event.target.files || []);
-    files.forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        setReferenceImages(prev => [
-          ...prev,
-          {
-            id: `${Date.now()}-${file.name}`,
-            src: reader.result,
-            caption: file.name.replace(/\.[^/.]+$/, '')
-          }
-        ]);
-      };
-      reader.readAsDataURL(file);
-    });
-    event.target.value = '';
-  };
-
-  const updateImageCaption = (id, caption) => {
-    setReferenceImages(prev => prev.map(image => image.id === id ? { ...image, caption } : image));
-  };
-
-  const removeImage = (id) => {
-    setReferenceImages(prev => prev.filter(image => image.id !== id));
-  };
-
   const handleSave = async () => {
     const cleanName = name.trim();
     if (!cleanName || saving) return;
@@ -6726,6 +6955,8 @@ function MobileSchoolDetail({ school, onBack, onClickEvent, onEdit, onMerge }) {
               ) : schoolNoteHistory.length ? null : <div className="text-xs font-semibold text-zinc-400">No notes yet.</div>}
             </div>
           </div>
+
+          <SchoolImagesSection school={school} canEdit={Boolean(onEdit)} compact />
 
           <div className="rounded-2xl border border-zinc-200 bg-white/80 p-3">
             <div className="text-xs font-black uppercase tracking-wide text-zinc-500">Recent / Upcoming History</div>
@@ -7565,6 +7796,7 @@ function SchoolPages({ query, onClickEvent, events, selectedName, setSelectedNam
         ...school,
         notes,
         referenceImages: [...(school.referenceImages || []), ...mergedImages],
+        imageSchoolIds: [school.id, ...mergedSourceSchools.map(item => item.id)].filter(Boolean),
         mergedFrom: mergedSourceSchools.map(item => item.name),
         history: getSchoolHistoryForSchool(school, mergedSourceSchools, events)
       };
