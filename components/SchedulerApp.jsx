@@ -4429,7 +4429,7 @@ function getCalendarMonthCells(month) {
 }
 
 function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent }) {
-  const cells = getCalendarMonthCells(month);
+  const cells = useMemo(() => getCalendarMonthCells(month), [month]);
   const weeks = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
   const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -4510,7 +4510,13 @@ function MobileMonthView({ events, month, onClick, selectedDate, setSelectedDate
 }
 
 function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setViewMode, onAddEvent, emptyMessage = '' }) {
-  const cells = getCalendarMonthCells(month);
+  const cells = useMemo(() => getCalendarMonthCells(month), [month]);
+  const visibleMonthEvents = useMemo(() => {
+    const firstVisibleDate = cells[0]?.date;
+    const lastVisibleDate = cells[cells.length - 1]?.date;
+    if (!firstVisibleDate || !lastVisibleDate) return [];
+    return (events || []).filter(event => event?.date && event.date <= lastVisibleDate && (event.endDate || event.date) >= firstVisibleDate);
+  }, [events, cells]);
   const weeks = [];
   for (let i = 0; i < cells.length; i += 7) {
     weeks.push(cells.slice(i, i + 7));
@@ -4518,7 +4524,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
 
   return (
     <>
-      <MobileMonthView events={events} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={onAddEvent} />
+      <MobileMonthView events={visibleMonthEvents} month={month} onClick={onClick} selectedDate={selectedDate} setSelectedDate={setSelectedDate} setViewMode={setViewMode} onAddEvent={onAddEvent} />
       <div className="hidden overflow-x-auto rounded-3xl border border-zinc-200 bg-white/60 p-3 shadow-sm sm:block sm:p-4">
       <div className="min-w-[560px] sm:min-w-0">
         <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -4527,7 +4533,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
         <div className="mt-2 space-y-2">
           {weeks.map((weekDays, weekIndex) => {
             const dates = weekDays.map(cell => cell.date);
-            const segments = buildMonthWeekSegments(events, dates, null);
+            const segments = buildMonthWeekSegments(visibleMonthEvents, dates, null);
             const visibleRows = Math.max(3, segments.reduce((max, segment) => Math.max(max, segment.row + 1), 0));
             const eventLayerTop = 40;
             const rowMinHeight = Math.max(132, eventLayerTop + 18 + (visibleRows * 34));
@@ -4581,7 +4587,7 @@ function MonthView({ events, month, onClick, selectedDate, setSelectedDate, setV
           })}
         </div>
       </div>
-        {events.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">{emptyMessage || `No events scheduled for ${monthLabel(month)} yet.`}</div> : null}
+        {visibleMonthEvents.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white/60 p-4 text-center text-sm text-zinc-500">{emptyMessage || `No events scheduled for ${monthLabel(month)} yet.`}</div> : null}
       </div>
     </>
   );
@@ -10442,6 +10448,9 @@ export default function SchedulerApp() {
   const supabaseEventsRef = useRef([]);
   const supabaseEventsLoadedRef = useRef(false);
   const eventsLoadPromiseRef = useRef(null);
+  const schoolsLoadPromiseRef = useRef(null);
+  const teamMembersLoadPromiseRef = useRef(null);
+  const rolloutLoadPromiseRef = useRef(null);
 
   useEffect(() => {
     supabaseEventsRef.current = supabaseEvents;
@@ -10532,6 +10541,17 @@ export default function SchedulerApp() {
       document.removeEventListener('visibilitychange', recordVisibility);
     };
   }, [authEmail]);
+
+  const runCoalescedLoad = (promiseRef, loader) => {
+    if (promiseRef.current) return promiseRef.current;
+    const promise = Promise.resolve()
+      .then(loader)
+      .finally(() => {
+        if (promiseRef.current === promise) promiseRef.current = null;
+      });
+    promiseRef.current = promise;
+    return promise;
+  };
 
   const loadEventsFromSupabase = async () => {
     // v2.11b loading rule: keep the known-fast v2.10 event read pattern, but make
@@ -10675,7 +10695,7 @@ export default function SchedulerApp() {
     return promise;
   };
 
-  const loadSchoolsFromSupabase = async () => {
+  const loadSchoolsFromSupabase = () => runCoalescedLoad(schoolsLoadPromiseRef, async () => {
     if (!hasSupabaseEnv()) {
       setSchools([]);
       setSchoolsMessage('Supabase is not connected. School List data is not being loaded; built-in historical data will not be substituted.');
@@ -10714,9 +10734,9 @@ export default function SchedulerApp() {
     const loadedSchools = dedupeLoadedSchools(data || []);
     setSchools(loadedSchools);
     setSchoolsMessage(`Loaded ${loadedSchools.length} protected School List row${loadedSchools.length === 1 ? '' : 's'} from Supabase.`);
-  };
+  });
 
-  const loadRolloutCapacityOverrides = async () => {
+  const loadRolloutCapacityOverrides = () => runCoalescedLoad(rolloutLoadPromiseRef, async () => {
     if (!hasSupabaseEnv()) {
       setRolloutCapacityOverrides({});
       return;
@@ -10744,9 +10764,9 @@ export default function SchedulerApp() {
       if (sourceDay === 0 || next[normalizedWeekStart] === undefined) next[normalizedWeekStart] = capacity;
     });
     setRolloutCapacityOverrides(next);
-  };
+  });
 
-  const loadTeamMembersFromSupabase = async () => {
+  const loadTeamMembersFromSupabase = () => runCoalescedLoad(teamMembersLoadPromiseRef, async () => {
     if (!hasSupabaseEnv()) {
       setTeamMembersMessage('Supabase is not connected yet. Using the built-in team member list.');
       return;
@@ -10816,7 +10836,7 @@ export default function SchedulerApp() {
     setPhotographers(activePhotographers);
     setAssistants(activeAssistants);
     setTeamMembersMessage(`Loaded ${loadedStaffMembers.length} staff member${loadedStaffMembers.length === 1 ? '' : 's'} from Supabase.`);
-  };
+  });
 
   useEffect(() => {
     const localBackup = loadLocalManualEvents();
@@ -10871,7 +10891,11 @@ export default function SchedulerApp() {
       if (cancelled) return;
       setAuthReady(true);
       setAuthEmail(session?.user?.email || null);
-      if (session && ['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event)) {
+      // Initial session data is already loaded by loadAfterAuth() above. Supabase
+      // also emits INITIAL_SESSION when this listener attaches; reloading all four
+      // resources here duplicates startup traffic and can make Scheduler feel slower.
+      // Keep the existing SIGNED_IN/TOKEN_REFRESHED refresh behavior unchanged.
+      if (session && ['SIGNED_IN', 'TOKEN_REFRESHED'].includes(event)) {
         loadTeamMembersFromSupabase();
         loadSchoolsFromSupabase();
         loadEventsFromSupabase();
